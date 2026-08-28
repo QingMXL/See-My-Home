@@ -1,0 +1,53 @@
+:root {
+  /* Surfaces — warm premium light theme */
+  --color-page: oklch(99% 0.004 95);
+  --color-surface: #ffffff;
+  --color-surface-warm: oklch(97.5% 0.008 85);
+  --color-surface-sunken: oklch(96.5% 0.006 90);
+  --color-ink: oklch(17% 0.005 80);
+  --color-ink-soft: oklch(42% 0.008 80);
+  --color-ink-faint: oklch(58% 0.008 80);
+  --color-line: oklch(90% 0.006 90);
+  --color-line-strong: oklch(80% 0.008 90);
+  --color-accent: oklch(55% 0.11 55);
+  --color-accent-soft: oklch(94% 0.03 70);
+  --color-success: oklch(58% 0.12 150);
+  --color-success-soft: oklch(95% 0.04 150);
+  --color-danger: oklch(55% 0.19 25);
+
+  /* Typography */
+  --font-sans: "Inter", -apple-system, "SF Pro Display", "Segoe UI", sans-serif;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: clamp(0.9375rem, 0.9rem + 0.2vw, 1rem);
+  --text-lg: 1.125rem;
+  --text-xl: clamp(1.25rem, 1.1rem + 0.6vw, 1.5rem);
+  --text-2xl: clamp(1.6rem, 1.3rem + 1.2vw, 2.1rem);
+  --text-hero: clamp(2.4rem, 1.6rem + 3.6vw, 4.25rem);
+
+  /* Spacing */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-section: clamp(3rem, 2rem + 4vw, 6rem);
+  --page-max: 82rem;
+  --page-pad: clamp(1rem, 0.5rem + 2.5vw, 3rem);
+
+  /* Radii + shadows */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --radius-pill: 999px;
+  --shadow-card: 0 1px 2px oklch(20% 0.01 80 / 0.05), 0 8px 24px oklch(20% 0.01 80 / 0.06);
+  --shadow-float: 0 2px 6px oklch(20% 0.01 80 / 0.08), 0 16px 40px oklch(20% 0.01 80 / 0.12);
+
+  /* Motion */
+  --duration-fast: 150ms;
+  --duration-normal: 300ms;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
