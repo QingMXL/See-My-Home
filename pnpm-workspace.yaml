@@ -3,3 +3,6 @@ packages:
   - Home-Layout-Agent
   - Home-Style-Agent
   - Home-Furniture-Agent
+
+allowBuilds:
+  esbuild: true
