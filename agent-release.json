@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "release_set": "2026-09-04.1",
+  "release_set": "2026-09-04.2",
   "agents": {
     "home-layout": {
       "directory": "Home-Layout-Agent",
@@ -23,7 +23,7 @@
     "home-furniture": {
       "directory": "Home-Furniture-Agent",
       "package": "@see-my-home/home-furniture-agent",
-      "package_version": "0.1.0",
+      "package_version": "0.2.0",
       "runtime_contract": "home-furniture-v1",
       "agent_id_env": "ZOOWORK_FURNITURE_AGENT_ID",
       "api_namespace": "/api/home-furniture",

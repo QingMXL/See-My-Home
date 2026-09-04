@@ -201,6 +201,33 @@ function getAsset(value: unknown, projectId: string, kind: UploadedAsset['source
   return asset;
 }
 
+function sourcePriority(input: Record<string, unknown>, hasSketch: boolean, hasInspiration: boolean): FurnitureTurnRequest['source_priority'] {
+  if (hasSketch && hasInspiration) {
+    if (input.source_priority === undefined) return { sketch: 0.8, inspiration: 0.2 };
+    if (typeof input.source_priority !== 'object' || input.source_priority === null || Array.isArray(input.source_priority)) {
+      throw new Error('source_priority must be an object');
+    }
+    const requested = input.source_priority as Record<string, unknown>;
+    const sketch = requested.sketch;
+    const inspiration = requested.inspiration;
+    if (
+      typeof sketch !== 'number'
+      || typeof inspiration !== 'number'
+      || !Number.isFinite(sketch)
+      || !Number.isFinite(inspiration)
+      || sketch <= 0
+      || inspiration <= 0
+      || sketch >= 1
+      || inspiration >= 1
+      || Math.abs(sketch + inspiration - 1) > 0.0001
+    ) throw new Error('source_priority must contain positive sketch and inspiration weights that add up to 1');
+    return { sketch, inspiration };
+  }
+  if (hasSketch) return { sketch: 1, inspiration: 0 };
+  if (hasInspiration) return { sketch: 0, inspiration: 1 };
+  return { sketch: 0, inspiration: 0 };
+}
+
 async function runGeneration(input: Record<string, unknown>) {
   const projectId = requireString(input.project_id, 'project_id');
   const tableType = requireString(input.table_type, 'table_type') as TableType;
@@ -219,7 +246,7 @@ async function runGeneration(input: Record<string, unknown>) {
     ...(sketch ? { sketch_asset_ref: sourceUrl(sketch) } : {}),
     ...(inspiration ? { inspiration_asset_ref: sourceUrl(inspiration) } : {}),
     ...(description ? { description } : {}),
-    source_priority: sketch && inspiration ? { sketch: 0.8, inspiration: 0.2 } : sketch ? { sketch: 1, inspiration: 0 } : inspiration ? { sketch: 0, inspiration: 1 } : { sketch: 0, inspiration: 0 },
+    source_priority: sourcePriority(input, Boolean(sketch), Boolean(inspiration)),
     design_controls: controls(input),
   };
   const result = await runtime.runFurnitureTurn(conversation, request);

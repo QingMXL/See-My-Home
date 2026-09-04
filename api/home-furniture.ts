@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { ZooworkError } from '@zoowork-ai/sdk';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import type {
   FurnitureDesignControls,
   FurnitureTurnRequest,
@@ -75,6 +76,56 @@ interface FurnitureApiInput extends Record<string, unknown> {
   finish?: unknown;
   storage?: unknown;
   component_notes?: unknown;
+  source_priority?: unknown;
+}
+
+interface FurnitureJob {
+  version: 1;
+  sessionId: string;
+  postedSeq: number;
+  requestId: string;
+  projectId: string;
+  type: 'agent.generate' | 'agent.refine';
+  expiresAt: number;
+}
+
+function jobSecret(): string {
+  const value = process.env.ZOOWORK_API_KEY?.trim();
+  if (!value) throw new Error('ZOOWORK_API_KEY is not configured on Vercel');
+  return value;
+}
+
+function signJob(job: FurnitureJob): string {
+  const payload = Buffer.from(JSON.stringify(job), 'utf8').toString('base64url');
+  const signature = createHmac('sha256', jobSecret()).update(payload).digest('base64url');
+  return `${payload}.${signature}`;
+}
+
+function verifyJob(value: unknown): FurnitureJob | null {
+  if (value === undefined) return null;
+  if (typeof value !== 'string' || value.length < 20 || value.length > 4096) throw new Error('job_token is invalid');
+  const parts = value.split('.');
+  if (parts.length !== 2 || !parts[0] || !parts[1]) throw new Error('job_token is invalid');
+  const expected = createHmac('sha256', jobSecret()).update(parts[0]).digest();
+  let actual: Buffer;
+  try { actual = Buffer.from(parts[1], 'base64url'); } catch { throw new Error('job_token is invalid'); }
+  if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) throw new Error('job_token is invalid');
+  let parsed: unknown;
+  try { parsed = JSON.parse(Buffer.from(parts[0], 'base64url').toString('utf8')); } catch { throw new Error('job_token is invalid'); }
+  const job = objectBody(parsed);
+  if (
+    job.version !== 1
+    || typeof job.sessionId !== 'string'
+    || typeof job.postedSeq !== 'number'
+    || !Number.isSafeInteger(job.postedSeq)
+    || job.postedSeq < 0
+    || typeof job.requestId !== 'string'
+    || typeof job.projectId !== 'string'
+    || (job.type !== 'agent.generate' && job.type !== 'agent.refine')
+    || typeof job.expiresAt !== 'number'
+    || job.expiresAt < Date.now()
+  ) throw new Error('job_token is invalid or expired');
+  return job as unknown as FurnitureJob;
 }
 
 function optionalString(value: unknown, field: string, maxLength: number): string {
@@ -113,8 +164,29 @@ function parseControls(input: FurnitureApiInput): FurnitureDesignControls {
   };
 }
 
-function sourcePriority(hasSketch: boolean, hasInspiration: boolean): FurnitureTurnRequest['source_priority'] {
-  if (hasSketch && hasInspiration) return { sketch: 0.8, inspiration: 0.2 };
+function sourcePriority(
+  input: FurnitureApiInput,
+  hasSketch: boolean,
+  hasInspiration: boolean,
+): FurnitureTurnRequest['source_priority'] {
+  if (hasSketch && hasInspiration) {
+    if (input.source_priority === undefined) return { sketch: 0.8, inspiration: 0.2 };
+    const requested = objectBody(input.source_priority);
+    const sketch = requested.sketch;
+    const inspiration = requested.inspiration;
+    if (
+      typeof sketch !== 'number'
+      || typeof inspiration !== 'number'
+      || !Number.isFinite(sketch)
+      || !Number.isFinite(inspiration)
+      || sketch <= 0
+      || inspiration <= 0
+      || sketch >= 1
+      || inspiration >= 1
+      || Math.abs(sketch + inspiration - 1) > 0.0001
+    ) throw new Error('source_priority must contain positive sketch and inspiration weights that add up to 1');
+    return { sketch, inspiration };
+  }
   if (hasSketch) return { sketch: 1, inspiration: 0 };
   if (hasInspiration) return { sketch: 0, inspiration: 1 };
   return { sketch: 0, inspiration: 0 };
@@ -122,7 +194,13 @@ function sourcePriority(hasSketch: boolean, hasInspiration: boolean): FurnitureT
 
 async function generate(request: VercelRequest, response: VercelResponse, refine: boolean): Promise<void> {
   const body = objectBody(request.body);
-  const base = (refine ? objectBody(body.base_input) : body) as FurnitureApiInput;
+  const type = refine ? 'agent.refine' : 'agent.generate';
+  const job = verifyJob(body.job_token);
+  const base = (refine ? objectBody(body.base_input) : (() => {
+    const input = { ...body };
+    delete input.job_token;
+    return input;
+  })()) as FurnitureApiInput;
   const overrides = refine ? objectBody(body.controls) : {};
   const input = { ...base, ...overrides } as FurnitureApiInput;
   if (refine && body.description !== undefined) input.description = body.description;
@@ -142,26 +220,59 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
   if (!sketchBlobUrl && !inspirationBlobUrl && !description) {
     throw new Error('Provide a sketch, an inspiration image, or a written description');
   }
+  if (job && (job.projectId !== projectId || job.type !== type)) {
+    throw new Error('job_token does not match this request');
+  }
 
   const sketchRef = sketchBlobUrl ? await temporaryBlobReadUrl(sketchBlobUrl) : undefined;
   const inspirationRef = inspirationBlobUrl ? await temporaryBlobReadUrl(inspirationBlobUrl) : undefined;
   const zoo = runtime();
-  await zoo.ensureRunning();
-  const conversation = await zoo.createConversation(projectId, newId(`furniture_${refine ? 'refine' : 'generate'}_${projectId}`));
+  const requestId = job?.requestId ?? newId('req');
   const turn: FurnitureTurnRequest = {
     contract_version: 'home-furniture-v1',
-    request_id: newId('req'),
+    request_id: requestId,
     project_id: projectId,
     locale,
     table_type: tableType,
     ...(sketchRef ? { sketch_asset_ref: sketchRef } : {}),
     ...(inspirationRef ? { inspiration_asset_ref: inspirationRef } : {}),
     ...(description ? { description } : {}),
-    source_priority: sourcePriority(Boolean(sketchRef), Boolean(inspirationRef)),
+    source_priority: sourcePriority(input, Boolean(sketchRef), Boolean(inspirationRef)),
     design_controls: parseControls(input),
   };
 
-  const result = await zoo.runFurnitureTurn(conversation, turn);
+  if (!job) {
+    await zoo.ensureRunning();
+    const conversation = await zoo.createConversation(projectId, newId(`furniture_${refine ? 'refine' : 'generate'}_${projectId}`));
+    const started = await zoo.startFurnitureTurn(conversation, turn);
+    sendJson(response, 202, {
+      status: 'processing',
+      job_token: signJob({
+        version: 1,
+        sessionId: conversation.sessionId,
+        postedSeq: started.postedSeq,
+        requestId,
+        projectId,
+        type,
+        expiresAt: Date.now() + 30 * 60 * 1000,
+      }),
+      poll_after_ms: 3_000,
+    });
+    return;
+  }
+
+  const conversation = { agentId: zoo.agentId, sessionId: job.sessionId };
+  const polled = await zoo.pollFurnitureTurn(conversation, turn, job.postedSeq);
+  if (polled.status === 'processing') {
+    sendJson(response, 202, {
+      status: 'processing',
+      job_token: signJob(job),
+      poll_after_ms: 3_000,
+    });
+    return;
+  }
+
+  const result = polled.result;
   const artifact = result.artifacts.find((candidate) => candidate.status === 'ready'
     && (candidate.contentType?.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(candidate.fileName ?? '')));
   if (!artifact) throw new Error(result.response.warnings.join(' ') || 'Home Furniture Agent completed without a readable published image artifact');
@@ -192,6 +303,7 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
       locale,
       table_type: tableType,
       description,
+      source_priority: turn.source_priority,
       ...turn.design_controls,
     },
   });

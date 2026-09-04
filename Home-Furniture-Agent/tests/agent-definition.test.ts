@@ -11,7 +11,7 @@ test('creates a session-scoped Home Furniture Agent resource', () => {
   assert.equal(resource.labels?.runtime_contract, 'home-furniture-v1');
   assert.deepEqual(resource.tool_policy, HOME_FURNITURE_TOOL_POLICY);
   const persona = resource.persona?.docs?.[0]?.content ?? '';
-  assert.match(persona, /sketch is the primary form authority/i);
+  assert.match(persona, /relative design-evidence weight/i);
   assert.match(persona, /concept design/i);
   assert.match(persona, /front, side, and top line views/i);
 });

@@ -139,12 +139,15 @@ export async function syncFurnitureSkills(client: ZooworkClient): Promise<SkillR
     if (matches.length !== 1 || !matches[0]) throw new Error(`Expected one owned ${skillName} skill, found ${matches.length}`);
     const bytes = archiveBytes(skillName);
     const digest = createHash('sha256').update(bytes).digest('hex').slice(0, 20);
-    const next = await client.uploadSkillVersion(matches[0].skill_id, bytes, {
+    await client.uploadSkillVersion(matches[0].skill_id, bytes, {
       fileName: `${skillName}.zip`,
       idempotencyKey: `see-my-home:${skillName}:${digest}`,
     });
-    await attachPinnedSkill(client, agentId, next);
-    updated.push(next);
+    const refreshed = (await client.listSkills({ q: skillName }))
+      .find((skill) => skill.skill_id === matches[0]?.skill_id);
+    if (!refreshed) throw new Error(`Uploaded ${skillName} but could not read its current registry version`);
+    await attachPinnedSkill(client, agentId, refreshed);
+    updated.push(refreshed);
   }
   return updated;
 }

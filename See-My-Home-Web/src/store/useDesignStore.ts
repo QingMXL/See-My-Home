@@ -60,6 +60,7 @@ interface FurnitureFlowState {
   inspirationName: string | null;
   inspirationUrl: string | null;
   inspirationAsset: UploadedFurnitureAsset | null;
+  sketchWeight: number;
   tableType: FurnitureTableType;
   prompt: string;
   material: string;
@@ -112,6 +113,7 @@ interface DesignStore {
   setFurniturePrompt: (prompt: string) => void;
   setFurnitureSource: (kind: "sketch" | "inspiration", name: string | null, url: string | null) => void;
   setFurnitureUploadedAsset: (kind: "sketch" | "inspiration", asset: UploadedFurnitureAsset | null) => void;
+  setFurnitureSketchWeight: (weight: number) => void;
   setFurnitureTableType: (tableType: FurnitureTableType) => void;
   setFurnitureOption: (key: "material" | "size" | "legs" | "handles" | "shelves", value: string) => void;
   setFurnitureAppearance: (key: "secondaryMaterial" | "topShape" | "edgeProfile" | "finish", value: string) => void;
@@ -161,6 +163,7 @@ const initialFurniture: FurnitureFlowState = {
   inspirationName: null,
   inspirationUrl: null,
   inspirationAsset: null,
+  sketchWeight: 80,
   tableType: "dining_table",
   prompt: "一张轮廓简洁的实木餐桌，保留手绘草图中的桌面比例和腿部位置。",
   material: "Walnut",
@@ -347,6 +350,14 @@ export const useDesignStore = create<DesignStore>()(
         ...(kind === "sketch" ? { sketchAsset: asset } : { inspirationAsset: asset }),
       },
     })),
+  setFurnitureSketchWeight: (sketchWeight) =>
+    set((s) => ({
+      furniture: {
+        ...s.furniture,
+        sketchWeight: Math.min(95, Math.max(5, Math.round(sketchWeight / 5) * 5)),
+        confirmed: false,
+      },
+    })),
   setFurnitureTableType: (tableType) =>
     set((s) => ({ furniture: { ...s.furniture, tableType, confirmed: false } })),
   setFurnitureOption: (key, value) =>
@@ -398,6 +409,7 @@ export const useDesignStore = create<DesignStore>()(
           projectId: s.furniture.projectId,
           sketchName: s.furniture.sketchName,
           inspirationName: s.furniture.inspirationName,
+          sketchWeight: s.furniture.sketchWeight ?? initialFurniture.sketchWeight,
           tableType: s.furniture.tableType,
           prompt: s.furniture.prompt,
           material: s.furniture.material,

@@ -51,6 +51,14 @@ interface RawTurnResult {
   runId?: string;
 }
 
+export interface FurnitureTurnStart {
+  postedSeq: number;
+}
+
+export type FurnitureTurnPoll =
+  | { status: 'processing'; postedSeq: number }
+  | { status: 'completed'; result: FurnitureTurnResult };
+
 export class HomeFurnitureRuntime {
   readonly agentId: string;
   readonly turnTimeoutMs: number;
@@ -97,6 +105,33 @@ export class HomeFurnitureRuntime {
     assertFurnitureTurnRequest(request);
     if (conversation.agentId !== this.agentId) throw new Error('conversation belongs to a different Agent');
     const raw = await this.postAndRead(conversation.sessionId, this.buildEvents(request), request.request_id);
+    return this.resultFromRaw(conversation.sessionId, request, raw);
+  }
+
+  async startFurnitureTurn(conversation: ConversationHandle, request: FurnitureTurnRequest): Promise<FurnitureTurnStart> {
+    assertFurnitureTurnRequest(request);
+    if (conversation.agentId !== this.agentId) throw new Error('conversation belongs to a different Agent');
+    return { postedSeq: await this.postTurnEvents(conversation.sessionId, this.buildEvents(request)) };
+  }
+
+  async pollFurnitureTurn(
+    conversation: ConversationHandle,
+    request: FurnitureTurnRequest,
+    postedSeq: number,
+  ): Promise<FurnitureTurnPoll> {
+    assertFurnitureTurnRequest(request);
+    if (conversation.agentId !== this.agentId) throw new Error('conversation belongs to a different Agent');
+    if (!Number.isSafeInteger(postedSeq) || postedSeq < 0) throw new Error('postedSeq is invalid');
+    const raw = await this.readDurableTurn(conversation.sessionId, postedSeq);
+    if (!raw) return { status: 'processing', postedSeq };
+    return { status: 'completed', result: await this.resultFromRaw(conversation.sessionId, request, raw) };
+  }
+
+  private async resultFromRaw(
+    sessionId: string,
+    request: FurnitureTurnRequest,
+    raw: RawTurnResult,
+  ): Promise<FurnitureTurnResult> {
     if (raw.outcome !== 'succeeded') throw new Error(`ZooWork run ended with status ${raw.outcome}`);
     const response = parseFurnitureAgentResponse(raw.text);
     assertResponseMatchesRequest(response, request);
@@ -106,7 +141,7 @@ export class HomeFurnitureRuntime {
       && response.qa.function_plausible
       && response.qa.publishable;
     const artifacts = response.status === 'completed' && passedQa
-      ? await this.artifactsForTurn(conversation.sessionId, raw.runId, raw.toolCalls, request.request_id)
+      ? await this.artifactsForTurn(sessionId, raw.runId, raw.toolCalls, request.request_id)
       : [];
     const result: FurnitureTurnResult = {
       response,
@@ -139,9 +174,13 @@ export class HomeFurnitureRuntime {
         runtime_contract: 'home-furniture-v1',
         runtime_timestamp: new Date().toISOString(),
         source_authority: {
-          primary: request.sketch_asset_ref ? 'sketch' : request.inspiration_asset_ref ? 'inspiration' : 'text',
+          primary: request.sketch_asset_ref && request.inspiration_asset_ref
+            ? request.source_priority.sketch === request.source_priority.inspiration
+              ? 'balanced'
+              : request.source_priority.sketch > request.source_priority.inspiration ? 'sketch' : 'inspiration'
+            : request.sketch_asset_ref ? 'sketch' : request.inspiration_asset_ref ? 'inspiration' : 'text',
           priority: request.source_priority,
-          rule: 'Sketch controls form and topology; inspiration controls secondary aesthetic language; exact dimensions are hard constraints. The numeric priority is decision guidance, not an image-tool parameter.',
+          rule: 'Move the design closer to the higher-weight image and retain proportionally fewer cues from the lower-weight image. Equal weights require a balanced synthesis. Exact dimensions are hard constraints. Numeric priority is design-decision guidance, not an image-tool parameter.',
         },
         contracts: { request_schema: REQUEST_SCHEMA, response_schema: RESPONSE_SCHEMA },
         request,
@@ -165,12 +204,7 @@ export class HomeFurnitureRuntime {
   }
 
   private async postAndRead(sessionId: string, events: OutboundEvent[], requestId: string): Promise<RawTurnResult> {
-    const receipt = await this.client.postEvents(this.agentId, sessionId, events);
-    const rejected = receipt.events.find((event) => event.accepted !== true);
-    if (rejected) throw new Error(`ZooWork rejected outbound event ${rejected.type ?? 'unknown'}`);
-    const posted = receipt.events.find((event) => event.type === 'user.message');
-    const postedSeq = typeof posted?.seq === 'number' ? posted.seq : undefined;
-    if (postedSeq === undefined) throw new Error('ZooWork accepted the user turn without returning its sequence');
+    const postedSeq = await this.postTurnEvents(sessionId, events);
 
     const assistantBySeq = new Map<number, string>();
     const toolsBySeq = new Map<number, AgentToolTrace>();
@@ -252,6 +286,61 @@ export class HomeFurnitureRuntime {
       toolCalls: [...toolsBySeq.entries()].sort(([a], [b]) => a - b).map(([, call]) => call),
     };
     if (cursor !== undefined) result.cursor = cursor;
+    if (runId !== undefined) result.runId = runId;
+    return result;
+  }
+
+  private async postTurnEvents(sessionId: string, events: OutboundEvent[]): Promise<number> {
+    const receipt = await this.client.postEvents(this.agentId, sessionId, events);
+    const rejected = receipt.events.find((event) => event.accepted !== true);
+    if (rejected) throw new Error(`ZooWork rejected outbound event ${rejected.type ?? 'unknown'}`);
+    const posted = receipt.events.find((event) => event.type === 'user.message');
+    if (typeof posted?.seq !== 'number') {
+      throw new Error('ZooWork accepted the user turn without returning its sequence');
+    }
+    return posted.seq;
+  }
+
+  private async readDurableTurn(sessionId: string, postedSeq: number): Promise<RawTurnResult | null> {
+    const events = await this.client.listAllEvents(this.agentId, sessionId, {
+      types: ['run.started', 'run.finished', 'agent.assistant', 'agent.tool'],
+    });
+    const assistantBySeq = new Map<number, string>();
+    const toolsBySeq = new Map<number, AgentToolTrace>();
+    let runId: string | undefined;
+    let outcome: RawTurnResult['outcome'] | undefined;
+
+    for (const event of [...events].sort((left, right) => left.seq - right.seq)) {
+      if (event.seq <= postedSeq) continue;
+      if (event.eventType === 'run.started') runId = event.runId;
+      const text = assistantText(event);
+      if (text) assistantBySeq.set(event.seq, text);
+      const call = toolCall(event);
+      if (call) {
+        toolsBySeq.set(event.seq, {
+          phase: call.phase,
+          ...(call.toolName ? { toolName: call.toolName } : {}),
+          ...(call.toolCallId ? { toolCallId: call.toolCallId } : {}),
+          ...(call.isError !== undefined ? { isError: call.isError } : {}),
+          ...(call.resultPreview ? { resultPreview: call.resultPreview } : {}),
+        });
+      }
+      if (!isRunFinished(event)) continue;
+      const candidate = runOutcome(event);
+      if (!candidate) continue;
+      if (candidate !== 'succeeded' || (this.hasJson(assistantBySeq) && this.hasTerminalTool(toolsBySeq))) {
+        outcome = candidate;
+        runId = event.runId ?? runId;
+        break;
+      }
+    }
+
+    if (!outcome) return null;
+    const result: RawTurnResult = {
+      text: [...assistantBySeq.entries()].sort(([a], [b]) => a - b).map(([, text]) => text).join(''),
+      outcome,
+      toolCalls: [...toolsBySeq.entries()].sort(([a], [b]) => a - b).map(([, call]) => call),
+    };
     if (runId !== undefined) result.runId = runId;
     return result;
   }

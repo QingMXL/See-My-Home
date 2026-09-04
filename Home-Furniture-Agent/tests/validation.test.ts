@@ -64,6 +64,10 @@ test('accepts sketch-led, inspiration-led, and text-only table requests', () => 
   assert.doesNotThrow(() => assertFurnitureTurnRequest(validRequest));
   assert.doesNotThrow(() => assertFurnitureTurnRequest({
     ...validRequest,
+    source_priority: { sketch: 0.55, inspiration: 0.45 },
+  }));
+  assert.doesNotThrow(() => assertFurnitureTurnRequest({
+    ...validRequest,
     sketch_asset_ref: undefined,
     source_priority: { sketch: 0, inspiration: 1 },
   }));

@@ -90,6 +90,13 @@ export interface FurnitureGenerateInput {
   finish: string;
   storage: string;
   component_notes?: string;
+  source_priority?: { sketch: number; inspiration: number };
+}
+
+interface FurnitureGenerationPending {
+  status: "processing";
+  job_token: string;
+  poll_after_ms: number;
 }
 
 export interface FurnitureGenerationResult {
@@ -115,7 +122,12 @@ async function readResponse<T>(response: Response): Promise<T> {
   try {
     data = JSON.parse(raw) as T & { error?: string };
   } catch {
-    throw new Error(`Home Furniture Agent returned an invalid response (${response.status})`);
+    const detail = raw.trim().replace(/\s+/g, " ").slice(0, 240);
+    throw new Error(
+      response.ok
+        ? "The Home Furniture Agent returned an invalid server response."
+        : `Home Furniture Agent request failed (${response.status})${detail ? `: ${detail}` : ""}`,
+    );
   }
   if (!response.ok) throw new Error(data.error ?? `Home Furniture Agent request failed (${response.status})`);
   return data;
@@ -177,12 +189,11 @@ export async function uploadFurnitureImage(
 }
 
 export async function generateFurniture(input: FurnitureGenerateInput): Promise<FurnitureGenerationResult> {
-  const response = await fetchWithTimeout("/api/home-furniture/events/agent.generate", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  }, 720_000, input.locale === "zh-CN" ? "Home Furniture Agent 处理超时，请重试。" : "The Home Furniture Agent timed out. Please try again.");
-  return readResponse<FurnitureGenerationResult>(response);
+  return runFurnitureGeneration(
+    "/api/home-furniture/events/agent.generate",
+    input,
+    input.locale === "zh-CN" ? "Home Furniture Agent 处理超时，请重试。" : "The Home Furniture Agent timed out. Please try again.",
+  );
 }
 
 export async function refineFurniture(
@@ -191,10 +202,37 @@ export async function refineFurniture(
   controls: Partial<FurnitureGenerateInput>,
   description: string,
 ): Promise<FurnitureGenerationResult> {
-  const response = await fetchWithTimeout("/api/home-furniture/events/agent.refine", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ base_input: baseInput, locale, controls, description }),
-  }, 720_000, locale === "zh-CN" ? "Home Furniture Agent 调整超时，请重试。" : "The Home Furniture Agent refinement timed out. Please try again.");
-  return readResponse<FurnitureGenerationResult>(response);
+  return runFurnitureGeneration(
+    "/api/home-furniture/events/agent.refine",
+    { base_input: baseInput, locale, controls, description },
+    locale === "zh-CN" ? "Home Furniture Agent 调整超时，请重试。" : "The Home Furniture Agent refinement timed out. Please try again.",
+  );
+}
+
+async function runFurnitureGeneration(
+  endpoint: string,
+  input: object,
+  timeoutMessage: string,
+): Promise<FurnitureGenerationResult> {
+  const deadline = Date.now() + 900_000;
+  let jobToken: string | undefined;
+  while (Date.now() < deadline) {
+    const response = await fetchWithTimeout(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...input, ...(jobToken ? { job_token: jobToken } : {}) }),
+    }, 60_000, timeoutMessage);
+    const result = await readResponse<FurnitureGenerationResult | FurnitureGenerationPending>(response);
+    if (result && "status" in result && result.status === "processing") {
+      if (typeof result.job_token !== "string" || !result.job_token) {
+        throw new Error("The Home Furniture Agent returned an invalid processing ticket.");
+      }
+      jobToken = result.job_token;
+      const delayMs = Math.min(10_000, Math.max(500, result.poll_after_ms || 3_000));
+      await new Promise((resolveDelay) => window.setTimeout(resolveDelay, delayMs));
+      continue;
+    }
+    return result as FurnitureGenerationResult;
+  }
+  throw new Error(timeoutMessage);
 }

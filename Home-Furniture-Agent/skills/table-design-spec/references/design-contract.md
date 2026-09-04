@@ -1,8 +1,8 @@
 # Table concept design contract
 
-The sketch is the primary form authority when present. Preserve its recognizable number and arrangement of tops, supports, aprons, stretchers, shelves, drawers, and other major components. Exact numeric controls override apparent sketch scale because a freehand drawing is not measured evidence.
+When both images are present, `source_priority` controls their relative authority. A higher sketch value preserves more of its recognizable number and arrangement of tops, supports, aprons, stretchers, shelves, drawers, silhouette, and proportions. A higher inspiration value moves the concept closer to its observable overall form and material language while retaining only the sketch cues supported by the remaining weight. Equal values require a balanced synthesis. Never copy logos, brand identifiers, or an entire protected product.
 
-The inspiration image is secondary. Borrow observable design language without copying logos, brand identifiers, or an entire protected product. When there is no sketch, the inspiration image may become the primary visual reference, but explicit text and dimensions still control function and size.
+When only one image is present, it is the sole visual reference. Exact numeric controls always override apparent image scale because neither a freehand drawing nor a perspective photograph is measured evidence.
 
 ## Supported table families
 

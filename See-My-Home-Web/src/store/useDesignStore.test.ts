@@ -100,4 +100,12 @@ describe("useDesignStore", () => {
     expect(useDesignStore.getState().furniture.material).toBe("White Oak");
     expect(useDesignStore.getState().furniture.confirmed).toBe(false);
   });
+
+  test("normalizes the adjustable sketch weight to safe five-point steps", () => {
+    useDesignStore.getState().setFurnitureSketchWeight(63);
+    expect(useDesignStore.getState().furniture.sketchWeight).toBe(65);
+
+    useDesignStore.getState().setFurnitureSketchWeight(100);
+    expect(useDesignStore.getState().furniture.sketchWeight).toBe(95);
+  });
 });

@@ -52,13 +52,6 @@ function sizeDimensions(size: string) {
   return SIZE_PRESETS.find((preset) => preset.label === size)?.dimensions ?? SIZE_PRESETS[0].dimensions;
 }
 
-function sourcePriorityLabel(hasSketch: boolean, hasInspiration: boolean, lang: "en" | "zh") {
-  if (hasSketch && hasInspiration) return lang === "zh" ? "草图 80% · 灵感图 20%" : "Sketch 80% · inspiration 20%";
-  if (hasSketch) return lang === "zh" ? "草图 100%" : "Sketch 100%";
-  if (hasInspiration) return lang === "zh" ? "灵感图 100%" : "Inspiration 100%";
-  return lang === "zh" ? "纯文字模式" : "Text-only mode";
-}
-
 export function FurniturePage() {
   const { t, tTag, lang } = useI18n();
   const furniture = useDesignStore((state) => state.furniture);
@@ -66,6 +59,7 @@ export function FurniturePage() {
     setFurniturePrompt,
     setFurnitureSource,
     setFurnitureUploadedAsset,
+    setFurnitureSketchWeight,
     setFurnitureTableType,
     setFurnitureOption,
     setFurnitureAppearance,
@@ -80,6 +74,12 @@ export function FurniturePage() {
   const drawingsRef = useRef<HTMLElement>(null);
   const [uploading, setUploading] = useState<FurnitureSourceKind | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const hasSketch = Boolean(furniture.sketchAsset);
+  const hasInspiration = Boolean(furniture.inspirationAsset);
+  const hasBothImages = hasSketch && hasInspiration;
+  const sketchWeight = furniture.sketchWeight ?? 80;
+  const visibleSketchWeight = hasBothImages ? sketchWeight : hasSketch ? 100 : hasInspiration ? 0 : sketchWeight;
+  const visibleInspirationWeight = hasBothImages ? 100 - sketchWeight : hasInspiration ? 100 : hasSketch ? 0 : 100 - sketchWeight;
 
   const copy = (en: string, zh: string) => (lang === "zh" ? zh : en);
   const steps = [
@@ -104,6 +104,7 @@ export function FurniturePage() {
     finish: furniture.finish,
     storage: furniture.shelves,
     component_notes: furniture.handles,
+    ...(hasBothImages ? { source_priority: { sketch: sketchWeight / 100, inspiration: (100 - sketchWeight) / 100 } } : {}),
   });
 
   const onUpload = async (kind: FurnitureSourceKind, event: ChangeEvent<HTMLInputElement>) => {
@@ -187,19 +188,35 @@ export function FurniturePage() {
 
       <div className="furniture-grid">
         <section className="card card--pad input-panel" aria-label={t("furn.input")}>
-          <div><h2 className="input-panel__title">{t("furn.input")}</h2><p className="input-panel__priority">{sourcePriorityLabel(Boolean(furniture.sketchAsset), Boolean(furniture.inspirationAsset), lang)}</p></div>
+          <div><h2 className="input-panel__title">{t("furn.input")}</h2></div>
           <input ref={sketchInputRef} className="furniture-file-input" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => onUpload("sketch", event)} />
           <input ref={inspirationInputRef} className="furniture-file-input" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => onUpload("inspiration", event)} />
           <button type="button" className="furniture-upload" disabled={Boolean(uploading)} onClick={() => sketchInputRef.current?.click()}>
             {furniture.sketchUrl ? <img src={furniture.sketchUrl} alt={furniture.sketchName ?? t("furn.sketch")} /> : <span className="furniture-upload__plus">+</span>}
-            <span><strong>{t("furn.sketch")}</strong><small>{copy("Primary form source · 80% when both images are used", "主要造型依据 · 两张图同时使用时占 80%")}</small></span>
+            <span><strong>{t("furn.sketch")}</strong><small>{copy("Form", "造型")}</small></span>
             <em>{uploading === "sketch" ? copy("Uploading…", "上传中…") : furniture.sketchName ?? copy("Choose image", "选择图片")}</em>
           </button>
           <button type="button" className="furniture-upload" disabled={Boolean(uploading)} onClick={() => inspirationInputRef.current?.click()}>
             {furniture.inspirationUrl ? <img src={furniture.inspirationUrl} alt={furniture.inspirationName ?? t("furn.inspiration")} /> : <span className="furniture-upload__plus">+</span>}
-            <span><strong>{t("furn.inspiration")}</strong><small>{copy("Secondary material and style source · 20%", "辅助材质与风格依据 · 同时使用时占 20%")}</small></span>
+            <span><strong>{t("furn.inspiration")}</strong><small>{copy("Style", "风格")}</small></span>
             <em>{uploading === "inspiration" ? copy("Uploading…", "上传中…") : furniture.inspirationName ?? copy("Choose image", "选择图片")}</em>
           </button>
+          <div className={`source-mix${hasBothImages ? "" : " source-mix--disabled"}`}>
+            <div className="source-mix__labels" aria-hidden="true">
+              <span><strong>{copy("Sketch", "草图")}</strong><small>{visibleSketchWeight}%</small></span>
+              <span><small>{visibleInspirationWeight}%</small><strong>{copy("Inspiration", "灵感")}</strong></span>
+            </div>
+            <input
+              aria-label={copy("Balance sketch and inspiration", "调整草图与灵感图倾向")}
+              type="range"
+              min="5"
+              max="95"
+              step="5"
+              value={hasBothImages ? 100 - sketchWeight : hasSketch ? 5 : hasInspiration ? 95 : 20}
+              disabled={!hasBothImages}
+              onChange={(event) => setFurnitureSketchWeight(100 - Number(event.target.value))}
+            />
+          </div>
           <div className="input-panel__prompt">
             <label htmlFor="furniture-prompt" className="tag-group__name">{t("furn.prompt")}</label>
             <textarea id="furniture-prompt" rows={4} value={furniture.prompt} onChange={(event) => setFurniturePrompt(event.target.value)} placeholder={copy("Describe the table, key features, and what must stay unchanged.", "描述桌子的用途、关键造型，以及哪些部分必须保留。")}/>

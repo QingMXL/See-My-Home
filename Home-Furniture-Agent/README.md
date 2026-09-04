@@ -2,8 +2,8 @@
 
 ZooWork managed-Agent runtime for `home-furniture-v1`. Version 1 designs tables
 from a hand sketch, one inspiration image, text, or any supported combination.
-When both images are present, the sketch is the 80% form authority and the
-inspiration image supplies 20% of the material and style direction.
+When both images are present, the UI sends an adjustable sketch-versus-inspiration
+weight (80/20 by default) that controls which reference the concept should resemble more.
 
 The Agent publishes one concept render plus a validated JSON specification. The
 web application derives front, side, and top line drawings from the same canonical
