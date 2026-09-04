@@ -17,6 +17,30 @@ test('accepts the canonical request, model, and response fixtures', () => {
   assert.doesNotThrow(() => assertRoomMapResponse(validRoomMapResponse()));
 });
 
+test('accepts long private Blob signed URLs as asset references', () => {
+  const signedAssetRef = `https://example.public.blob.vercel-storage.com/uploads/layout/plan.png?token=${'a'.repeat(3000)}`;
+  const request = validRequest();
+  request.evidence[0]!.asset_ref = signedAssetRef;
+  assert.doesNotThrow(() => assertHomeTurnRequest(request));
+
+  const model = validHomeModel();
+  const sources = model.sources as Array<Record<string, unknown>>;
+  sources[0]!.asset_ref = signedAssetRef;
+  assert.doesNotThrow(() => assertHomeModel(model));
+});
+
+test('keeps asset references bounded at 4096 characters', () => {
+  const oversizedAssetRef = `https://example.public.blob.vercel-storage.com/plan.png?token=${'a'.repeat(4096)}`;
+  const request = validRequest();
+  request.evidence[0]!.asset_ref = oversizedAssetRef;
+  assert.throws(() => assertHomeTurnRequest(request), ContractValidationError);
+
+  const model = validHomeModel();
+  const sources = model.sources as Array<Record<string, unknown>>;
+  sources[0]!.asset_ref = oversizedAssetRef;
+  assert.throws(() => assertHomeModel(model), ContractValidationError);
+});
+
 test('parses compact Room Map output and rejects out-of-range geometry', () => {
   assert.deepEqual(parseRoomMapResponse(JSON.stringify(validRoomMapResponse())), validRoomMapResponse());
   const invalid = validRoomMapResponse();

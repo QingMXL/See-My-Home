@@ -145,7 +145,7 @@
         "id": { "$ref": "#/$defs/id" },
         "kind": { "enum": ["floor_plan", "room_photo", "measurement", "user_statement", "vision_model_output", "user_correction"] },
         "label": { "type": "string", "minLength": 1, "maxLength": 200 },
-        "asset_ref": { "type": ["string", "null"], "maxLength": 500 },
+        "asset_ref": { "type": ["string", "null"], "maxLength": 4096 },
         "provider_model": { "type": ["string", "null"], "maxLength": 200 },
         "received_at": { "type": "string", "format": "date-time" }
       }
