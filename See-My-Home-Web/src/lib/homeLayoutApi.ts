@@ -91,6 +91,12 @@ export interface LayoutGenerationResult {
   request_context?: GenerateLayoutInput;
 }
 
+interface LayoutGenerationPending {
+  status: "processing";
+  job_token: string;
+  poll_after_ms: number;
+}
+
 export type LayoutPlacementKind =
   | "sofa" | "tv" | "coffee_table" | "dining_table" | "bed" | "wardrobe"
   | "desk" | "bookshelf" | "counter" | "sink" | "cooktop" | "refrigerator"
@@ -214,7 +220,18 @@ export interface LayoutImageAnalysisResult {
 }
 
 async function readResponse<T>(response: Response): Promise<T> {
-  const data = (await response.json()) as T & { error?: string };
+  const raw = await response.text();
+  let data: T & { error?: string };
+  try {
+    data = JSON.parse(raw) as T & { error?: string };
+  } catch {
+    const detail = raw.trim().replace(/\s+/g, " ").slice(0, 240);
+    throw new Error(
+      response.ok
+        ? "The Home Layout Agent returned an invalid server response."
+        : `Layout Agent request failed (${response.status})${detail ? `: ${detail}` : ""}`,
+    );
+  }
   if (!response.ok) throw new Error(data.error ?? `Layout Agent request failed (${response.status})`);
   return data;
 }
@@ -238,19 +255,13 @@ async function fetchWithTimeout(
 }
 
 export async function generateLayout(input: GenerateLayoutInput): Promise<LayoutGenerationResult> {
-  const response = await fetchWithTimeout(
+  return runLayoutGeneration(
     "/api/home-layout/events/agent.generate",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    },
-    720_000,
+    input,
     input.locale === "zh-CN"
       ? "Home Layout Agent 处理超时，请重试。"
       : "The Home Layout Agent timed out. Please try again.",
   );
-  return readResponse<LayoutGenerationResult>(response);
 }
 
 export async function refineLayout(
@@ -258,19 +269,46 @@ export async function refineLayout(
   locale: "en-US" | "zh-CN",
   userMessage: string,
 ): Promise<LayoutGenerationResult> {
-  const response = await fetchWithTimeout(
+  return runLayoutGeneration(
     "/api/home-layout/events/agent.refine",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ base_input: baseInput, locale, user_message: userMessage }),
-    },
-    720_000,
+    { base_input: baseInput, locale, user_message: userMessage },
     locale === "zh-CN"
       ? "Home Layout Agent 重新生成超时，请重试。"
       : "The Home Layout Agent refinement timed out. Please try again.",
   );
-  return readResponse<LayoutGenerationResult>(response);
+}
+
+async function runLayoutGeneration(
+  endpoint: string,
+  input: object,
+  timeoutMessage: string,
+): Promise<LayoutGenerationResult> {
+  const deadline = Date.now() + 720_000;
+  let jobToken: string | undefined;
+  while (Date.now() < deadline) {
+    const response = await fetchWithTimeout(
+      endpoint,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...input, ...(jobToken ? { job_token: jobToken } : {}) }),
+      },
+      60_000,
+      timeoutMessage,
+    );
+    const result = await readResponse<LayoutGenerationResult | LayoutGenerationPending>(response);
+    if (result && "status" in result && result.status === "processing") {
+      if (typeof result.job_token !== "string" || !result.job_token) {
+        throw new Error("The Home Layout Agent returned an invalid processing ticket.");
+      }
+      jobToken = result.job_token;
+      const delayMs = Math.min(10_000, Math.max(500, result.poll_after_ms || 3_000));
+      await new Promise((resolveDelay) => window.setTimeout(resolveDelay, delayMs));
+      continue;
+    }
+    return result as LayoutGenerationResult;
+  }
+  throw new Error(timeoutMessage);
 }
 
 export async function uploadLayoutFile(

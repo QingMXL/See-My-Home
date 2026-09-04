@@ -8,6 +8,7 @@ import {
   toolCall,
   ZooworkError,
   type OutboundEvent,
+  type SessionEvent,
   type ZooworkClient,
 } from '@zoowork-ai/sdk';
 import type {
@@ -225,6 +226,15 @@ interface RawTurnResult {
   toolCalls: AgentToolTrace[];
 }
 
+export interface StructuredTurnStart {
+  postedSeq: number;
+  repairAttempt: number;
+}
+
+export type StructuredTurnPoll =
+  | { status: 'processing'; postedSeq: number; repairAttempt: number }
+  | { status: 'completed'; result: StructuredTurnResult };
+
 export class HomeLayoutRuntime {
   readonly agentId: string;
   readonly maxOutputRepairAttempts: number;
@@ -298,20 +308,7 @@ export class HomeLayoutRuntime {
     currentHomeModel: HomeModel | null,
     uiEvent?: UiAgentEvent,
   ): Promise<StructuredTurnResult> {
-    assertHomeTurnRequest(request);
-    if (currentHomeModel !== null) {
-      assertHomeModel(currentHomeModel);
-      if (currentHomeModel.home_id !== request.home_id) {
-        throw new ContractValidationError(
-          'HomeTurnRequest',
-          'current Home Model belongs to a different home_id',
-        );
-      }
-    }
-
-    if (conversation.agentId !== this.agentId) {
-      throw new Error('conversation belongs to a different agent');
-    }
+    this.validateStructuredTurn(conversation, request, currentHomeModel);
 
     let rawTurn = await this.postAndRead(
       conversation.sessionId,
@@ -366,6 +363,57 @@ export class HomeLayoutRuntime {
     }
 
     throw lastError ?? new Error('Agent response validation failed');
+  }
+
+  async startStructuredTurn(
+    conversation: ConversationHandle,
+    request: HomeTurnRequest,
+    currentHomeModel: HomeModel | null,
+    uiEvent?: UiAgentEvent,
+  ): Promise<StructuredTurnStart> {
+    this.validateStructuredTurn(conversation, request, currentHomeModel);
+    const postedSeq = await this.postTurnEvents(
+      conversation.sessionId,
+      this.buildTurnEvents(request, currentHomeModel, uiEvent),
+    );
+    return { postedSeq, repairAttempt: 0 };
+  }
+
+  async pollStructuredTurn(
+    conversation: ConversationHandle,
+    request: HomeTurnRequest,
+    currentHomeModel: HomeModel | null,
+    postedSeq: number,
+    repairAttempt = 0,
+  ): Promise<StructuredTurnPoll> {
+    this.validateStructuredTurn(conversation, request, currentHomeModel);
+    if (!Number.isSafeInteger(postedSeq) || postedSeq < 0) throw new Error('postedSeq is invalid');
+    if (!Number.isSafeInteger(repairAttempt) || repairAttempt < 0) throw new Error('repairAttempt is invalid');
+
+    const rawTurn = await this.readDurableTurn(
+      conversation.sessionId,
+      postedSeq,
+      request.operation === 'visualize',
+    );
+    if (!rawTurn) return { status: 'processing', postedSeq, repairAttempt };
+    if (rawTurn.outcome !== 'succeeded') {
+      throw new Error(`ZooWork run ended with status ${rawTurn.outcome}`);
+    }
+
+    try {
+      return {
+        status: 'completed',
+        result: await this.structuredResult(conversation.sessionId, request, rawTurn),
+      };
+    } catch (error) {
+      if (!(error instanceof ContractValidationError) || repairAttempt >= this.maxOutputRepairAttempts) throw error;
+      const nextAttempt = repairAttempt + 1;
+      const nextPostedSeq = await this.postTurnEvents(
+        conversation.sessionId,
+        this.buildRepairEvents(request, error, nextAttempt),
+      );
+      return { status: 'processing', postedSeq: nextPostedSeq, repairAttempt: nextAttempt };
+    }
   }
 
   async runRoomMapTurn(
@@ -518,17 +566,7 @@ export class HomeLayoutRuntime {
     events: OutboundEvent[],
     requirePublishedArtifact = false,
   ): Promise<RawTurnResult> {
-    const receipt = await this.client.postEvents(this.agentId, sessionId, events);
-    const rejected = receipt.events.find((event) => event.accepted !== true);
-    if (rejected) {
-      throw new Error(`ZooWork rejected outbound event ${rejected.type ?? 'unknown'}`);
-    }
-
-    const acceptedTurn = receipt.events.find((event) => event.type === 'user.message');
-    const postedSeq = typeof acceptedTurn?.seq === 'number' ? acceptedTurn.seq : undefined;
-    if (postedSeq === undefined) {
-      throw new Error('ZooWork accepted the user turn without returning its sequence');
-    }
+    const postedSeq = await this.postTurnEvents(sessionId, events);
 
     const assistantBySeq = new Map<number, string>();
     const structuredCandidatesBySeq = new Map<number, string>();
@@ -701,6 +739,122 @@ export class HomeLayoutRuntime {
     if (latestCursor !== undefined) result.cursor = latestCursor;
     if (targetRunId !== undefined) result.runId = targetRunId;
     return result;
+  }
+
+  private async postTurnEvents(sessionId: string, events: OutboundEvent[]): Promise<number> {
+    const receipt = await this.client.postEvents(this.agentId, sessionId, events);
+    const rejected = receipt.events.find((event) => event.accepted !== true);
+    if (rejected) throw new Error(`ZooWork rejected outbound event ${rejected.type ?? 'unknown'}`);
+    const acceptedTurn = receipt.events.find((event) => event.type === 'user.message');
+    if (typeof acceptedTurn?.seq !== 'number') {
+      throw new Error('ZooWork accepted the user turn without returning its sequence');
+    }
+    return acceptedTurn.seq;
+  }
+
+  private async readDurableTurn(
+    sessionId: string,
+    postedSeq: number,
+    requirePublishedArtifact: boolean,
+  ): Promise<RawTurnResult | null> {
+    const events = await this.client.listAllEvents(this.agentId, sessionId, {
+      types: ['run.started', 'run.finished', 'agent.assistant', 'agent.tool'],
+    });
+    return this.rawTurnFromEvents(events, postedSeq, requirePublishedArtifact);
+  }
+
+  private rawTurnFromEvents(
+    events: SessionEvent[],
+    postedSeq: number,
+    requirePublishedArtifact: boolean,
+  ): RawTurnResult | null {
+    const assistantBySeq = new Map<number, string>();
+    const structuredCandidatesBySeq = new Map<number, string>();
+    const toolCallsBySeq = new Map<number, AgentToolTrace>();
+    let targetRunId: string | undefined;
+    let finalOutcome: RawTurnResult['outcome'] | undefined;
+
+    for (const event of [...events].sort((left, right) => left.seq - right.seq)) {
+      if (event.seq <= postedSeq) continue;
+      if (event.eventType === 'run.started') targetRunId = event.runId;
+      const text = assistantText(event);
+      if (text) assistantBySeq.set(event.seq, text);
+      const call = toolCall(event);
+      if (call) {
+        const structuredCandidate = this.structuredCandidateFromTool(call);
+        if (structuredCandidate) structuredCandidatesBySeq.set(event.seq, structuredCandidate);
+        toolCallsBySeq.set(event.seq, {
+          phase: call.phase,
+          ...(call.toolCallId ? { toolCallId: call.toolCallId } : {}),
+          ...(call.toolName ? { toolName: call.toolName } : {}),
+          ...(call.isError !== undefined ? { isError: call.isError } : {}),
+          ...(call.resultPreview ? { resultPreview: call.resultPreview } : {}),
+        });
+      }
+      if (!isRunFinished(event)) continue;
+      const outcome = runOutcome(event);
+      if (!outcome) continue;
+      if (
+        outcome !== 'succeeded'
+        || (
+          this.hasCompleteJson(assistantBySeq, structuredCandidatesBySeq)
+          && (!requirePublishedArtifact || this.hasTerminalVisualizationTool(toolCallsBySeq))
+        )
+      ) {
+        finalOutcome = outcome;
+        targetRunId = event.runId ?? targetRunId;
+        break;
+      }
+    }
+
+    if (!finalOutcome) return null;
+    const result: RawTurnResult = {
+      text: this.bestStructuredText(assistantBySeq, structuredCandidatesBySeq),
+      outcome: finalOutcome,
+      toolCalls: [...toolCallsBySeq.entries()]
+        .sort(([left], [right]) => left - right)
+        .map(([, call]) => call),
+    };
+    if (targetRunId !== undefined) result.runId = targetRunId;
+    return result;
+  }
+
+  private async structuredResult(
+    sessionId: string,
+    request: HomeTurnRequest,
+    rawTurn: RawTurnResult,
+  ): Promise<StructuredTurnResult> {
+    const response = parseAgentResponse(rawTurn.text);
+    this.assertResponseMatchesRequest(response, request);
+    if (response.home_model !== null) assertHomeModel(response.home_model);
+    const result: StructuredTurnResult = {
+      response,
+      rawText: rawTurn.text,
+      runOutcome: rawTurn.outcome,
+      toolCalls: rawTurn.toolCalls,
+      artifacts:
+        request.operation === 'visualize' && this.hasSuccessfulArtifactPublishTrace(rawTurn.toolCalls)
+          ? await this.artifactsForRun(sessionId, rawTurn.runId, rawTurn.toolCalls, request.request_id)
+          : [],
+    };
+    if (rawTurn.cursor !== undefined) result.cursor = rawTurn.cursor;
+    if (rawTurn.runId !== undefined) result.runId = rawTurn.runId;
+    return result;
+  }
+
+  private validateStructuredTurn(
+    conversation: ConversationHandle,
+    request: HomeTurnRequest,
+    currentHomeModel: HomeModel | null,
+  ): void {
+    assertHomeTurnRequest(request);
+    if (currentHomeModel !== null) {
+      assertHomeModel(currentHomeModel);
+      if (currentHomeModel.home_id !== request.home_id) {
+        throw new ContractValidationError('HomeTurnRequest', 'current Home Model belongs to a different home_id');
+      }
+    }
+    if (conversation.agentId !== this.agentId) throw new Error('conversation belongs to a different agent');
   }
 
   private assistantText(assistantBySeq: Map<number, string>): string {

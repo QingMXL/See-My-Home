@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { ZooworkError } from '@zoowork-ai/sdk';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import type {
   AgentArtifact,
   EvidenceSource,
@@ -61,6 +62,17 @@ interface GenerateInput extends Record<string, unknown> {
   analysis?: unknown;
 }
 
+interface LayoutJob {
+  version: 1;
+  sessionId: string;
+  postedSeq: number;
+  requestId: string;
+  homeId: string;
+  type: 'agent.generate' | 'agent.refine';
+  repairAttempt: number;
+  expiresAt: number;
+}
+
 const roomCodes = new Set<RoomFunctionCode>([
   'living_room', 'family_room', 'dining_room', 'kitchen', 'primary_bedroom', 'guest_bedroom',
   'kids_room', 'nursery', 'home_office', 'walk_in_closet', 'bathroom', 'powder_room',
@@ -72,6 +84,48 @@ function runtime(): HomeLayoutRuntime {
   const agentId = process.env.ZOOWORK_AGENT_ID?.trim();
   if (!agentId) throw new Error('ZOOWORK_AGENT_ID is not configured on Vercel');
   return HomeLayoutRuntime.fromEnvironment({ agentId, turnTimeoutMs: 760_000 });
+}
+
+function jobSecret(): string {
+  const value = process.env.ZOOWORK_API_KEY?.trim();
+  if (!value) throw new Error('ZOOWORK_API_KEY is not configured on Vercel');
+  return value;
+}
+
+function signJob(job: LayoutJob): string {
+  const payload = Buffer.from(JSON.stringify(job), 'utf8').toString('base64url');
+  const signature = createHmac('sha256', jobSecret()).update(payload).digest('base64url');
+  return `${payload}.${signature}`;
+}
+
+function verifyJob(value: unknown): LayoutJob | null {
+  if (value === undefined) return null;
+  if (typeof value !== 'string' || value.length < 20 || value.length > 4096) throw new Error('job_token is invalid');
+  const parts = value.split('.');
+  if (parts.length !== 2 || !parts[0] || !parts[1]) throw new Error('job_token is invalid');
+  const expected = createHmac('sha256', jobSecret()).update(parts[0]).digest();
+  let actual: Buffer;
+  try { actual = Buffer.from(parts[1], 'base64url'); } catch { throw new Error('job_token is invalid'); }
+  if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) throw new Error('job_token is invalid');
+  let parsed: unknown;
+  try { parsed = JSON.parse(Buffer.from(parts[0], 'base64url').toString('utf8')); } catch { throw new Error('job_token is invalid'); }
+  const job = objectBody(parsed);
+  if (
+    job.version !== 1
+    || typeof job.sessionId !== 'string'
+    || typeof job.postedSeq !== 'number'
+    || !Number.isSafeInteger(job.postedSeq)
+    || job.postedSeq < 0
+    || typeof job.requestId !== 'string'
+    || typeof job.homeId !== 'string'
+    || (job.type !== 'agent.generate' && job.type !== 'agent.refine')
+    || typeof job.repairAttempt !== 'number'
+    || !Number.isSafeInteger(job.repairAttempt)
+    || job.repairAttempt < 0
+    || typeof job.expiresAt !== 'number'
+    || job.expiresAt < Date.now()
+  ) throw new Error('job_token is invalid or expired');
+  return job as unknown as LayoutJob;
 }
 
 function safeFileName(value: string): string {
@@ -288,9 +342,9 @@ async function analyze(request: VercelRequest, response: VercelResponse): Promis
   });
 }
 
-function visualizationRequest(value: ReturnType<typeof confirmedInput>, model: HomeModel, message: string, type: 'agent.generate' | 'agent.refine'): HomeTurnRequest {
+function visualizationRequest(value: ReturnType<typeof confirmedInput>, model: HomeModel, message: string, type: 'agent.generate' | 'agent.refine', requestId = newId('req')): HomeTurnRequest {
   return {
-    schema_version: '1.0', request_id: newId('req'), home_id: value.homeId, operation: 'visualize', locale: value.locale,
+    schema_version: '1.0', request_id: requestId, home_id: value.homeId, operation: 'visualize', locale: value.locale,
     user_message: `${message.trim()} Preserve every confirmed polygon, wall, column, door, opening, and window from the source plan. Keep excluded regions outside furnishing and finishes. Generate one new label-free colorized floor plan with realistic furniture, sanitary fixtures, appliances, flooring, and material textures. Use only Banana Pro and Image 2 through ZooWork; prefer Banana Pro for geometry-preserving image-to-image work and Image 2 as the clean-plan fallback. Follow each room_program as a sensible first draft, apply explicit user instructions with highest priority, and avoid duplicate beds, toilets, sinks, vanities, cooktops, refrigerators, sofas, televisions, dining tables, and desks. Assess only circulation, function, adjacency, privacy, daylight, storage demand, activity conflict, and underused space. Publish every readable raster even if it has quality warnings; only a missing, corrupt, empty, or unreadable image may remain unpublished. This is a ${type} turn.`,
     evidence: [],
     visualization_request: { mode: 'colorized_plan', selected_entity_refs: value.rooms.map((room) => room.id), style_direction: 'Source-referenced, geometry-locked, label-free colorized floor plan with realistic furniture and restrained material textures. Do not add text, labels, legends, dimensions, numbers, or pseudo-glyphs.' },
@@ -306,28 +360,69 @@ async function generatedPayload(zoo: HomeLayoutRuntime, artifact: AgentArtifact 
 
 async function generate(request: VercelRequest, response: VercelResponse, type: 'agent.generate' | 'agent.refine'): Promise<void> {
   const body = objectBody(request.body);
-  const source = type === 'agent.refine' ? objectBody(body.base_input) as GenerateInput : body as GenerateInput;
+  const job = verifyJob(body.job_token);
+  const source = type === 'agent.refine'
+    ? objectBody(body.base_input) as GenerateInput
+    : (() => {
+      const input = { ...body };
+      delete input.job_token;
+      return input as GenerateInput;
+    })();
   if (type === 'agent.refine') {
     source.locale = body.locale;
     source.user_message = requireString(body.user_message, 'user_message');
   }
   const value = confirmedInput(source);
-  if (value.sourceUrl) value.sourceUrl = await temporaryBlobReadUrl(value.sourceUrl);
+  if (job && (job.homeId !== value.homeId || job.type !== type)) throw new Error('job_token does not match this request');
+  if (!job && value.sourceUrl) value.sourceUrl = await temporaryBlobReadUrl(value.sourceUrl);
   const model = buildHomeModel(value);
   const defaultMessage = `Generate the layout. Priorities: ${value.tags.join(', ') || 'none specified'}. Special considerations: ${value.considerations || 'none specified'}.`;
   const message = typeof source.user_message === 'string' && source.user_message.trim() ? source.user_message.trim() : defaultMessage;
   const zoo = runtime();
-  await zoo.ensureRunning();
-  const conversation = await zoo.createConversation(value.homeId, newId(`layout_${type === 'agent.refine' ? 'refine' : 'generate'}_${value.homeId}`));
-  const turn = visualizationRequest(value, model, message, type);
+  const requestId = job?.requestId ?? newId('req');
+  const turn = visualizationRequest(value, model, message, type, requestId);
   const event: UiAgentEvent = { type, project_id: value.homeId, mode: 'layout' };
-  const result = await zoo.runStructuredTurn(conversation, turn, model, event);
+  if (!job) {
+    await zoo.ensureRunning();
+    const conversation = await zoo.createConversation(value.homeId, newId(`layout_${type === 'agent.refine' ? 'refine' : 'generate'}_${value.homeId}`));
+    const started = await zoo.startStructuredTurn(conversation, turn, model, event);
+    sendJson(response, 202, {
+      status: 'processing',
+      job_token: signJob({
+        version: 1,
+        sessionId: conversation.sessionId,
+        postedSeq: started.postedSeq,
+        requestId,
+        homeId: value.homeId,
+        type,
+        repairAttempt: started.repairAttempt,
+        expiresAt: Date.now() + 30 * 60 * 1000,
+      }),
+      poll_after_ms: 3_000,
+    });
+    return;
+  }
+
+  const conversation = { agentId: zoo.agentId, sessionId: job.sessionId };
+  const polled = await zoo.pollStructuredTurn(conversation, turn, model, job.postedSeq, job.repairAttempt);
+  if (polled.status === 'processing') {
+    sendJson(response, 202, {
+      status: 'processing',
+      job_token: signJob({ ...job, postedSeq: polled.postedSeq, repairAttempt: polled.repairAttempt }),
+      poll_after_ms: 3_000,
+    });
+    return;
+  }
+
+  const result = polled.result;
   const imageArtifact = result.artifacts.find((artifact) => artifact.status === 'ready' && (artifact.contentType?.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(artifact.fileName ?? '')));
   const generatedImage = await generatedPayload(zoo, imageArtifact, value, turn.request_id);
+  if (value.sourceUrl) value.sourceUrl = await temporaryBlobReadUrl(privateBlobUrl(source.asset_id, 'layout', value.homeId));
+  const responseModel = buildHomeModel(value);
   const intake: HomeAgentResponse = {
     schema_version: '1.0', request_id: turn.request_id, home_id: value.homeId, operation: 'correct', status: 'completed', locale: value.locale,
     message: type === 'agent.refine' ? 'The confirmed geometry and room functions were preserved for this refinement.' : 'The confirmed room map was committed to the Home Model.',
-    home_model: model, diagnosis: null, visualization_brief: null, questions: value.questions, warnings: value.warnings,
+    home_model: responseModel, diagnosis: null, visualization_brief: null, questions: value.questions, warnings: value.warnings,
   };
   const spaceRefs = new Set(value.rooms.map((room) => room.id));
   const diagnosis = result.response.diagnosis;

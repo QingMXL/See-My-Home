@@ -84,6 +84,93 @@ test('posts one structured user event and stops streaming on run.finished', asyn
   assert.equal(result.response.request_id, 'req_demo_001');
 });
 
+test('starts a structured turn and completes it through durable polling', async () => {
+  const request = validRequest();
+  request.operation = 'visualize';
+  request.visualization_request = { mode: 'colorized_plan', selected_entity_refs: [] };
+  const response = {
+    ...validResponse(),
+    operation: 'visualize' as const,
+    home_model: null,
+    diagnosis: {
+      based_on_model_revision: 1,
+      finding_refs: [],
+      opportunity_refs: [],
+      summary: 'Circulation remains clear.',
+      assessment_items: [],
+    },
+    visualization_brief: {
+      based_on_model_revision: 1,
+      mode: 'colorized_plan' as const,
+      fidelity_status: 'faithful_to_confirmed_geometry' as const,
+      selected_entity_refs: [],
+      frozen_elements: [],
+      allowed_changes: ['Furniture and finishes only.'],
+      positive_prompt: 'Create a furnished plan.',
+      negative_prompt: 'Do not move walls.',
+      preferred_providers: ['Banana Pro', 'Image 2'],
+    },
+  };
+  let reads = 0;
+  const fakeClient = {
+    async postEvents() {
+      return { events: [{ id: 'event_user', seq: 10, type: 'user.message', accepted: true }] };
+    },
+    async listAllEvents() {
+      reads += 1;
+      const started: SessionEvent = { seq: 11, eventType: 'run.started', payload: {}, runId: 'run_async' };
+      if (reads === 1) return [started];
+      return [
+        started,
+        {
+          seq: 12,
+          eventType: 'agent.tool',
+          payload: {
+            phase: 'end', toolName: 'artifact_publish', toolCallId: 'tool_publish', isError: false,
+            resultPreview: JSON.stringify({ artifactId: 'art_async_001' }),
+          },
+          runId: 'run_async',
+        },
+        {
+          seq: 13,
+          eventType: 'agent.assistant',
+          payload: { message: { role: 'assistant', content: [{ type: 'text', text: JSON.stringify(response) }] } },
+          runId: 'run_async',
+        },
+        { seq: 14, eventType: 'run.finished', payload: { status: 'succeeded' }, runId: 'run_async' },
+      ] satisfies SessionEvent[];
+    },
+    async listArtifacts() {
+      return {
+        artifacts: [{
+          artifact_id: 'art_async_001',
+          file_name: 'home_demo_001_req_demo_001_layout.png',
+          source_path: '/workspace/artifacts/home_demo_001/home_demo_001_req_demo_001_layout.png',
+          content_type: 'image/png',
+          size: 1024,
+          status: 'ready',
+          run_id: 'run_async',
+        }],
+        has_more: false,
+      };
+    },
+  } as unknown as ZooworkClient;
+  const runtime = new HomeLayoutRuntime(fakeClient, 'agent_private_001', 0, 0);
+  const conversation = { agentId: 'agent_private_001', sessionId: 'session_async' };
+
+  const started = await runtime.startStructuredTurn(conversation, request, null);
+  const pending = await runtime.pollStructuredTurn(conversation, request, null, started.postedSeq);
+  const completed = await runtime.pollStructuredTurn(conversation, request, null, started.postedSeq);
+
+  assert.deepEqual(started, { postedSeq: 10, repairAttempt: 0 });
+  assert.deepEqual(pending, { status: 'processing', postedSeq: 10, repairAttempt: 0 });
+  assert.equal(completed.status, 'completed');
+  if (completed.status === 'completed') {
+    assert.equal(completed.result.response.request_id, request.request_id);
+    assert.equal(completed.result.artifacts[0]?.artifactId, 'art_async_001');
+  }
+});
+
 test('uses the compact room-map contract for project.create', async () => {
   let postedContent = '';
   const verboseRoomMap = validRoomMapResponse();
