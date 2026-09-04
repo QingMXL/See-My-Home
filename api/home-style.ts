@@ -5,7 +5,7 @@ import type { ModernEastProfile, RenovationScope, StyleRoomType, StyleTurnReques
 import { HomeStyleRuntime, HomeStyleTurnTimeoutError, MODERN_EAST_KNOWLEDGE_VERSION } from '../Home-Style-Agent/src/runtime.js';
 import { newId, objectBody, parseLocale, persistGeneratedImage, privateBlobUrl, requestPath, requireString, sendJson, temporaryBlobReadUrl } from './_lib/common.js';
 
-export const config = { maxDuration: 800 };
+export const config = { maxDuration: 300 };
 
 const roomTypes = new Set<StyleRoomType>(['living_room', 'primary_bedroom', 'kitchen', 'dining_room', 'bathroom', 'home_office', 'other']);
 const profiles = new Set<ModernEastProfile>(['quiet-poise', 'urban-elegance', 'sculptural-luxe', 'warm-residence']);

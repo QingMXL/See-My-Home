@@ -27,7 +27,7 @@ import {
   temporaryBlobReadUrl,
 } from './_lib/common.js';
 
-export const config = { maxDuration: 800 };
+export const config = { maxDuration: 300 };
 
 type Polygon = number[][];
 

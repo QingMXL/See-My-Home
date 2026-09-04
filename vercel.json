@@ -5,22 +5,22 @@
   "framework": "vite",
   "functions": {
     "api/home-layout.ts": {
-      "maxDuration": 800,
+      "maxDuration": 300,
       "memory": 2048,
       "includeFiles": "Home-Layout-Agent/skills/**/*.json"
     },
     "api/home-layout/**/*.ts": {
-      "maxDuration": 800,
+      "maxDuration": 300,
       "memory": 2048,
       "includeFiles": "Home-Layout-Agent/skills/**/*.json"
     },
     "api/home-style.ts": {
-      "maxDuration": 800,
+      "maxDuration": 300,
       "memory": 2048,
       "includeFiles": "Home-Style-Agent/contracts/*.json"
     },
     "api/home-style/**/*.ts": {
-      "maxDuration": 800,
+      "maxDuration": 300,
       "memory": 2048,
       "includeFiles": "Home-Style-Agent/contracts/*.json"
     }
