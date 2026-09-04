@@ -28,14 +28,10 @@
       "maxDuration": 300,
       "memory": 2048,
       "includeFiles": "Home-Furniture-Agent/{contracts,skills}/**/*"
-    },
-    "api/home-furniture/**/*.ts": {
-      "maxDuration": 300,
-      "memory": 2048,
-      "includeFiles": "Home-Furniture-Agent/{contracts,skills}/**/*"
     }
   },
   "rewrites": [
+    { "source": "/api/home-furniture/:path*", "destination": "/api/home-furniture?path=:path*" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
