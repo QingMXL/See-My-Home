@@ -1,0 +1,280 @@
+schema_version: "1.0"
+knowledge_base_version: "0.1-research"
+style:
+  id: modern_east
+  display_name: Modern East
+  display_name_zh: 摩登东方
+  market: en-US
+  status: research
+  tagline: A refined balance of modern form, natural materials, and Eastern restraint.
+  definition: >-
+    A contemporary residential language that expresses Eastern ideas through
+    spatial restraint, layered views, negative space, natural materiality and
+    time-aware light rather than literal historical symbols.
+
+provenance:
+  theory_anchor:
+    organization: W.DESIGN
+    source_url: https://www.wdesign.hk/modengdongfang.html
+  visual_references:
+    - organization: W.DESIGN
+      role: spatial_poetry_and_abstraction
+    - organization: CCD
+      role: material_refinement_and_contemporary_luxury
+  production_prompt_uses_firm_names: false
+  reference_images_internal_only: true
+
+profiles:
+  quiet-poise:
+    default: true
+    suitable_for: [apartment, condo, townhouse, single_family_home, bedroom, family_room]
+    intensity: restrained
+    cues: [warm_pale_neutrals, tactile_textiles, restrained_dark_timber, soft_daylight, sparse_art]
+  urban-elegance:
+    default: false
+    suitable_for: [urban_apartment, penthouse, open_living_dining]
+    intensity: medium
+    cues: [slim_dark_frames, smoked_glass, warm_gray, espresso_tones, precise_metal_details]
+  sculptural-luxe:
+    default: false
+    suitable_for: [large_residence, double_height_living]
+    intensity: expressive
+    gates: [adequate_room_size, explicit_user_preference]
+    cues: [single_sculptural_focal_point, statement_light, focal_stone, controlled_contrast]
+  warm-residence:
+    default: false
+    suitable_for: [small_home, bedroom, family_room]
+    intensity: soft
+    cues: [warm_pale_oak, ivory_textiles, soft_ambient_light, small_amount_dark_framing]
+
+style_dna:
+  required:
+    - modern_frame_eastern_spirit
+    - active_negative_space
+    - layered_revelation
+    - quiet_material_contrast
+    - nature_through_light_and_framing
+    - art_integrated_with_daily_life
+  preferred:
+    - one_primary_focal_point
+    - balanced_asymmetry
+    - low_glare_layered_light
+    - conventional_residential_scale
+  forbidden:
+    - literal_historical_theme
+    - japanese_room_language
+    - monumental_hospitality_scale
+    - material_overload
+    - architecture_change_without_explicit_scope
+
+vocabulary:
+  space:
+    - layered views
+    - framed sightlines
+    - calibrated negative space
+    - quiet spatial rhythm
+    - open yet zoned
+    - residential scale
+  form:
+    - clean architectural planes
+    - restrained geometry
+    - softened corners
+    - one controlled sculptural gesture
+    - slender dark frames
+    - balanced asymmetry
+  material:
+    - matte dark oak
+    - smoked walnut
+    - warm pale oak
+    - honed limestone
+    - quiet-veined marble
+    - mineral plaster
+    - textured wallcovering
+    - reeded glass
+    - satin bronze
+    - blackened metal
+    - linen
+    - wool
+    - boucle
+  color:
+    - warm ivory
+    - stone greige
+    - mushroom taupe
+    - espresso brown
+    - charcoal
+    - ink black accents
+    - muted jade
+    - olive green
+    - aged bronze
+  furnishing:
+    - low-profile tailored seating
+    - tactile neutral upholstery
+    - one abstract artwork
+    - handcrafted ceramic object
+    - natural branch arrangement
+    - layered neutral rug
+  lighting:
+    - soft daylight
+    - warm indirect lighting
+    - concealed cove light
+    - focused wall wash
+    - paper-like diffused pendant
+    - low-glare fixtures
+
+materials:
+  primary:
+    - id: matte_dark_oak
+      finish: matte_open_grain
+      use: [door_frames, partial_wall_panels, cabinetry, furniture_frames]
+      avoid: [glossy_red_tone, full_room_wrap]
+    - id: smoked_walnut
+      finish: matte_or_satin
+      use: [cabinetry, furniture, portals]
+      avoid: [high_gloss]
+    - id: warm_pale_oak
+      finish: matte
+      use: [bedrooms, kitchens, small_residences]
+      pairing_requirement: dark_frame_or_stone_anchor
+    - id: pale_honed_stone
+      finish: honed_low_reflection
+      use: [countertops, fireplace, single_feature_plane]
+      avoid: [multiple_competing_veins]
+    - id: quiet_veined_marble
+      finish: honed_or_soft_satin
+      max_focal_surfaces_per_view: 1
+  secondary:
+    - mineral_plaster
+    - fine_textured_wallcovering
+    - reeded_glass
+    - smoked_glass
+    - satin_bronze
+    - blackened_steel
+    - linen
+    - wool
+    - boucle
+
+color_system:
+  dominant:
+    target_share: "approximately 60%"
+    colors: [warm_ivory, pale_stone, light_greige]
+  secondary:
+    target_share: "approximately 25-30%"
+    colors: [wood_brown, mushroom_taupe, charcoal]
+  accent:
+    maximum_share: "approximately 10-15%"
+    colors: [ink_black, aged_bronze, muted_jade, olive_green]
+  forbidden:
+    - saturated_red_and_bright_gold
+    - multiple_high_saturation_jewel_tones
+    - all_black_hospitality_palette
+    - cold_white_mirror_silver_showroom_palette
+
+anti_patterns:
+  traditional_symbolism:
+    - ornate Chinese carving
+    - dragon and phoenix motifs
+    - dense cloud patterns
+    - glossy red rosewood furniture set
+    - replica dynasty furniture
+    - red lantern theme
+  japandi_confusion:
+    - tatami
+    - shoji screens
+    - Japanese tea room
+    - floor-level dining table
+    - all-pale-wood Japandi
+    - exaggerated wabi-sabi decay
+  hospitality_drift:
+    - hotel lobby
+    - reception lounge
+    - banquet hall
+    - monumental symmetry
+    - oversized chandelier
+    - theatrical hospitality lighting
+    - excessive ceiling sculpture
+  material_failures:
+    - mirror-polished gold
+    - glossy burgundy wood
+    - busy multicolor marble
+    - excessive black marble
+    - too many competing materials
+
+immutable_semantics:
+  always_preserve:
+    - room_envelope
+    - walls
+    - columns
+    - beams
+    - ceiling_height
+    - doors
+    - windows
+    - openings
+    - camera_position
+    - lens_perspective
+    - crop
+  preserve_by_default:
+    - fixed_cabinet_boundaries
+    - kitchen_service_locations
+    - bathroom_service_locations
+    - fireplace
+  note: >-
+    These are semantic requirements. The agent must enforce them with masks,
+    spatial conditions and post-generation structural validation.
+
+renovation_levels:
+  furnish:
+    editable: [movable_furniture, rugs, curtains, freestanding_lighting, art, plants, decor]
+  refresh:
+    editable: [paint, wall_finish, floor_finish, cabinet_front_finish, movable_furniture, lighting, textiles, decor]
+  light-remodel:
+    editable: [explicitly_masked_non_structural_built_ins]
+    requires_explicit_mask: true
+
+room_recipes:
+  living_room:
+    required: [conversation_oriented_seating, one_primary_artwork, realistic_circulation]
+    preferred: [restrained_coffee_table, one_architectural_plant, integrated_existing_tv_or_fireplace]
+    avoid: [lobby_seating, double_living_room, oversized_chandelier]
+  primary_bedroom:
+    required: [quiet_enveloping_mood, functional_bedside_surfaces, layered_warm_light]
+    preferred: [integrated_headboard, tactile_neutral_bedding, optional_window_bench]
+    avoid: [hotel_suite_staging, excessive_symmetry, floor_level_japanese_furniture]
+  kitchen_dining:
+    required: [functional_clearances, preserved_services, realistic_appliances]
+    preferred: [matte_timber_cabinetry, quiet_stone, round_or_soft_rectangle_table]
+    avoid: [display_kitchen_theater, dominant_wine_wall, impossible_floating_counter]
+  bathroom:
+    required: [preserved_fixture_locations, plausible_wet_zone, maintainable_surfaces]
+    preferred: [honed_pale_stone, restrained_timber_vanity, textured_glass, soft_mirror_light]
+    avoid: [hotel_spa, all_over_bookmatched_marble, decorative_indoor_tree, impossible_sunken_bath]
+
+raw_shell_rules:
+  immutable: [visible_walls, slab_edges, beams, columns, ceiling_planes, door_openings, window_openings]
+  add: [finishes, justified_cabinetry, lighting, furniture, textiles, decor]
+  never_invent: [new_windows, new_doors, fireplace, stairs, mezzanine, vaulted_ceiling, structural_opening]
+  service_assumption: conservative
+
+style_evaluation:
+  scoring_range_per_dimension: [0, 4]
+  publish_threshold: 22
+  dimensions:
+    - contemporary_language
+    - abstract_eastern_expression
+    - material_coherence
+    - spatial_restraint
+    - residential_livability
+    - lighting_quality
+    - differentiation_from_adjacent_styles
+  hard_fail:
+    - immutable_architecture_changed
+    - traditional_symbol_theme
+    - japanese_room_language
+    - hospitality_or_showroom_conversion
+    - impossible_kitchen_or_bathroom_services
+    - blocked_circulation
+
+retrieval:
+  required_keys: [style_id, profile, room_type, renovation_level]
+  optional_keys: [room_size_band, daylight_level]
+  retrieve_entire_knowledge_base: false
+

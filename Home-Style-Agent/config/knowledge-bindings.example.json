@@ -1,0 +1,11 @@
+{
+  "schema_version": "1.0",
+  "bindings": {
+    "modern_east": {
+      "provider": "zoowork_skill",
+      "skill_name": "modern-east-style",
+      "skill_scope": "org",
+      "version_policy": "pinned"
+    }
+  }
+}

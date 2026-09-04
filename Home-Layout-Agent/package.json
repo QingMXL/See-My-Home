@@ -1,0 +1,31 @@
+{
+  "name": "@see-my-home/home-layout-agent",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test tests/**/*.test.ts",
+    "package:skills": "node scripts/package-skills.mjs",
+    "runtime": "tsx src/cli.ts",
+    "models": "tsx src/cli.ts models",
+    "provision": "tsx src/cli.ts provision",
+    "test:local": "tsx src/local-test-server.ts",
+    "smoke:generation": "tsx scripts/smoke-generation.ts",
+    "smoke:intake": "tsx scripts/smoke-intake.ts"
+  },
+  "dependencies": {
+    "@zoowork-ai/sdk": "0.5.0",
+    "ajv": "8.17.1",
+    "ajv-formats": "3.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.0",
+    "tsx": "4.20.5",
+    "typescript": "5.9.2"
+  }
+}

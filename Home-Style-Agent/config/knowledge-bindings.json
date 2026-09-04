@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0",
+  "bindings": {
+    "modern_east": {
+      "runtime_provider": "zoowork_skill",
+      "skill_name": "modern-east-style",
+      "skill_scope": "org",
+      "version_policy": "pinned",
+      "authoring_mirror": {
+        "provider": "zoowork_plugin_knowledge",
+        "knowledge_base_id": "ce58f618f8c2407da0a1ac6860d167ab",
+        "runtime_attachment": "unsupported_by_sdk_0.5.0"
+      }
+    }
+  }
+}

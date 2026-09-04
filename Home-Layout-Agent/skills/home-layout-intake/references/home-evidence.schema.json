@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://seemyhome.ai/schemas/home-turn-request-1.0.json",
+  "title": "See My Home — Home Turn Request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "request_id", "home_id", "operation", "locale", "user_message", "evidence"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "request_id": { "$ref": "#/$defs/id" },
+    "home_id": { "$ref": "#/$defs/id" },
+    "operation": { "enum": ["intake", "correct", "diagnose", "visualize"] },
+    "locale": { "enum": ["en-US", "zh-CN"] },
+    "user_message": { "type": "string", "minLength": 1, "maxLength": 8000 },
+    "evidence": { "type": "array", "maxItems": 100, "items": { "$ref": "#/$defs/source" } },
+    "visualization_request": { "$ref": "#/$defs/visualizationRequest" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "operation": { "const": "intake" } }, "required": ["operation"] },
+      "then": { "properties": { "evidence": { "type": "array", "minItems": 1 } } }
+    },
+    {
+      "if": { "properties": { "operation": { "const": "visualize" } }, "required": ["operation"] },
+      "then": {
+        "properties": { "visualization_request": { "$ref": "#/$defs/visualizationRequest" } },
+        "required": ["visualization_request"]
+      }
+    }
+  ],
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{2,127}$" },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "normalizedPoint": {
+      "type": "array",
+      "prefixItems": [
+        { "type": "number", "minimum": 0, "maximum": 1 },
+        { "type": "number", "minimum": 0, "maximum": 1 }
+      ],
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "fact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "subject_ref", "predicate", "value", "epistemic_state", "confidence"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "subject_ref": { "$ref": "#/$defs/id" },
+        "predicate": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "value": true,
+        "epistemic_state": { "enum": ["observed", "inferred", "user_confirmed"] },
+        "confidence": { "$ref": "#/$defs/confidence" }
+      }
+    },
+    "geometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "entity_ref", "coordinate_space", "coordinates", "confidence"],
+      "properties": {
+        "kind": { "enum": ["point", "polyline", "polygon"] },
+        "entity_ref": { "$ref": "#/$defs/id" },
+        "coordinate_space": { "const": "image_normalized_0_1" },
+        "coordinates": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/normalizedPoint" } },
+        "confidence": { "$ref": "#/$defs/confidence" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "polygon" } }, "required": ["kind"] },
+          "then": { "properties": { "coordinates": { "type": "array", "minItems": 3 } } }
+        }
+      ]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_id", "kind", "label", "facts"],
+      "properties": {
+        "source_id": { "$ref": "#/$defs/id" },
+        "kind": { "enum": ["floor_plan", "room_photo", "measurement", "user_statement", "vision_model_output"] },
+        "label": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "asset_ref": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "provider_model": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "extracted_text": { "type": "array", "maxItems": 200, "items": { "type": "string", "minLength": 1, "maxLength": 1000 } },
+        "facts": { "type": "array", "maxItems": 1000, "items": { "$ref": "#/$defs/fact" } },
+        "geometry": { "type": "array", "maxItems": 1000, "items": { "$ref": "#/$defs/geometry" } }
+      }
+    },
+    "visualizationRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "selected_entity_refs"],
+      "properties": {
+        "mode": { "enum": ["colorized_plan", "visual_home_model", "conceptual_perspective"] },
+        "selected_entity_refs": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+        "style_direction": { "type": "string", "minLength": 1, "maxLength": 2000 }
+      }
+    }
+  }
+}

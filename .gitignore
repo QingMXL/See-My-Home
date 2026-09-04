@@ -2,3 +2,13 @@ node_modules/
 dist/
 *.tsbuildinfo
 .DS_Store
+.pnpm-store/
+.research/
+audit/
+see-my-home-flowcharts/
+.vercel/
+.env
+.env.*
+!.env.example
+**/.runtime/
+**/*.log

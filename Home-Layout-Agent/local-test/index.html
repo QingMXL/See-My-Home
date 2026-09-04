@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Home Layout Agent — Local Test</title>
+    <style>
+      :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #f5f3ee; color: #232721; }
+      * { box-sizing: border-box; }
+      body { margin: 0; }
+      main { width: min(1180px, calc(100% - 32px)); margin: 32px auto; }
+      header { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
+      h1 { font-size: 28px; margin: 0 0 6px; }
+      p { margin: 0; color: #697067; }
+      .badge { border: 1px solid #b8c7b4; color: #486048; background: #e9f0e6; padding: 7px 10px; border-radius: 999px; font-size: 12px; }
+      .grid { display: grid; grid-template-columns: minmax(320px, 0.85fr) minmax(420px, 1.15fr); gap: 18px; }
+      .panel { background: #fff; border: 1px solid #deded7; border-radius: 16px; padding: 20px; box-shadow: 0 10px 30px rgb(27 35 26 / 5%); }
+      .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      label { display: grid; gap: 6px; font-size: 12px; font-weight: 650; color: #535b50; margin-bottom: 14px; }
+      input, select, textarea, button { font: inherit; }
+      input, select, textarea { width: 100%; border: 1px solid #cfd2ca; border-radius: 10px; padding: 10px 11px; background: #fbfbf9; color: #232721; }
+      textarea { min-height: 140px; resize: vertical; line-height: 1.45; }
+      #evidence { min-height: 120px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+      details { margin: 2px 0 16px; }
+      summary { cursor: pointer; color: #596157; font-size: 13px; margin-bottom: 10px; }
+      .actions { display: flex; gap: 10px; }
+      button { border: 0; border-radius: 10px; padding: 10px 15px; cursor: pointer; font-weight: 700; }
+      button.primary { background: #2f4933; color: #fff; flex: 1; }
+      button.secondary { background: #ecece7; color: #3f473e; }
+      button:disabled { cursor: wait; opacity: .55; }
+      .status { min-height: 21px; margin-top: 12px; font-size: 13px; color: #657063; }
+      .status.error { color: #a33c32; }
+      .empty { display: grid; place-items: center; min-height: 420px; text-align: center; color: #83887f; }
+      #result[hidden], #visual-options[hidden] { display: none; }
+      .message { padding: 14px; background: #eef2eb; border-radius: 10px; line-height: 1.5; margin-bottom: 14px; }
+      .meta { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; font-size: 12px; color: #60685e; }
+      .meta span { background: #f0f0ec; padding: 5px 8px; border-radius: 6px; }
+      pre { overflow: auto; max-height: 540px; margin: 0; padding: 14px; border-radius: 10px; background: #20251f; color: #e8eee5; font-size: 12px; line-height: 1.45; }
+      @media (max-width: 820px) { .grid { grid-template-columns: 1fr; } header { align-items: start; flex-direction: column; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div><h1>Home Layout Agent</h1><p>Private local Runtime test console</p></div>
+        <span class="badge">127.0.0.1 only · key stays server-side</span>
+      </header>
+      <section class="grid">
+        <form class="panel" id="turn-form">
+          <div class="row">
+            <label>Home ID<input id="home-id" value="home_local_001" required pattern="[a-z][a-z0-9_-]{2,127}" /></label>
+            <label>Language<select id="locale"><option value="en-US">English (US)</option><option value="zh-CN">中文</option></select></label>
+          </div>
+          <label>Operation<select id="operation"><option value="intake">Intake</option><option value="correct">Correct</option><option value="diagnose">Diagnose</option><option value="visualize">Visualize brief</option></select></label>
+          <label>Message<textarea id="message" required placeholder="Example: The dining room is where I work most days."></textarea></label>
+          <div id="visual-options" hidden>
+            <label>Visualization mode<select id="visual-mode"><option value="visual_home_model">Visual home model</option><option value="colorized_plan">Colorized plan</option><option value="conceptual_perspective">Conceptual perspective</option></select></label>
+            <label>Selected entity refs<input id="entity-refs" placeholder="space_living_001, space_kitchen_001" /></label>
+            <label>Style direction<input id="style-direction" placeholder="Optional style direction" /></label>
+          </div>
+          <details>
+            <summary>Optional structured evidence from Image2 / Banana Pro</summary>
+            <label>Evidence JSON array<textarea id="evidence" spellcheck="false" placeholder='Leave blank to create a user_statement source automatically.&#10;[{"source_id":"src_vision_001",...}]'></textarea></label>
+          </details>
+          <div class="actions"><button class="secondary" id="reset" type="button">Reset home</button><button class="primary" id="send" type="submit">Send test turn</button></div>
+          <div class="status" id="status">Ready.</div>
+        </form>
+        <section class="panel">
+          <div class="empty" id="empty">The validated Agent response and Home Model will appear here.</div>
+          <div id="result" hidden>
+            <div class="meta" id="meta"></div>
+            <div class="message" id="response-message"></div>
+            <pre id="json-output"></pre>
+          </div>
+        </section>
+      </section>
+    </main>
+    <script>
+      const localToken = '__LOCAL_TEST_TOKEN__';
+      const form = document.querySelector('#turn-form');
+      const operation = document.querySelector('#operation');
+      const visualOptions = document.querySelector('#visual-options');
+      const status = document.querySelector('#status');
+      const send = document.querySelector('#send');
+      const result = document.querySelector('#result');
+      const empty = document.querySelector('#empty');
+
+      operation.addEventListener('change', () => { visualOptions.hidden = operation.value !== 'visualize'; });
+
+      async function post(path, body) {
+        const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Local-Test-Token': localToken }, body: JSON.stringify(body) });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+        return data;
+      }
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        send.disabled = true;
+        status.className = 'status';
+        status.textContent = 'Running the private ZooWork Agent…';
+        try {
+          const evidenceText = document.querySelector('#evidence').value.trim();
+          const body = {
+            home_id: document.querySelector('#home-id').value.trim(),
+            operation: operation.value,
+            locale: document.querySelector('#locale').value,
+            user_message: document.querySelector('#message').value.trim(),
+          };
+          if (evidenceText) body.evidence = JSON.parse(evidenceText);
+          if (operation.value === 'visualize') {
+            const refs = document.querySelector('#entity-refs').value.split(',').map((value) => value.trim()).filter(Boolean);
+            const style = document.querySelector('#style-direction').value.trim();
+            body.visualization_request = { mode: document.querySelector('#visual-mode').value, selected_entity_refs: refs };
+            if (style) body.visualization_request.style_direction = style;
+          }
+          const data = await post('/api/turn', body);
+          document.querySelector('#meta').innerHTML = `<span>${data.response.operation}</span><span>${data.response.status}</span><span>${data.response.locale}</span><span>${data.session_id}</span>`;
+          document.querySelector('#response-message').textContent = data.response.message;
+          document.querySelector('#json-output').textContent = JSON.stringify(data.response, null, 2);
+          empty.hidden = true;
+          result.hidden = false;
+          status.textContent = 'Validated response received.';
+        } catch (error) {
+          status.className = 'status error';
+          status.textContent = error instanceof Error ? error.message : String(error);
+        } finally { send.disabled = false; }
+      });
+
+      document.querySelector('#reset').addEventListener('click', async () => {
+        status.className = 'status';
+        status.textContent = 'Resetting local home state…';
+        try {
+          await post('/api/reset', { home_id: document.querySelector('#home-id').value.trim() });
+          result.hidden = true;
+          empty.hidden = false;
+          status.textContent = 'Local state reset. The next turn starts a new session.';
+        } catch (error) {
+          status.className = 'status error';
+          status.textContent = error instanceof Error ? error.message : String(error);
+        }
+      });
+    </script>
+  </body>
+</html>

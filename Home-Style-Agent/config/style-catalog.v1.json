@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.0",
+  "styles": {
+    "modern_east": {
+      "display_name": "Modern East",
+      "display_name_zh": "摩登东方",
+      "knowledge_version": "0.1-research",
+      "source_directory": "knowledge/modern-east",
+      "default_profile": "quiet-poise",
+      "supported_rooms": [
+        "living_room",
+        "primary_bedroom",
+        "kitchen",
+        "dining_room",
+        "bathroom",
+        "home_office"
+      ],
+      "runtime_projection": {
+        "include": [
+          "modern-east-knowledge-base.md",
+          "prompts/modern-east-prompts.md",
+          "schema/modern-east.v1.yaml"
+        ],
+        "exclude": [
+          "reference-images/**",
+          "sources/**"
+        ]
+      }
+    }
+  }
+}

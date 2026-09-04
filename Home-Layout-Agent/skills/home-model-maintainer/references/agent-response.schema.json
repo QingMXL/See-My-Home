@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://seemyhome.ai/schemas/home-agent-response-1.0.json",
+  "title": "See My Home — Home Layout Agent Response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "request_id", "home_id", "operation", "status", "locale", "message", "home_model", "diagnosis", "visualization_brief", "questions", "warnings"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "request_id": { "$ref": "#/$defs/id" },
+    "home_id": { "$ref": "#/$defs/id" },
+    "operation": { "enum": ["intake", "correct", "diagnose", "visualize"] },
+    "status": { "enum": ["completed", "needs_confirmation", "insufficient_input", "failed"] },
+    "locale": { "enum": ["en-US", "zh-CN"] },
+    "message": { "type": "string", "minLength": 1, "maxLength": 8000 },
+    "home_model": {
+      "oneOf": [
+        { "$ref": "https://seemyhome.ai/schemas/home-model-2.0.json" },
+        { "type": "null" }
+      ]
+    },
+    "diagnosis": { "oneOf": [{ "$ref": "#/$defs/diagnosis" }, { "type": "null" }] },
+    "visualization_brief": { "oneOf": [{ "$ref": "#/$defs/visualizationBrief" }, { "type": "null" }] },
+    "questions": { "type": "array", "maxItems": 3, "items": { "$ref": "#/$defs/question" } },
+    "warnings": { "type": "array", "maxItems": 20, "items": { "type": "string", "minLength": 1, "maxLength": 500 } }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "operation": { "enum": ["intake", "correct"] } }, "required": ["operation"] },
+      "then": { "properties": { "home_model": { "$ref": "https://seemyhome.ai/schemas/home-model-2.0.json" } } }
+    },
+    {
+      "if": { "properties": { "operation": { "const": "diagnose" } }, "required": ["operation"] },
+      "then": { "properties": { "diagnosis": { "$ref": "#/$defs/diagnosis" } } }
+    },
+    {
+      "if": { "properties": { "operation": { "const": "visualize" } }, "required": ["operation"] },
+      "then": { "properties": { "visualization_brief": { "$ref": "#/$defs/visualizationBrief" } } }
+    }
+  ],
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{2,127}$" },
+    "idRefs": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+    "question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "question", "impact", "related_refs"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "question": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "impact": { "enum": ["low", "medium", "high"] },
+        "related_refs": { "$ref": "#/$defs/idRefs" }
+      }
+    },
+    "diagnosis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["based_on_model_revision", "finding_refs", "opportunity_refs", "summary", "assessment_items"],
+      "properties": {
+        "based_on_model_revision": { "type": "integer", "minimum": 1 },
+        "finding_refs": { "$ref": "#/$defs/idRefs" },
+        "opportunity_refs": { "$ref": "#/$defs/idRefs" },
+        "summary": { "type": "string", "minLength": 1, "maxLength": 800 },
+        "assessment_items": {
+          "type": "array",
+          "maxItems": 5,
+          "items": { "$ref": "#/$defs/assessmentItem" }
+        }
+      }
+    },
+    "localizedCopy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["en-US", "zh-CN"],
+      "properties": {
+        "en-US": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "zh-CN": { "type": "string", "minLength": 1, "maxLength": 500 }
+      }
+    },
+    "assessmentItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "category", "impact", "title", "statement", "affects_refs"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "category": { "enum": ["circulation", "functional_gap", "adjacency", "privacy", "daylight", "storage", "activity_conflict", "underused_space"] },
+        "impact": { "enum": ["low", "medium", "high"] },
+        "title": { "$ref": "#/$defs/localizedCopy" },
+        "statement": { "$ref": "#/$defs/localizedCopy" },
+        "affects_refs": { "$ref": "#/$defs/idRefs" }
+      }
+    },
+    "visualizationBrief": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["based_on_model_revision", "mode", "fidelity_status", "selected_entity_refs", "frozen_elements", "allowed_changes", "positive_prompt", "negative_prompt", "preferred_providers"],
+      "properties": {
+        "based_on_model_revision": { "type": "integer", "minimum": 1 },
+        "mode": { "enum": ["colorized_plan", "visual_home_model", "conceptual_perspective"] },
+        "fidelity_status": { "enum": ["faithful_to_confirmed_geometry", "conceptual_not_measured", "insufficient_geometry"] },
+        "selected_entity_refs": { "$ref": "#/$defs/idRefs" },
+        "frozen_elements": { "$ref": "#/$defs/idRefs" },
+        "allowed_changes": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 500 } },
+        "positive_prompt": { "type": "string", "minLength": 1, "maxLength": 8000 },
+        "negative_prompt": { "type": "string", "minLength": 1, "maxLength": 8000 },
+        "preferred_providers": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 200 } }
+      }
+    }
+  }
+}

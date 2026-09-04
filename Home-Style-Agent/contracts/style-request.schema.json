@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://see-my-home.local/contracts/home-style-request-v1.json",
+  "title": "Home Style Request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "request_id",
+    "home_id",
+    "source_asset_ref",
+    "room_type",
+    "style_id",
+    "renovation_scope"
+  ],
+  "properties": {
+    "contract_version": { "const": "home-style-v1" },
+    "request_id": { "type": "string", "minLength": 1 },
+    "home_id": { "type": "string", "minLength": 1 },
+    "source_asset_ref": { "type": "string", "minLength": 1 },
+    "room_type": {
+      "enum": [
+        "living_room",
+        "primary_bedroom",
+        "kitchen",
+        "dining_room",
+        "bathroom",
+        "home_office",
+        "other"
+      ]
+    },
+    "style_id": { "const": "modern_east" },
+    "style_profile": {
+      "enum": ["quiet-poise", "urban-elegance", "sculptural-luxe", "warm-residence"]
+    },
+    "renovation_scope": {
+      "enum": ["soft_furnishing_only", "finishes_and_furnishing", "limited_hard_finish"]
+    },
+    "user_preferences": {
+      "type": "array",
+      "items": { "type": "string", "maxLength": 240 },
+      "maxItems": 12
+    },
+    "known_immutable_elements": {
+      "type": "array",
+      "items": { "type": "string", "maxLength": 160 },
+      "maxItems": 40
+    }
+  }
+}

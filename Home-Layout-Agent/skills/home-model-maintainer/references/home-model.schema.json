@@ -1,0 +1,406 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://seemyhome.ai/schemas/home-model-2.0.json",
+  "title": "See My Home — Canonical Home Model",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "home_id", "model_revision", "status", "locale",
+    "measurement_policy", "coordinate_system", "scale", "sources", "floors",
+    "spaces", "room_programs", "boundaries", "openings", "objects", "relationships",
+    "living_patterns", "constraints", "problems", "opportunities",
+    "open_questions", "change_log"
+  ],
+  "properties": {
+    "schema_version": { "const": "2.0" },
+    "home_id": { "$ref": "#/$defs/id" },
+    "model_revision": { "type": "integer", "minimum": 1 },
+    "status": { "enum": ["draft", "needs_confirmation", "confirmed_enough", "scale_confirmed"] },
+    "locale": { "enum": ["en-US", "zh-CN"] },
+    "measurement_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["system", "linear_storage", "area_storage", "us_listing_area_display"],
+      "properties": {
+        "system": { "const": "metric" },
+        "linear_storage": { "const": "mm" },
+        "area_storage": { "const": "m2" },
+        "us_listing_area_display": { "enum": ["none", "sq_ft_secondary"] }
+      }
+    },
+    "coordinate_system": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "unit", "origin", "x_axis", "y_axis", "north_angle_deg"],
+      "properties": {
+        "type": { "const": "local_plan_2d" },
+        "unit": { "const": "mm" },
+        "origin": { "const": "floor_envelope_bottom_left" },
+        "x_axis": { "const": "right" },
+        "y_axis": { "const": "up" },
+        "north_angle_deg": { "type": ["number", "null"], "minimum": 0, "exclusiveMaximum": 360 }
+      }
+    },
+    "scale": { "$ref": "#/$defs/scale" },
+    "sources": { "type": "array", "items": { "$ref": "#/$defs/source" } },
+    "floors": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/floor" } },
+    "spaces": { "type": "array", "items": { "$ref": "#/$defs/space" } },
+    "excluded_regions": { "type": "array", "items": { "$ref": "#/$defs/excludedRegion" } },
+    "room_programs": { "type": "array", "items": { "$ref": "#/$defs/roomProgram" } },
+    "boundaries": { "type": "array", "items": { "$ref": "#/$defs/boundary" } },
+    "openings": { "type": "array", "items": { "$ref": "#/$defs/opening" } },
+    "objects": { "type": "array", "items": { "$ref": "#/$defs/object" } },
+    "relationships": { "type": "array", "items": { "$ref": "#/$defs/relationship" } },
+    "living_patterns": { "type": "array", "items": { "$ref": "#/$defs/livingPattern" } },
+    "constraints": { "type": "array", "items": { "$ref": "#/$defs/constraint" } },
+    "problems": { "type": "array", "items": { "$ref": "#/$defs/problem" } },
+    "opportunities": { "type": "array", "items": { "$ref": "#/$defs/opportunity" } },
+    "open_questions": { "type": "array", "maxItems": 3, "items": { "$ref": "#/$defs/question" } },
+    "change_log": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/change" } }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{2,127}$" },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "state": { "enum": ["observed", "inferred", "user_confirmed"] },
+    "sourceRefs": {
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": { "$ref": "#/$defs/id" }
+    },
+    "idRefs": {
+      "type": "array", "uniqueItems": true,
+      "items": { "$ref": "#/$defs/id" }
+    },
+    "metricPoint": {
+      "type": "array",
+      "prefixItems": [
+        { "type": "integer", "minimum": 0 },
+        { "type": "integer", "minimum": 0 }
+      ],
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "normalizedPoint": {
+      "type": "array",
+      "prefixItems": [
+        { "type": "number", "minimum": 0, "maximum": 1 },
+        { "type": "number", "minimum": 0, "maximum": 1 }
+      ],
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "metricGeometry": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "floor_ref", "coordinate_space", "unit", "coordinates", "precision"],
+          "properties": {
+            "kind": { "enum": ["point", "polyline", "polygon"] },
+            "floor_ref": { "$ref": "#/$defs/id" },
+            "coordinate_space": { "const": "local_plan_2d" },
+            "unit": { "const": "mm" },
+            "coordinates": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/metricPoint" } },
+            "precision": { "enum": ["estimated", "measured", "verified"] }
+          }
+        }
+      ]
+    },
+    "sourceGeometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_ref", "coordinate_space", "kind", "coordinates", "confidence"],
+      "properties": {
+        "source_ref": { "$ref": "#/$defs/id" },
+        "coordinate_space": { "const": "image_normalized_0_1" },
+        "kind": { "enum": ["point", "polyline", "polygon"] },
+        "coordinates": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/normalizedPoint" } },
+        "confidence": { "$ref": "#/$defs/confidence" }
+      }
+    },
+    "geometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["metric", "source_geometries"],
+      "properties": {
+        "metric": { "$ref": "#/$defs/metricGeometry" },
+        "source_geometries": { "type": "array", "items": { "$ref": "#/$defs/sourceGeometry" } }
+      }
+    },
+    "scale": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "millimeters_per_source_unit", "source_ref"],
+      "properties": {
+        "status": { "enum": ["unknown", "estimated", "confirmed"] },
+        "millimeters_per_source_unit": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "source_ref": { "oneOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "label", "received_at"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "kind": { "enum": ["floor_plan", "room_photo", "measurement", "user_statement", "vision_model_output", "user_correction"] },
+        "label": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "asset_ref": { "type": ["string", "null"], "maxLength": 500 },
+        "provider_model": { "type": ["string", "null"], "maxLength": 200 },
+        "received_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "floor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "level_index", "state", "confidence", "source_refs"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "level_index": { "type": "integer" },
+        "state": { "$ref": "#/$defs/state" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "source_refs": { "$ref": "#/$defs/sourceRefs" }
+      }
+    },
+    "space": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "floor_ref", "label", "architectural_type", "actual_uses", "geometry", "area_m2", "state", "confidence", "source_refs"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "floor_ref": { "$ref": "#/$defs/id" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "architectural_type": { "enum": ["living_room", "kitchen", "dining", "bedroom", "bathroom", "entry", "hallway", "balcony", "utility", "storage", "work_area", "other", "unknown"] },
+        "actual_uses": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 100 } },
+        "geometry": { "$ref": "#/$defs/geometry" },
+        "area_m2": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "state": { "$ref": "#/$defs/state" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "source_refs": { "$ref": "#/$defs/sourceRefs" }
+      }
+    },
+    "excludedRegion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "reason", "geometry", "state", "confidence", "source_refs"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "reason": { "enum": ["lightwell", "double_height", "void", "shaft", "outside_envelope", "user_excluded", "other"] },
+        "geometry": { "$ref": "#/$defs/geometry" },
+        "state": { "$ref": "#/$defs/state" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "source_refs": { "$ref": "#/$defs/sourceRefs" }
+      }
+    },
+    "roomProgram": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["space_ref", "function_code", "baseline_objects", "conditional_objects", "default_object_counts", "user_overrides", "status", "source_refs"],
+      "properties": {
+        "space_ref": { "$ref": "#/$defs/id" },
+        "function_code": {
+          "enum": ["living_room", "family_room", "dining_room", "kitchen", "primary_bedroom", "guest_bedroom", "kids_room", "nursery", "home_office", "walk_in_closet", "bathroom", "powder_room", "laundry_room", "pantry", "mudroom", "entry", "balcony", "den", "storage", "garage", "home_theater", "fitness_room", "game_room", "other"]
+        },
+        "baseline_objects": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 100 } },
+        "conditional_objects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["object", "condition"],
+            "properties": {
+              "object": { "type": "string", "minLength": 1, "maxLength": 100 },
+              "condition": { "type": "string", "minLength": 1, "maxLength": 300 }
+            }
+          }
+        },
+        "default_object_counts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["object", "min_count", "max_count"],
+            "properties": {
+              "object": { "type": "string", "minLength": 1, "maxLength": 100 },
+              "min_count": { "type": "integer", "minimum": 0, "maximum": 20 },
+              "max_count": { "type": "integer", "minimum": 0, "maximum": 20 }
+            }
+          }
+        },
+        "user_overrides": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["include_objects", "exclude_objects", "replace_objects"],
+          "properties": {
+            "include_objects": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 100 } },
+            "exclude_objects": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 100 } },
+            "replace_objects": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["from", "to"],
+                "properties": {
+                  "from": { "type": "string", "minLength": 1, "maxLength": 100 },
+                  "to": { "type": "string", "minLength": 1, "maxLength": 100 }
+                }
+              }
+            }
+          }
+        },
+        "status": { "enum": ["system_default", "user_adjusted"] },
+        "source_refs": { "$ref": "#/$defs/sourceRefs" }
+      }
+    },
+    "boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "between_refs", "geometry", "structural_status", "state", "confidence", "source_refs"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "kind": { "enum": ["wall", "partition", "exterior_edge", "unknown"] },
+        "between_refs": { "$ref": "#/$defs/idRefs" },
+        "geometry": { "$ref": "#/$defs/geometry" },
+        "structural_status": { "enum": ["unknown", "verified_load_bearing", "verified_non_load_bearing"] },
+        "state": { "$ref": "#/$defs/state" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "source_refs": { "$ref": "#/$defs/sourceRefs" }
+      }
+    },
+    "opening": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "connects_refs", "geometry", "width_mm", "state", "confidence", "source_refs"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "kind": { "enum": ["door", "window", "open_passage", "unknown"] },
+        "connects_refs": { "$ref": "#/$defs/idRefs" },
+        "geometry": { "$ref": "#/$defs/geometry" },
+        "width_mm": { "type": ["integer", "null"], "exclusiveMinimum": 0 },
+        "swing_or_orientation": { "type": ["string", "null"], "maxLength": 100 },
+        "state": { "$ref": "#/$defs/state" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "source_refs": { "$ref": "#/$defs/sourceRefs" }
+      }
+    },
+    "object": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "label", "space_ref", "geometry", "retention", "fixed", "state", "confidence", "source_refs"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "kind": { "enum": ["furniture", "fixture", "cabinetry", "appliance", "other"] },
+        "label": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "space_ref": { "oneOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+        "geometry": { "$ref": "#/$defs/geometry" },
+        "retention": { "enum": ["must_keep", "prefer_keep", "replaceable", "unknown"] },
+        "fixed": { "enum": ["yes", "no", "unknown"] },
+        "state": { "$ref": "#/$defs/state" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "source_refs": { "$ref": "#/$defs/sourceRefs" }
+      }
+    },
+    "relationship": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "from_ref", "to_ref", "state", "confidence", "source_refs"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "enum": ["adjacent", "connected", "visible_to", "circulation_through", "daylight_from", "activity_overlap"] },
+        "from_ref": { "$ref": "#/$defs/id" },
+        "to_ref": { "$ref": "#/$defs/id" },
+        "state": { "$ref": "#/$defs/state" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "source_refs": { "$ref": "#/$defs/sourceRefs" }
+      }
+    },
+    "livingPattern": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "statement", "space_refs", "frequency", "priority", "state", "confidence", "source_refs"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "statement": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "space_refs": { "$ref": "#/$defs/idRefs" },
+        "frequency": { "enum": ["daily", "weekly", "occasional", "unknown"] },
+        "priority": { "enum": ["low", "medium", "high", "unknown"] },
+        "state": { "$ref": "#/$defs/state" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "source_refs": { "$ref": "#/$defs/sourceRefs" }
+      }
+    },
+    "constraint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "category", "statement", "strength", "status", "state", "confidence", "source_refs"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "category": { "enum": ["physical", "retained_item", "budget", "household", "legal", "safety", "preference", "other"] },
+        "statement": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "strength": { "enum": ["hard", "soft"] },
+        "status": { "enum": ["active", "superseded"] },
+        "state": { "$ref": "#/$defs/state" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "source_refs": { "$ref": "#/$defs/sourceRefs" }
+      }
+    },
+    "problem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "kind", "statement", "affects_refs", "evidence_refs", "impact", "state", "confidence", "status"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "enum": ["circulation", "storage", "functional_mismatch", "bottleneck", "daylight", "activity_conflict", "underused_space", "other"] },
+        "kind": { "enum": ["finding", "hypothesis"] },
+        "statement": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "affects_refs": { "$ref": "#/$defs/idRefs" },
+        "evidence_refs": { "$ref": "#/$defs/sourceRefs" },
+        "impact": { "enum": ["low", "medium", "high"] },
+        "state": { "$ref": "#/$defs/state" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "status": { "enum": ["proposed", "user_confirmed", "resolved", "rejected"] }
+      }
+    },
+    "opportunity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "statement", "responds_to_refs", "constraint_refs", "intervention_level", "reversibility", "requires_professional_verification", "status"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "statement": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "responds_to_refs": { "$ref": "#/$defs/idRefs" },
+        "constraint_refs": { "$ref": "#/$defs/idRefs" },
+        "intervention_level": { "enum": ["behavior", "furniture", "storage", "lighting", "finish", "structural_review"] },
+        "reversibility": { "enum": ["easy", "moderate", "hard"] },
+        "requires_professional_verification": { "type": "boolean" },
+        "status": { "enum": ["proposed", "user_accepted", "rejected", "implemented"] }
+      }
+    },
+    "question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "question", "impact", "related_refs", "status"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "question": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "impact": { "enum": ["low", "medium", "high"] },
+        "related_refs": { "$ref": "#/$defs/idRefs" },
+        "status": { "enum": ["open", "answered", "deferred"] }
+      }
+    },
+    "change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revision", "timestamp", "summary", "changed_ids", "source_refs"],
+      "properties": {
+        "revision": { "type": "integer", "minimum": 1 },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "summary": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "changed_ids": { "$ref": "#/$defs/idRefs" },
+        "source_refs": { "$ref": "#/$defs/sourceRefs" }
+      }
+    }
+  }
+}

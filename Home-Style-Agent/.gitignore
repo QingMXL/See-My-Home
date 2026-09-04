@@ -1,0 +1,4 @@
+.env
+.runtime/
+dist/
+config/knowledge-bindings.local.json
