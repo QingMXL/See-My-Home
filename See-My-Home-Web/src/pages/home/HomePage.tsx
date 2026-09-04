@@ -1,38 +1,31 @@
 import { Link } from "react-router-dom";
 import { Button, Sparkle } from "../../components/ui/Button";
-import { FurnishedPlan } from "../../components/visuals/FurnishedPlan";
-import { FurnitureRender } from "../../components/visuals/FurnitureRender";
-import { RoomScene } from "../../components/visuals/RoomScene";
-import { SAMPLE_DETECTED_ROOMS } from "../../data/rooms";
-import { STYLE_TEMPLATES } from "../../data/styleTemplates";
 import { useI18n } from "../../i18n/LanguageContext";
 import type { MsgKey } from "../../i18n/translations";
 import { useDesignStore } from "../../store/useDesignStore";
 import "./home.css";
 
-const warmTemplate = STYLE_TEMPLATES.find((t) => t.id === "studio-a")!;
-
-const TEMPLATE_CARDS: { to: string; titleKey: MsgKey; textKey: MsgKey; ctaKey: MsgKey; art: React.ReactNode }[] = [
+const TEMPLATE_CARDS: { to: string; titleKey: MsgKey; textKey: MsgKey; ctaKey: MsgKey; image: string }[] = [
   {
     to: "/layout",
     titleKey: "home.layout.title",
     textKey: "home.layout.text",
     ctaKey: "home.layout.cta",
-    art: <FurnishedPlan view="design" rooms={SAMPLE_DETECTED_ROOMS} />,
+    image: "/images/home/layout.jpg",
   },
   {
     to: "/style",
     titleKey: "home.style.title",
     textKey: "home.style.text",
     ctaKey: "home.style.cta",
-    art: <RoomScene variant="render" template={warmTemplate} />,
+    image: "/images/home/style.jpg",
   },
   {
     to: "/furniture",
     titleKey: "home.furniture.title",
     textKey: "home.furniture.text",
     ctaKey: "home.furniture.cta",
-    art: <FurnitureRender material="Walnut" legs="Metal Base" />,
+    image: "/images/home/furniture.jpg",
   },
 ];
 
@@ -66,8 +59,14 @@ export function HomePage() {
             <span aria-hidden="true">★★★★★</span> {t("home.trust")}
           </p>
         </div>
-        <div className="hero__art card" aria-hidden="true">
-          <RoomScene variant="render" template={warmTemplate} />
+        <div className="hero__art card">
+          <img
+            src="/images/home/hero.jpg"
+            alt="Warm modern open-plan living room and kitchen"
+            width="1584"
+            height="990"
+            fetchPriority="high"
+          />
         </div>
       </section>
 
@@ -78,7 +77,9 @@ export function HomePage() {
         <div className="templates__grid">
           {TEMPLATE_CARDS.map((card) => (
             <article key={card.titleKey} className="template-card card">
-              <div className="template-card__art">{card.art}</div>
+              <div className="template-card__art">
+                <img src={card.image} alt="" width="1584" height="990" loading="lazy" />
+              </div>
               <div className="template-card__body">
                 <h3>{t(card.titleKey)}</h3>
                 <p>{t(card.textKey)}</p>
