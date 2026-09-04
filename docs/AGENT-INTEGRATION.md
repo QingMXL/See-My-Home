@@ -6,7 +6,7 @@ See My Home has three independently developed Agent domains:
 | --- | --- | --- | --- |
 | Home Layout | `Home-Layout-Agent/` | `/api/home-layout/*`, `home-layout-v2` | Connected |
 | Home Style | `Home-Style-Agent/` | `/api/home-style/*`, `home-style-v1` | Connected |
-| Home Furniture | `Home-Furniture-Agent/` | `/api/home-furniture/*`, `home-furniture-v1` | Awaiting real Agent source |
+| Home Furniture | `Home-Furniture-Agent/` | `/api/home-furniture/*`, `home-furniture-v1` | Connected |
 
 ## Ownership boundary
 
@@ -16,7 +16,7 @@ The website must not call ZooWork directly and must not depend on an Agent's per
 Skill files, provisioning logic, or session implementation.
 
 Shared Blob storage is infrastructure, not shared Agent state. Every domain uses a
-separate pathname prefix (`uploads/layout`, `uploads/style`, and later
+separate pathname prefix (`uploads/layout`, `uploads/style`, and
 `uploads/furniture`). ZooWork credentials remain server-side.
 
 ## Preventing version drift
@@ -41,7 +41,7 @@ The Vercel environment variables are deliberately separate:
 
 - `ZOOWORK_AGENT_ID`
 - `ZOOWORK_STYLE_AGENT_ID`
-- `ZOOWORK_FURNITURE_AGENT_ID` (once the third Runtime is merged)
+- `ZOOWORK_FURNITURE_AGENT_ID`
 - `ZOOWORK_API_KEY` (shared account credential, server-side only)
 
 ## Concurrent work

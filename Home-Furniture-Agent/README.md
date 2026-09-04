@@ -1,13 +1,41 @@
-# Home Furniture Agent integration slot
+# Home Furniture Agent
 
-This directory is reserved for the independently developed Home Furniture Agent.
-It is intentionally not presented as a working Agent yet: the current website still
-uses a browser-only demo for furniture generation.
+ZooWork managed-Agent runtime for `home-furniture-v1`. Version 1 designs tables
+from a hand sketch, one inspiration image, text, or any supported combination.
+When both images are present, the sketch is the 80% form authority and the
+inspiration image supplies 20% of the material and style direction.
 
-When the real Agent source is merged, keep all of its Runtime, Skills, schemas,
-tests, provisioning code, and documentation inside this directory. Its public
-boundary must be `home-furniture-v1`; the website must reach it only through
-`/api/home-furniture/*` and must never import its internal implementation.
+The Agent publishes one concept render plus a validated JSON specification. The
+web application derives front, side, and top line drawings from the same canonical
+millimetre dimensions. These are concept views, not fabrication-ready shop drawings.
 
-See [`docs/AGENT-INTEGRATION.md`](../docs/AGENT-INTEGRATION.md) for the release and
-compatibility rules.
+## Local setup
+
+Copy `.env.example` to the ignored `.env`, then fill `ZOOWORK_API_KEY`. The model ID
+must be selected from the SDK's `listModels()` result. Provisioning is deliberately
+guarded and mutates ZooWork only when `ZOOWORK_ALLOW_REMOTE_WRITE=true`.
+
+```bash
+pnpm install
+pnpm check
+pnpm test
+pnpm package:skills
+pnpm models
+```
+
+After an explicitly approved provisioning run, copy the returned Agent ID to
+`ZOOWORK_FURNITURE_AGENT_ID`. For local image-input testing, the hosted Agent also
+needs a public HTTPS origin in `HOME_FURNITURE_PUBLIC_BASE_URL`; text-only testing
+does not require that source-image tunnel.
+
+```bash
+pnpm runtime
+```
+
+The Vite application proxies `/api/home-furniture/*` to the local runtime on port
+4319. Production uses the isolated Vercel adapter in `api/home-furniture.ts` and
+private Vercel Blob URLs.
+
+The Agent persona, Skills, JSON schemas, SDK runtime, provisioning code, and tests
+are all contained in this directory. Public integration rules live in
+[`docs/AGENT-INTEGRATION.md`](../docs/AGENT-INTEGRATION.md).

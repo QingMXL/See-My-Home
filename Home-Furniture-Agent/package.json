@@ -1,6 +1,31 @@
 {
   "name": "@see-my-home/home-furniture-agent",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
-  "description": "Reserved integration boundary for the independently developed Home Furniture Agent"
+  "description": "ZooWork runtime for sketch-led custom table concept design",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test tests/**/*.test.ts",
+    "package:skills": "node scripts/package-skills.mjs",
+    "models": "tsx src/cli.ts models",
+    "status": "tsx src/cli.ts status",
+    "provision": "tsx src/cli.ts provision",
+    "sync-skills": "tsx src/cli.ts sync-skills",
+    "runtime": "tsx src/local-test-server.ts"
+  },
+  "dependencies": {
+    "@zoowork-ai/sdk": "0.5.0",
+    "ajv": "8.17.1",
+    "ajv-formats": "3.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.0",
+    "tsx": "4.20.5",
+    "typescript": "5.9.2"
+  }
 }

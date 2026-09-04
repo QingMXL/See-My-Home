@@ -23,11 +23,11 @@
     "home-furniture": {
       "directory": "Home-Furniture-Agent",
       "package": "@see-my-home/home-furniture-agent",
-      "package_version": "0.0.0",
+      "package_version": "0.1.0",
       "runtime_contract": "home-furniture-v1",
       "agent_id_env": "ZOOWORK_FURNITURE_AGENT_ID",
       "api_namespace": "/api/home-furniture",
-      "status": "awaiting_source"
+      "status": "ready"
     }
   }
 }

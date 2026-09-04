@@ -7,8 +7,8 @@
   "scripts": {
     "dev": "pnpm --dir See-My-Home-Web dev",
     "build": "pnpm --dir See-My-Home-Web build",
-    "check": "node scripts/check-agent-release.mjs && tsc -p api/tsconfig.json --noEmit && pnpm --dir Home-Layout-Agent check && pnpm --dir Home-Style-Agent check",
-    "test": "pnpm --dir See-My-Home-Web test && pnpm --dir Home-Layout-Agent test && pnpm --dir Home-Style-Agent test",
+    "check": "node scripts/check-agent-release.mjs && tsc -p api/tsconfig.json --noEmit && pnpm --dir Home-Layout-Agent check && pnpm --dir Home-Style-Agent check && pnpm --dir Home-Furniture-Agent check",
+    "test": "pnpm --dir See-My-Home-Web test && pnpm --dir Home-Layout-Agent test && pnpm --dir Home-Style-Agent test && pnpm --dir Home-Furniture-Agent test",
     "preview": "pnpm --dir See-My-Home-Web preview"
   },
   "dependencies": {

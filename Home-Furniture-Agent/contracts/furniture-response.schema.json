@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://see-my-home.example/contracts/home-furniture-v1-response.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract_version", "request_id", "status", "table_type", "design_summary", "design_spec", "questions", "warnings", "qa"],
+  "properties": {
+    "contract_version": { "const": "home-furniture-v1" },
+    "request_id": { "type": "string", "minLength": 1, "maxLength": 160 },
+    "status": { "enum": ["completed", "needs_confirmation", "failed"] },
+    "table_type": { "enum": ["dining_table", "coffee_table", "console_table", "side_table", "desk", "bedside_table", "nesting_tables", "bar_table", "other_table"] },
+    "artifact_id": { "type": "string", "minLength": 1, "maxLength": 240 },
+    "design_summary": { "type": "string", "maxLength": 1200 },
+    "design_spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dimensions_mm", "top", "base", "materials", "components", "drawing_notes"],
+      "properties": {
+        "dimensions_mm": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["width", "depth", "height"],
+          "properties": {
+            "width": { "type": "integer", "minimum": 250, "maximum": 5000 },
+            "depth": { "type": "integer", "minimum": 200, "maximum": 2000 },
+            "height": { "type": "integer", "minimum": 150, "maximum": 1500 }
+          }
+        },
+        "top": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["shape", "edge_profile", "thickness_mm"],
+          "properties": {
+            "shape": { "enum": ["rectangular", "round", "oval", "square", "freeform"] },
+            "edge_profile": { "type": "string", "minLength": 1, "maxLength": 120 },
+            "thickness_mm": { "type": "integer", "minimum": 5, "maximum": 250 }
+          }
+        },
+        "base": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["style", "support_count"],
+          "properties": {
+            "style": { "type": "string", "minLength": 1, "maxLength": 120 },
+            "support_count": { "type": "integer", "minimum": 1, "maximum": 12 },
+            "inset_mm": { "type": "integer", "minimum": 0, "maximum": 1000 }
+          }
+        },
+        "materials": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["part", "material", "finish"],
+            "properties": {
+              "part": { "type": "string", "minLength": 1, "maxLength": 120 },
+              "material": { "type": "string", "minLength": 1, "maxLength": 120 },
+              "finish": { "type": "string", "maxLength": 120 }
+            }
+          }
+        },
+        "components": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 40,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "name", "role", "quantity"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$" },
+              "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+              "role": { "enum": ["top", "support", "apron", "stretcher", "shelf", "drawer", "hardware", "other"] },
+              "quantity": { "type": "integer", "minimum": 1, "maximum": 24 },
+              "dimensions_mm": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "width": { "type": "integer", "minimum": 1, "maximum": 5000 },
+                  "depth": { "type": "integer", "minimum": 1, "maximum": 2000 },
+                  "height": { "type": "integer", "minimum": 1, "maximum": 1500 }
+                }
+              }
+            }
+          }
+        },
+        "drawing_notes": { "type": "array", "maxItems": 12, "items": { "type": "string", "minLength": 1, "maxLength": 240 } }
+      }
+    },
+    "questions": { "type": "array", "maxItems": 3, "items": { "type": "string", "minLength": 1, "maxLength": 400 } },
+    "warnings": { "type": "array", "maxItems": 20, "items": { "type": "string", "minLength": 1, "maxLength": 500 } },
+    "qa": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sketch_geometry_preserved", "inspiration_language_applied", "dimensions_consistent", "function_plausible", "publishable"],
+      "properties": {
+        "sketch_geometry_preserved": { "type": "boolean" },
+        "inspiration_language_applied": { "type": "boolean" },
+        "dimensions_consistent": { "type": "boolean" },
+        "function_plausible": { "type": "boolean" },
+        "publishable": { "type": "boolean" }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "completed" } }, "required": ["status"] },
+      "then": {
+        "required": ["artifact_id"],
+        "properties": {
+          "artifact_id": {},
+          "qa": {
+            "type": "object",
+            "properties": {
+              "sketch_geometry_preserved": { "const": true },
+              "inspiration_language_applied": { "const": true },
+              "dimensions_consistent": { "const": true },
+              "function_plausible": { "const": true },
+              "publishable": { "const": true }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "enum": ["needs_confirmation", "failed"] } }, "required": ["status"] },
+      "then": { "properties": { "qa": { "type": "object", "properties": { "publishable": { "const": false } } } } }
+    }
+  ]
+}

@@ -23,6 +23,16 @@
       "maxDuration": 300,
       "memory": 2048,
       "includeFiles": "Home-Style-Agent/contracts/*.json"
+    },
+    "api/home-furniture.ts": {
+      "maxDuration": 300,
+      "memory": 2048,
+      "includeFiles": "Home-Furniture-Agent/{contracts,skills}/**/*"
+    },
+    "api/home-furniture/**/*.ts": {
+      "maxDuration": 300,
+      "memory": 2048,
+      "includeFiles": "Home-Furniture-Agent/{contracts,skills}/**/*"
     }
   },
   "rewrites": [

@@ -4,6 +4,12 @@ import { roomFunctionFrom, roomFunctionLabel, SAMPLE_DETECTED_ROOMS, type Detect
 import { STYLE_TEMPLATES } from "../data/styleTemplates";
 import type { LayoutGenerationResult, LayoutImageAnalysisResult, UploadedLayoutAsset } from "../lib/homeLayoutApi";
 import type { StyleGenerationResult, UploadedStyleAsset } from "../lib/homeStyleApi";
+import type {
+  FurnitureGenerationResult,
+  FurnitureTableType,
+  FurnitureTopShape,
+  UploadedFurnitureAsset,
+} from "../lib/homeFurnitureApi";
 
 export type GenerationPhase = "idle" | "generating" | "done" | "error";
 
@@ -47,15 +53,29 @@ interface StyleFlowState {
 }
 
 interface FurnitureFlowState {
+  projectId: string | null;
+  sketchName: string | null;
+  sketchUrl: string | null;
+  sketchAsset: UploadedFurnitureAsset | null;
+  inspirationName: string | null;
+  inspirationUrl: string | null;
+  inspirationAsset: UploadedFurnitureAsset | null;
+  tableType: FurnitureTableType;
   prompt: string;
   material: string;
+  secondaryMaterial: string;
   size: string;
   legs: string;
   handles: string;
   shelves: string;
+  topShape: FurnitureTopShape;
+  edgeProfile: string;
+  finish: string;
   phase: GenerationPhase;
   stepIndex: number;
   confirmed: boolean;
+  agentRun: FurnitureGenerationResult | null;
+  agentError: string | null;
 }
 
 interface DesignStore {
@@ -90,8 +110,14 @@ interface DesignStore {
   setStyleAgentError: (message: string | null) => void;
 
   setFurniturePrompt: (prompt: string) => void;
+  setFurnitureSource: (kind: "sketch" | "inspiration", name: string | null, url: string | null) => void;
+  setFurnitureUploadedAsset: (kind: "sketch" | "inspiration", asset: UploadedFurnitureAsset | null) => void;
+  setFurnitureTableType: (tableType: FurnitureTableType) => void;
   setFurnitureOption: (key: "material" | "size" | "legs" | "handles" | "shelves", value: string) => void;
+  setFurnitureAppearance: (key: "secondaryMaterial" | "topShape" | "edgeProfile" | "finish", value: string) => void;
   setFurniturePhase: (phase: GenerationPhase, stepIndex?: number) => void;
+  setFurnitureAgentRun: (run: FurnitureGenerationResult) => void;
+  setFurnitureAgentError: (message: string | null) => void;
   confirmFurniture: () => void;
 
   saveDesign: (design: Omit<SavedDesign, "id" | "savedAt">) => void;
@@ -128,15 +154,29 @@ const initialStyle: StyleFlowState = {
 };
 
 const initialFurniture: FurnitureFlowState = {
-  prompt: "A 96-inch walnut sideboard with a light stone top and an open shelf in the center.",
+  projectId: null,
+  sketchName: null,
+  sketchUrl: null,
+  sketchAsset: null,
+  inspirationName: null,
+  inspirationUrl: null,
+  inspirationAsset: null,
+  tableType: "dining_table",
+  prompt: "一张轮廓简洁的实木餐桌，保留手绘草图中的桌面比例和腿部位置。",
   material: "Walnut",
-  size: '96" W × 20" D × 30" H',
-  legs: "Metal Base",
-  handles: "Push-to-Open",
-  shelves: "Open Shelf in Center",
+  secondaryMaterial: "Blackened Steel",
+  size: "1800 × 900 × 750 mm",
+  legs: "Four Tapered Legs",
+  handles: "No Hardware",
+  shelves: "No Storage",
+  topShape: "rectangular",
+  edgeProfile: "Soft Radius",
+  finish: "Matte Clear Oil",
   phase: "idle",
   stepIndex: 0,
   confirmed: false,
+  agentRun: null,
+  agentError: null,
 };
 
 let nextId = 1;
@@ -289,10 +329,36 @@ export const useDesignStore = create<DesignStore>()(
     set((s) => ({ style: { ...s.style, agentError } })),
 
   setFurniturePrompt: (prompt) => set((s) => ({ furniture: { ...s.furniture, prompt } })),
+  setFurnitureSource: (kind, name, url) =>
+    set((s) => ({
+      furniture: {
+        ...s.furniture,
+        ...(kind === "sketch"
+          ? { sketchName: name, sketchUrl: url, sketchAsset: null }
+          : { inspirationName: name, inspirationUrl: url, inspirationAsset: null }),
+        confirmed: false,
+      },
+    })),
+  setFurnitureUploadedAsset: (kind, asset) =>
+    set((s) => ({
+      furniture: {
+        ...s.furniture,
+        projectId: asset?.project_id ?? s.furniture.projectId,
+        ...(kind === "sketch" ? { sketchAsset: asset } : { inspirationAsset: asset }),
+      },
+    })),
+  setFurnitureTableType: (tableType) =>
+    set((s) => ({ furniture: { ...s.furniture, tableType, confirmed: false } })),
   setFurnitureOption: (key, value) =>
+    set((s) => ({ furniture: { ...s.furniture, [key]: value, confirmed: false } })),
+  setFurnitureAppearance: (key, value) =>
     set((s) => ({ furniture: { ...s.furniture, [key]: value, confirmed: false } })),
   setFurniturePhase: (phase, stepIndex) =>
     set((s) => ({ furniture: { ...s.furniture, phase, stepIndex: stepIndex ?? s.furniture.stepIndex } })),
+  setFurnitureAgentRun: (agentRun) =>
+    set((s) => ({ furniture: { ...s.furniture, agentRun, agentError: null } })),
+  setFurnitureAgentError: (agentError) =>
+    set((s) => ({ furniture: { ...s.furniture, agentError } })),
   confirmFurniture: () => set((s) => ({ furniture: { ...s.furniture, confirmed: true } })),
 
   saveDesign: (design) =>
@@ -325,6 +391,26 @@ export const useDesignStore = create<DesignStore>()(
           agentRun: s.style.agentRun,
           renderHistory: s.style.renderHistory,
           refinements: s.style.refinements,
+          agentError: null,
+        },
+        furniture: {
+          ...initialFurniture,
+          projectId: s.furniture.projectId,
+          sketchName: s.furniture.sketchName,
+          inspirationName: s.furniture.inspirationName,
+          tableType: s.furniture.tableType,
+          prompt: s.furniture.prompt,
+          material: s.furniture.material,
+          secondaryMaterial: s.furniture.secondaryMaterial,
+          size: s.furniture.size,
+          legs: s.furniture.legs,
+          handles: s.furniture.handles,
+          shelves: s.furniture.shelves,
+          topShape: s.furniture.topShape,
+          edgeProfile: s.furniture.edgeProfile,
+          finish: s.furniture.finish,
+          phase: s.furniture.phase === "done" ? "done" : "idle",
+          agentRun: s.furniture.agentRun,
           agentError: null,
         },
       }),

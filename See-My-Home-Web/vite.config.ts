@@ -16,6 +16,11 @@ export default defineConfig({
         changeOrigin: false,
         rewrite: (path) => path.replace(/^\/api\/home-style/, '/api/site/style'),
       },
+      '/api/home-furniture': {
+        target: 'http://127.0.0.1:4319',
+        changeOrigin: false,
+        rewrite: (path) => path.replace(/^\/api\/home-furniture/, '/api/site/furniture'),
+      },
     },
   },
 })

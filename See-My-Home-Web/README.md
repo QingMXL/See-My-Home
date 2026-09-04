@@ -34,7 +34,7 @@ The agent layer is fully mocked behind a clean API boundary (`src/lib/agents.ts`
 
 - 🏠 **See My Layout** — upload (or use the sample plan) → AI room detection → confirm room uses from a tag library → lifestyle tags ("Anything special we should design around?") → staged generation → a furnished top-down plan with **Design / Furniture / Circulation / Room Labels** views, tailored layout notes, and key decisions
 - 🎨 **See My Style** — room photo + room type → six design templates with style tags → hero render + short design story → refinement loop with quick suggestions, agent replies, and version thumbnails (Original / Current / Refinements)
-- 🪑 **Make My Furniture** — sketch + inspiration + prompt → product-grade render → refine material / size / legs / handles / shelves → *"This is it"* → dimensioned front/side/top drawings + basic specification
+- 🪑 **Make My Furniture** — hand sketch, one inspiration image, and/or text → ZooWork table render → refine dimensions, materials, top, edge, base, finish, and features → *"This is it"* → dimensionally consistent concept front/side/top drawings + specification
 - 🗂️ **My Designs** — saved designs grouped by project, persisted in `localStorage`
 - 🌐 **Bilingual UI** — every string, generated note, design story, and tag label switches between English and 中文; the choice persists across sessions
 - ✨ **Parametric SVG imagery** — floor plans, renders, and drawings are drawn in code and react to your actual selections (room labels, lifestyle tags, template palettes, materials); downloads export real SVG files

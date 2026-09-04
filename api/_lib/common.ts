@@ -29,7 +29,7 @@ export function requestPath(value: unknown): string {
   return typeof value === 'string' ? value.replace(/^\/+|\/+$/g, '') : '';
 }
 
-export function privateBlobUrl(value: unknown, kind: 'layout' | 'style', projectId: string): string {
+export function privateBlobUrl(value: unknown, kind: 'layout' | 'style' | 'furniture', projectId: string): string {
   const raw = requireString(value, 'asset_id');
   let url: URL;
   try { url = new URL(raw); } catch { throw new Error('asset_id is not a valid Blob URL'); }
@@ -62,7 +62,7 @@ export function imageMime(contentType: string | null, fileName: string | null): 
 
 export async function persistGeneratedImage(input: {
   signedUrl: string;
-  kind: 'layout' | 'style';
+  kind: 'layout' | 'style' | 'furniture';
   projectId: string;
   requestId: string;
   artifactId: string;
