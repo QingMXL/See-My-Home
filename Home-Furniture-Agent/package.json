@@ -1,0 +1,6 @@
+{
+  "name": "@see-my-home/home-furniture-agent",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Reserved integration boundary for the independently developed Home Furniture Agent"
+}

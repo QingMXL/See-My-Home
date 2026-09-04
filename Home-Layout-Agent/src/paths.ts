@@ -5,9 +5,15 @@ import { existsSync } from 'node:fs';
 const sourceDirectory = dirname(fileURLToPath(import.meta.url));
 const directParent = resolve(sourceDirectory, '..');
 
-export const projectRoot = existsSync(resolve(directParent, 'package.json'))
-  ? directParent
-  : resolve(directParent, '..');
+const candidates = [
+  directParent,
+  resolve(directParent, '..'),
+  resolve(process.cwd(), 'Home-Layout-Agent'),
+];
+
+export const projectRoot = candidates.find((candidate) =>
+  existsSync(resolve(candidate, 'skills', 'home-model-maintainer', 'references', 'home-model.schema.json')),
+) ?? directParent;
 export const skillsRoot = resolve(projectRoot, 'skills');
 export const runtimeStatePath = resolve(projectRoot, '.runtime', 'agent-state.json');
 

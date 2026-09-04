@@ -14,8 +14,9 @@ export interface UploadedStyleAsset {
   mime_type: "image/jpeg" | "image/png" | "image/webp";
   size_bytes: number;
   sha256: string;
-  storage: "application_backend";
+  storage: "application_backend" | "vercel_blob";
   image_processing_status: "uploaded";
+  source_url?: string;
 }
 
 export interface StyleAgentResponse {
@@ -50,6 +51,18 @@ export interface StyleGenerationResult {
     size_bytes: number;
     provider_model: string;
   };
+  request_context?: StyleGenerateInput;
+}
+
+export interface StyleGenerateInput {
+  project_id: string;
+  asset_id: string;
+  locale: "en-US" | "zh-CN";
+  room_type: StyleRoomCode;
+  style_id: "modern_east";
+  style_profile?: StyleGenerationResult["style_profile"];
+  renovation_scope?: "soft_furnishing_only" | "finishes_and_furnishing" | "limited_hard_finish";
+  preferences?: string[];
 }
 
 async function readResponse<T>(response: Response): Promise<T> {
@@ -69,6 +82,30 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, tim
 }
 
 export async function uploadStylePhoto(file: File, locale: "en-US" | "zh-CN"): Promise<UploadedStyleAsset> {
+  if (!import.meta.env.DEV) {
+    const projectId = `style_${crypto.randomUUID()}`;
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "room-photo";
+    const blob = await upload(`uploads/style/${projectId}/${safeName}`, file, {
+      access: "private",
+      handleUploadUrl: "/api/home-style/upload",
+      clientPayload: JSON.stringify({ project_id: projectId }),
+      contentType: file.type || "application/octet-stream",
+      multipart: file.size > 4 * 1024 * 1024,
+    });
+    const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+    const sha256 = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+    return {
+      project_id: projectId,
+      asset_id: blob.url,
+      source_url: blob.url,
+      file_name: file.name,
+      mime_type: file.type as UploadedStyleAsset["mime_type"],
+      size_bytes: file.size,
+      sha256,
+      storage: "vercel_blob",
+      image_processing_status: "uploaded",
+    };
+  }
   const response = await fetchWithTimeout("/api/home-style/upload", {
     method: "POST",
     headers: {
@@ -80,16 +117,7 @@ export async function uploadStylePhoto(file: File, locale: "en-US" | "zh-CN"): P
   return readResponse<UploadedStyleAsset>(response);
 }
 
-export async function generateStyle(input: {
-  project_id: string;
-  asset_id: string;
-  locale: "en-US" | "zh-CN";
-  room_type: StyleRoomCode;
-  style_id: "modern_east";
-  style_profile?: StyleGenerationResult["style_profile"];
-  renovation_scope?: "soft_furnishing_only" | "finishes_and_furnishing" | "limited_hard_finish";
-  preferences?: string[];
-}): Promise<StyleGenerationResult> {
+export async function generateStyle(input: StyleGenerateInput): Promise<StyleGenerationResult> {
   const response = await fetchWithTimeout("/api/home-style/events/agent.generate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -98,11 +126,11 @@ export async function generateStyle(input: {
   return readResponse<StyleGenerationResult>(response);
 }
 
-export async function refineStyle(projectId: string, locale: "en-US" | "zh-CN", refinement: string): Promise<StyleGenerationResult> {
+export async function refineStyle(baseInput: StyleGenerateInput, locale: "en-US" | "zh-CN", refinement: string): Promise<StyleGenerationResult> {
   const response = await fetchWithTimeout("/api/home-style/events/agent.refine", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ project_id: projectId, locale, refinement }),
+    body: JSON.stringify({ base_input: baseInput, locale, refinement }),
   }, 720_000, locale === "zh-CN" ? "Home Style Agent 调整超时，请重试。" : "The Home Style Agent refinement timed out. Please try again.");
   return readResponse<StyleGenerationResult>(response);
 }
@@ -118,3 +146,4 @@ export function roomTypeToCode(room: string): StyleRoomCode {
   };
   return values[room] ?? "other";
 }
+import { upload } from "@vercel/blob/client";

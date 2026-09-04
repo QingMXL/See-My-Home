@@ -60,7 +60,10 @@ export function StyleResultPage() {
     setReplyKey(null);
     setStyleAgentError(null);
     try {
-      const run = await refineStyle(style.agentRun.project_id, lang === "zh" ? "zh-CN" : "en-US", ask);
+      if (!style.agentRun.request_context) {
+        throw new Error(lang === "zh" ? "缺少本次生成上下文，请返回风格页重新生成一次。" : "This result is missing its generation context. Return to Style and generate it once more.");
+      }
+      const run = await refineStyle(style.agentRun.request_context, lang === "zh" ? "zh-CN" : "en-US", ask);
       setStyleAgentRun(run, ask);
       setStylePhase("done");
       setSelectedFrame(-1);

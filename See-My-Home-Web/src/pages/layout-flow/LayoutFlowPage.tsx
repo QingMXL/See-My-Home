@@ -230,6 +230,12 @@ export function LayoutFlowPage() {
         source_kind: uploadedAsset ? "uploaded_analyzed" : "sample_plan",
         file_name: layout.fileName ?? undefined,
         asset_id: uploadedAsset?.asset_id,
+        analysis: imageAnalysis ? {
+          boundaries: imageAnalysis.boundaries,
+          openings: imageAnalysis.openings,
+          questions: imageAnalysis.questions,
+          warnings: imageAnalysis.warnings,
+        } : undefined,
       });
       setLayoutAgentRun(agentRun);
       setLayoutPhase("done");

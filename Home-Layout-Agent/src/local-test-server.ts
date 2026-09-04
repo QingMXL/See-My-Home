@@ -77,6 +77,7 @@ interface RefineInput {
   home_id?: unknown;
   locale?: unknown;
   user_message?: unknown;
+  base_input?: unknown;
 }
 
 type RuntimeTurnResult = Awaited<ReturnType<HomeLayoutRuntime['runStructuredTurn']>>;
@@ -889,6 +890,7 @@ const server = createServer(async (request, response) => {
         session_id: state.conversation.sessionId, image_processing_status: 'analyzed',
         intake, diagnosis: generation.result.response, visualization: generation.result.response,
         generated_image: generatedImage, render_plan: state.renderPlan, event_trace: ['room_map.confirm', 'agent.generate'],
+        request_context: input,
         tool_calls: generation.result.toolCalls.map((call) => call.toolName).filter(Boolean),
       });
       return;
@@ -898,7 +900,10 @@ const server = createServer(async (request, response) => {
       const raw = await readJson(request);
       if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) throw new Error('Body must be an object');
       const input = raw as RefineInput;
-      const projectId = requireString(input.home_id, 'home_id');
+      const baseInput = typeof input.base_input === 'object' && input.base_input !== null && !Array.isArray(input.base_input)
+        ? input.base_input as GenerateInput
+        : null;
+      const projectId = requireString(input.home_id ?? baseInput?.home_id, 'home_id');
       const state = projects.get(projectId);
       if (!state?.homeModel) throw new Error('Generate an initial confirmed layout before refining it');
       const locale = parseLocale(input.locale);
@@ -915,6 +920,7 @@ const server = createServer(async (request, response) => {
         session_id: state.conversation.sessionId, image_processing_status: 'analyzed',
         intake, diagnosis: generation.result.response, visualization: generation.result.response,
         generated_image: generatedImage, render_plan: state.renderPlan, event_trace: ['agent.refine'],
+        request_context: baseInput ?? { home_id: projectId },
         tool_calls: generation.result.toolCalls.map((call) => call.toolName).filter(Boolean),
       });
       return;

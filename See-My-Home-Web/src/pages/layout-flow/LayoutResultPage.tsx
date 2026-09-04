@@ -93,8 +93,11 @@ export function LayoutResultPage() {
     setRefining(true);
     setRefineError(null);
     try {
+      if (!agentRun.request_context) {
+        throw new Error(lang === "zh" ? "缺少本次生成上下文，请返回布局页重新生成一次。" : "This result is missing its generation context. Return to Layout and generate it once more.");
+      }
       const result = await refineLayout(
-        agentRun.intake.home_id,
+        agentRun.request_context,
         lang === "zh" ? "zh-CN" : "en-US",
         request,
       );

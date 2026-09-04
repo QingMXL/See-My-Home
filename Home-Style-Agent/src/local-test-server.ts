@@ -327,7 +327,7 @@ const server = createServer(async (request, response) => {
       const input = raw as Record<string, unknown>;
       if (input.style_id !== 'modern_east') throw new Error('Only modern_east is currently deployed');
       const state = await createState(input);
-      json(response, 200, await runGeneration(state, locale(input.locale)));
+      json(response, 200, { ...(await runGeneration(state, locale(input.locale))), request_context: input });
       return;
     }
     if (request.method === 'POST' && url.pathname === '/api/site/style/events/agent.refine') {
@@ -335,12 +335,15 @@ const server = createServer(async (request, response) => {
       const raw = await readJson(request);
       if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) throw new Error('Body must be an object');
       const input = raw as Record<string, unknown>;
-      const projectId = requireString(input.project_id, 'project_id');
+      const baseInput = typeof input.base_input === 'object' && input.base_input !== null && !Array.isArray(input.base_input)
+        ? input.base_input as Record<string, unknown>
+        : null;
+      const projectId = requireString(input.project_id ?? baseInput?.project_id, 'project_id');
       const state = projects.get(projectId);
       if (!state) throw new Error('Generate the initial style result before refining it');
       const refinement = requireString(input.refinement, 'refinement');
       state.preferences = [...state.preferences, refinement].slice(-12);
-      json(response, 200, await runGeneration(state, locale(input.locale)));
+      json(response, 200, { ...(await runGeneration(state, locale(input.locale))), request_context: baseInput ?? { project_id: projectId } });
       return;
     }
     if (request.method === 'POST' && url.pathname === '/api/site/style/reset') {

@@ -88,6 +88,7 @@ export interface LayoutGenerationResult {
     note: string | null;
   } | null;
   render_plan?: LayoutRenderPlan;
+  request_context?: GenerateLayoutInput;
 }
 
 export type LayoutPlacementKind =
@@ -150,6 +151,7 @@ export interface GenerateLayoutInput {
   source_kind: "sample_plan" | "uploaded_analyzed";
   file_name?: string;
   asset_id?: string;
+  analysis?: Pick<LayoutImageAnalysisResult, "boundaries" | "openings" | "questions" | "warnings">;
 }
 
 export interface UploadedLayoutAsset {
@@ -159,8 +161,9 @@ export interface UploadedLayoutAsset {
   mime_type: "image/jpeg" | "image/png" | "application/pdf";
   size_bytes: number;
   sha256: string;
-  storage: "application_backend";
+  storage: "application_backend" | "vercel_blob";
   image_processing_status: "uploaded";
+  source_url?: string;
 }
 
 export interface AnalyzedLayoutRoom {
@@ -251,7 +254,7 @@ export async function generateLayout(input: GenerateLayoutInput): Promise<Layout
 }
 
 export async function refineLayout(
-  homeId: string,
+  baseInput: GenerateLayoutInput,
   locale: "en-US" | "zh-CN",
   userMessage: string,
 ): Promise<LayoutGenerationResult> {
@@ -260,7 +263,7 @@ export async function refineLayout(
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ home_id: homeId, locale, user_message: userMessage }),
+      body: JSON.stringify({ base_input: baseInput, locale, user_message: userMessage }),
     },
     720_000,
     locale === "zh-CN"
@@ -274,6 +277,30 @@ export async function uploadLayoutFile(
   file: File,
   locale: "en-US" | "zh-CN",
 ): Promise<UploadedLayoutAsset> {
+  if (!import.meta.env.DEV) {
+    const projectId = `home_${crypto.randomUUID()}`;
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "floor-plan";
+    const blob = await upload(`uploads/layout/${projectId}/${safeName}`, file, {
+      access: "private",
+      handleUploadUrl: "/api/home-layout/upload",
+      clientPayload: JSON.stringify({ project_id: projectId }),
+      contentType: file.type || "application/octet-stream",
+      multipart: file.size > 4 * 1024 * 1024,
+    });
+    const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+    const sha256 = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+    return {
+      project_id: projectId,
+      asset_id: blob.url,
+      source_url: blob.url,
+      file_name: file.name,
+      mime_type: file.type as UploadedLayoutAsset["mime_type"],
+      size_bytes: file.size,
+      sha256,
+      storage: "vercel_blob",
+      image_processing_status: "uploaded",
+    };
+  }
   const response = await fetchWithTimeout(
     "/api/home-layout/upload",
     {
@@ -324,3 +351,4 @@ export async function resetLayoutAgent(homeId: string): Promise<void> {
   );
   await readResponse<{ reset: true }>(response);
 }
+import { upload } from "@vercel/blob/client";
