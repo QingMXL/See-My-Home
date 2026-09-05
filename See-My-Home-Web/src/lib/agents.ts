@@ -24,12 +24,15 @@ export const LAYOUT_GENERATION_STEPS: GenerationStep[] = [
 
 /** A short but complete-looking generation sequence for the bundled demo. */
 export const DEMO_LAYOUT_GENERATION_STEPS: GenerationStep[] = [
-  { labelKey: "gen.layout.reading", weight: 0.65 },
-  { labelKey: "gen.layout.confirming", weight: 0.65 },
-  { labelKey: "gen.layout.planning", weight: 1 },
-  { labelKey: "gen.layout.materials", weight: 1 },
-  { labelKey: "gen.layout.creating", weight: 1.25 },
+  { labelKey: "gen.layout.reading", weight: 0.4 },
+  { labelKey: "gen.layout.confirming", weight: 0.4 },
+  { labelKey: "gen.layout.planning", weight: 0.6 },
+  { labelKey: "gen.layout.materials", weight: 0.6 },
+  { labelKey: "gen.layout.creating", weight: 0.8 },
 ];
+
+export const DEMO_LAYOUT_UPLOAD_DELAY_MS = 350;
+export const DEMO_LAYOUT_DETECTION_DELAY_MS = 650;
 
 export const STYLE_GENERATION_STEPS: GenerationStep[] = [
   { labelKey: "gen.style.reading", weight: 1 },
@@ -45,6 +48,10 @@ export const FURNITURE_GENERATION_STEPS: GenerationStep[] = [
 ];
 
 const STEP_BASE_MS = 900;
+
+export function generationDurationMs(steps: GenerationStep[]) {
+  return steps.reduce((total, step) => total + STEP_BASE_MS * step.weight, 0);
+}
 
 /**
  * Runs a simulated generation, invoking `onStep` as each stage begins.

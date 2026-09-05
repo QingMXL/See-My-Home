@@ -20,7 +20,13 @@ import {
   roomFunctionLabel,
 } from "../../data/rooms";
 import { useI18n } from "../../i18n/LanguageContext";
-import { DEMO_LAYOUT_GENERATION_STEPS, LAYOUT_GENERATION_STEPS, runGeneration } from "../../lib/agents";
+import {
+  DEMO_LAYOUT_DETECTION_DELAY_MS,
+  DEMO_LAYOUT_GENERATION_STEPS,
+  DEMO_LAYOUT_UPLOAD_DELAY_MS,
+  LAYOUT_GENERATION_STEPS,
+  runGeneration,
+} from "../../lib/agents";
 import {
   createLayoutProject,
   generateLayout,
@@ -42,8 +48,6 @@ type Stage = "empty" | "sample-preview" | "uploading" | "detecting" | "confirm";
 type ConfirmationStep = "rooms" | "considerations";
 const SAMPLE_PLAN_WIDTH = 900;
 const SAMPLE_PLAN_HEIGHT = 560;
-const DEMO_UPLOAD_DELAY_MS = 650;
-const DEMO_DETECTION_DELAY_MS = 1250;
 
 function wait(ms: number) {
   return new Promise<void>((resolve) => window.setTimeout(resolve, ms));
@@ -150,9 +154,9 @@ export function LayoutFlowPage() {
     setConfirmationStep("rooms");
     setLayoutAgentError(null);
     setStage("uploading");
-    await wait(DEMO_UPLOAD_DELAY_MS);
+    await wait(DEMO_LAYOUT_UPLOAD_DELAY_MS);
     setStage("detecting");
-    await wait(DEMO_DETECTION_DELAY_MS);
+    await wait(DEMO_LAYOUT_DETECTION_DELAY_MS);
     const rooms = createDemoRooms();
     setLayoutRooms(rooms);
     setActiveRoomId(rooms[0]?.id ?? null);
@@ -331,7 +335,7 @@ export function LayoutFlowPage() {
   const lastUserExcludedRoom = [...(layout.excludedRooms ?? [])].reverse().find((room) => room.excludedBy === "user") ?? null;
 
   return (
-    <main className="page flow-page">
+    <main className={`page flow-page flow-page--${stage}`}>
       <Breadcrumbs crumbs={[{ label: t("crumb.home"), to: "/" }, { label: t("layout.crumb") }]} />
 
       <div className="flow-head">
@@ -498,7 +502,7 @@ export function LayoutFlowPage() {
                     onClick={() => setConfirmationStep("rooms")}
                   >
                     <span>2.1</span>
-                    {t("confirm.boundaryTitle")}
+                    {t("confirm.boundaryStepTitle")}
                   </button>
                   <button
                     type="button"
@@ -507,7 +511,7 @@ export function LayoutFlowPage() {
                     disabled={!readyToGenerate}
                   >
                     <span>2.2</span>
-                    {t("confirm.specialTitle")}
+                    {t("confirm.specialStepTitle")}
                   </button>
                 </nav>
 

@@ -158,7 +158,9 @@ export const MESSAGES = {
     zh: "我们不会分享你的户型图或个人信息。",
   },
   "confirm.internalSteps": { en: "Room confirmation steps", zh: "房间确认步骤" },
-  "confirm.boundaryTitle": { en: "Confirm rooms", zh: "确认房间边界与功能" },
+  "confirm.boundaryStepTitle": { en: "Rooms", zh: "边界与功能" },
+  "confirm.specialStepTitle": { en: "Requirements", zh: "特别要求" },
+  "confirm.boundaryTitle": { en: "Confirm boundaries & functions", zh: "确认边界与功能" },
   "confirm.boundaryIntro": {
     en: "Select a space on the plan. Drag its boundary points to correct the area, then choose its function here.",
     zh: "点击左侧空间进行检查。拖动边界节点可修正范围，并在这里修改空间功能。",

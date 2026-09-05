@@ -10,6 +10,11 @@ describe("MESSAGES", () => {
       expect(entry.zh, `${key}.zh`).toBeTruthy();
     }
   });
+
+  test("uses compact labels for the two room-confirmation substeps", () => {
+    expect(MESSAGES["confirm.boundaryStepTitle"].zh).toBe("边界与功能");
+    expect(MESSAGES["confirm.specialStepTitle"].zh).toBe("特别要求");
+  });
 });
 
 describe("TAG_ZH coverage", () => {

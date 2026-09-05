@@ -2,6 +2,10 @@ import { describe, expect, test, vi } from "vitest";
 import {
   buildLayoutResult,
   buildRefinementReplyKey,
+  DEMO_LAYOUT_DETECTION_DELAY_MS,
+  DEMO_LAYOUT_GENERATION_STEPS,
+  DEMO_LAYOUT_UPLOAD_DELAY_MS,
+  generationDurationMs,
   LAYOUT_GENERATION_STEPS,
   runGeneration,
 } from "./agents";
@@ -65,6 +69,14 @@ describe("buildRefinementReplyKey", () => {
 });
 
 describe("runGeneration", () => {
+  test("keeps the bundled Home Layout demo animations below ten seconds", () => {
+    const totalDuration = DEMO_LAYOUT_UPLOAD_DELAY_MS
+      + DEMO_LAYOUT_DETECTION_DELAY_MS
+      + generationDurationMs(DEMO_LAYOUT_GENERATION_STEPS);
+
+    expect(totalDuration).toBeLessThan(10_000);
+  });
+
   test("invokes every step in order, then resolves", async () => {
     // Arrange
     vi.useFakeTimers();
