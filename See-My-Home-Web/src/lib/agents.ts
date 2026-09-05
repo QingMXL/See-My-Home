@@ -22,6 +22,15 @@ export const LAYOUT_GENERATION_STEPS: GenerationStep[] = [
   { labelKey: "gen.layout.creating", weight: 1.4 },
 ];
 
+/** A short but complete-looking generation sequence for the bundled demo. */
+export const DEMO_LAYOUT_GENERATION_STEPS: GenerationStep[] = [
+  { labelKey: "gen.layout.reading", weight: 0.65 },
+  { labelKey: "gen.layout.confirming", weight: 0.65 },
+  { labelKey: "gen.layout.planning", weight: 1 },
+  { labelKey: "gen.layout.materials", weight: 1 },
+  { labelKey: "gen.layout.creating", weight: 1.25 },
+];
+
 export const STYLE_GENERATION_STEPS: GenerationStep[] = [
   { labelKey: "gen.style.reading", weight: 1 },
   { labelKey: "gen.style.direction", weight: 1 },

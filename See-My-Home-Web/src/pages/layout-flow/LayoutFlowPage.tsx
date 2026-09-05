@@ -20,10 +20,9 @@ import {
   STEP_TWO_REQUIREMENT_GROUPS,
   roomFunctionFrom,
   roomFunctionLabel,
-  SAMPLE_DETECTED_ROOMS,
 } from "../../data/rooms";
 import { useI18n } from "../../i18n/LanguageContext";
-import { LAYOUT_GENERATION_STEPS, runGeneration } from "../../lib/agents";
+import { DEMO_LAYOUT_GENERATION_STEPS, LAYOUT_GENERATION_STEPS, runGeneration } from "../../lib/agents";
 import {
   createLayoutProject,
   generateLayout,
@@ -41,10 +40,16 @@ import {
 import { useDesignStore } from "../../store/useDesignStore";
 import "./layout-flow.css";
 
-type Stage = "empty" | "uploading" | "detecting" | "confirm";
+type Stage = "empty" | "sample-preview" | "uploading" | "detecting" | "confirm";
 type ConfirmationStep = "rooms" | "considerations";
 const SAMPLE_PLAN_WIDTH = 900;
 const SAMPLE_PLAN_HEIGHT = 560;
+const DEMO_UPLOAD_DELAY_MS = 650;
+const DEMO_DETECTION_DELAY_MS = 1250;
+
+function wait(ms: number) {
+  return new Promise<void>((resolve) => window.setTimeout(resolve, ms));
+}
 
 function sampleRoomGeometry(roomId: string) {
   const room = ROOM_RECTS.find((candidate) => candidate.id === roomId);
@@ -138,30 +143,40 @@ export function LayoutFlowPage() {
     { title: t("layout.step3"), hint: t("layout.step3hint") },
   ];
 
-  const startDetection = (name: string, url: string | null, rooms = SAMPLE_DETECTED_ROOMS) => {
-    if (layout.fileUrl?.startsWith("blob:")) URL.revokeObjectURL(layout.fileUrl);
-    setLayoutFile(name, url);
-    setLayoutUploadedAsset(null);
-    setLayoutImageAnalysis(null);
-    setLayoutRooms(rooms);
-    setLayoutExcludedRooms([]);
-    setActiveRoomId(rooms[0]?.id ?? null);
-    setConfirmationStep("rooms");
-    setStage("detecting");
-    window.setTimeout(() => setStage("confirm"), 1400);
-  };
-
-  const startDemo = async () => {
+  const openDemoPreview = async () => {
     const [sourceAvailable, resultAvailable] = await Promise.all([
       imageAssetAvailable(DEMO_LAYOUT_SOURCE_URL),
       imageAssetAvailable(DEMO_LAYOUT_RESULT_URL),
     ]);
+    if (!sourceAvailable) {
+      setLayoutAgentError(t("samplePreview.missing"));
+      return;
+    }
     setDemoResultAvailable(resultAvailable);
-    startDetection(
-      DEMO_LAYOUT_FILE_NAME,
-      sourceAvailable ? DEMO_LAYOUT_SOURCE_URL : null,
-      createDemoRooms(),
-    );
+    setLayoutAgentError(null);
+    const resultPreload = new Image();
+    resultPreload.src = DEMO_LAYOUT_RESULT_URL;
+    setStage("sample-preview");
+  };
+
+  const confirmDemoUpload = async () => {
+    if (layout.fileUrl?.startsWith("blob:")) URL.revokeObjectURL(layout.fileUrl);
+    setLayoutFile(DEMO_LAYOUT_FILE_NAME, DEMO_LAYOUT_SOURCE_URL);
+    setLayoutUploadedAsset(null);
+    setLayoutImageAnalysis(null);
+    setLayoutRooms([]);
+    setLayoutExcludedRooms([]);
+    setActiveRoomId(null);
+    setConfirmationStep("rooms");
+    setLayoutAgentError(null);
+    setStage("uploading");
+    await wait(DEMO_UPLOAD_DELAY_MS);
+    setStage("detecting");
+    await wait(DEMO_DETECTION_DELAY_MS);
+    const rooms = createDemoRooms();
+    setLayoutRooms(rooms);
+    setActiveRoomId(rooms[0]?.id ?? null);
+    setStage("confirm");
   };
 
   const onFileChosen = async (file: File | undefined) => {
@@ -271,7 +286,7 @@ export function LayoutFlowPage() {
       };
       const agentRun = isDemoPlan
         ? await runGeneration(
-            LAYOUT_GENERATION_STEPS,
+            DEMO_LAYOUT_GENERATION_STEPS,
             (stepIndex) => setLayoutPhase("generating", stepIndex),
           ).then(() => createDemoLayoutResult({
             rooms: layout.rooms,
@@ -349,7 +364,7 @@ export function LayoutFlowPage() {
           <p className="flow-sub">{t("layout.sub")}</p>
         </div>
         <div className="flow-stepper">
-          <Stepper steps={steps} current={stage === "confirm" ? 1 : 0} />
+          <Stepper steps={steps} current={layout.phase === "generating" ? 2 : stage === "confirm" ? 1 : 0} />
         </div>
       </div>
 
@@ -363,7 +378,7 @@ export function LayoutFlowPage() {
           <p>{t("upload.desc")}</p>
           <div className="upload-zone__actions">
             <Button onClick={() => fileInputRef.current?.click()}>{t("upload.choose")}</Button>
-            <Button variant="secondary" onClick={() => void startDemo()}>
+            <Button variant="secondary" onClick={() => void openDemoPreview()}>
               {t("upload.sample")}
             </Button>
           </div>
@@ -375,6 +390,29 @@ export function LayoutFlowPage() {
             onChange={(e) => onFileChosen(e.target.files?.[0])}
           />
           <p className="upload-zone__note">{t("upload.note")}</p>
+          {layout.agentError && <p className="layout-agent-error" role="alert">{layout.agentError}</p>}
+        </section>
+      )}
+
+      {stage === "sample-preview" && (
+        <section className="card sample-preview" aria-labelledby="sample-preview-title">
+          <header className="sample-preview__head">
+            <div>
+              <span className="sample-preview__eyebrow">{t("samplePreview.original")}</span>
+              <h2 id="sample-preview-title">{t("samplePreview.title")}</h2>
+              <p>{t("samplePreview.sub")}</p>
+            </div>
+          </header>
+          <div className="sample-preview__canvas">
+            <img src={DEMO_LAYOUT_SOURCE_URL} alt={t("samplePreview.imageAlt")} />
+          </div>
+          <div className="sample-preview__actions">
+            <Button variant="secondary" onClick={() => setStage("empty")}>{t("samplePreview.back")}</Button>
+            <Button size="lg" onClick={() => void confirmDemoUpload()}>
+              <Sparkle />
+              {t("samplePreview.confirm")}
+            </Button>
+          </div>
         </section>
       )}
 
@@ -633,7 +671,11 @@ export function LayoutFlowPage() {
       )}
 
       {layout.phase === "generating" && (
-        <GeneratingOverlay title={t("gen.layoutTitle")} steps={LAYOUT_GENERATION_STEPS} activeIndex={layout.stepIndex} />
+        <GeneratingOverlay
+          title={t("gen.layoutTitle")}
+          steps={isDemoPlan ? DEMO_LAYOUT_GENERATION_STEPS : LAYOUT_GENERATION_STEPS}
+          activeIndex={layout.stepIndex}
+        />
       )}
     </main>
   );
