@@ -32,8 +32,7 @@ describe("Home Layout demo", () => {
   test("provides editable polygons calibrated to the bundled source plan", () => {
     const rooms = createDemoRooms();
     expect(rooms).toHaveLength(7);
-    expect(rooms.every((room) => (room.polygon?.length ?? 0) >= 4)).toBe(true);
-    expect(rooms.find((room) => room.id === "primary-bedroom")?.polygon).toHaveLength(8);
+    expect(rooms.every((room) => room.polygon?.length === 4)).toBe(true);
     expect(rooms.find((room) => room.id === "balcony")?.functionCode).toBe("balcony");
   });
 
@@ -50,7 +49,7 @@ describe("Home Layout demo", () => {
     expect(result.generated_image?.provider_model).toBe("Pre-rendered demo");
   });
 
-  test("falls back to the built-in illustrated plan while demo images are absent", () => {
+  test("reports no generated image while the bundled result asset is absent", () => {
     const result = createDemoLayoutResult({
       rooms: createDemoRooms(),
       locale: "zh-CN",
