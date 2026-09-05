@@ -20,11 +20,3 @@ export const ROOM_RECTS: RoomRect[] = [
   { id: "dining", x: 700, y: 40, w: 160, h: 250, floor: "wood" },
   { id: "living-room", x: 460, y: 230, w: 400, h: 290, floor: "wood" },
 ];
-
-/** Circulation flows drawn in the Circulation view. */
-export const PRIMARY_FLOW = "M 870 380 L 640 380 L 640 250 L 560 250";
-export const SECONDARY_FLOWS = [
-  "M 640 380 L 400 380 L 400 260 L 310 200",
-  "M 400 380 L 160 380 L 160 310",
-  "M 400 260 L 400 150 L 460 150",
-];

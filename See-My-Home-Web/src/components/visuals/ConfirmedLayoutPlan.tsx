@@ -100,8 +100,7 @@ export function ConfirmedLayoutPlan({
   view,
   roomLabel,
 }: ConfirmedLayoutPlanProps) {
-  const showFurniture = view === "design" || view === "furniture";
-  const showLabels = view === "design" || view === "labels";
+  const showLabels = view === "design";
   return (
     <div className="confirmed-layout-stage">
       <img className="confirmed-layout-source" src={imageUrl} alt={imageAlt} />
@@ -117,7 +116,7 @@ export function ConfirmedLayoutPlan({
         {boundaries.map((boundary) => <polyline key={boundary.id} points={boundary.path.map(([x, y]) => `${x},${y}`).join(" ")} className={`confirmed-layout-boundary confirmed-layout-boundary--${boundary.kind}`} />)}
         {openings.map((opening) => <circle key={opening.id} cx={opening.position[0]} cy={opening.position[1]} r={opening.kind === "window" ? 0.008 : 0.006} className={`confirmed-layout-opening confirmed-layout-opening--${opening.kind}`} />)}
       </svg>
-      {showFurniture && <div className="confirmed-layout-furniture-layer">{renderPlan.placements.map((placement) => <PlacementIcon key={placement.id} placement={placement} />)}</div>}
+      <div className="confirmed-layout-furniture-layer">{renderPlan.placements.map((placement) => <PlacementIcon key={placement.id} placement={placement} />)}</div>
       {showLabels && (
         <div className="confirmed-layout-labels">
           {rooms.map((room) => {

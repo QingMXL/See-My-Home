@@ -192,38 +192,6 @@
   box-shadow: 0 0.12rem 0.45rem rgb(15 23 42 / 0.14);
 }
 
-.legend {
-  position: absolute;
-  left: var(--space-4);
-  bottom: var(--space-4);
-  display: grid;
-  gap: 0.35rem;
-  background: var(--color-surface);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-lg);
-  font-size: var(--text-xs);
-  box-shadow: var(--shadow-card);
-  padding: var(--space-3) var(--space-4);
-}
-
-.legend__item::before {
-  content: "";
-  display: inline-block;
-  width: 1.4rem;
-  height: 0;
-  border-top: 3px dashed;
-  margin-right: 0.5rem;
-  vertical-align: middle;
-}
-
-.legend__item--primary::before {
-  color: #2563eb;
-}
-
-.legend__item--secondary::before {
-  color: #16a34a;
-}
-
 /* Sidebar */
 .result-side {
   position: sticky;

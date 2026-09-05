@@ -164,7 +164,13 @@
 }
 
 .room-map-toolbar .room-map-toolbar__remove {
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0 0.7rem;
   color: #9f3a38;
+  font-size: var(--text-xs);
 }
 
 .room-map-toolbar span {
@@ -281,19 +287,20 @@
   border: 0;
   border-radius: 50%;
   background: transparent;
-  color: #556b73;
+  color: #fff;
   transform: translate(-50%, -50%);
   pointer-events: auto;
-  opacity: 0.45;
+  opacity: 0.9;
 }
 
 .room-map-edge-point::before {
   content: "";
   position: absolute;
-  inset: 0.43rem;
-  border: 1px dashed #70858c;
+  inset: 0.3rem;
+  border: 1.5px solid #fff;
   border-radius: 50%;
-  background: rgb(255 255 255 / 0.92);
+  background: #556b73;
+  box-shadow: 0 1px 4px rgb(15 23 42 / 0.32);
 }
 
 .room-map-edge-point svg {
@@ -350,6 +357,30 @@
 
 .room-map-vertex:focus-visible::after {
   box-shadow: 0 0 0 3px rgb(85 107 115 / 0.24), 0 1px 4px rgb(15 23 42 / 0.2);
+}
+
+.room-map-vertex-remove {
+  position: absolute;
+  z-index: 4;
+  width: 1.35rem;
+  height: 1.35rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #9f3a38;
+  color: #fff;
+  box-shadow: 0 2px 7px rgb(15 23 42 / 0.3);
+  transform: translate(-50%, -50%) translate(0.85rem, -0.85rem);
+  pointer-events: auto;
+}
+
+.room-map-vertex-remove:hover,
+.room-map-vertex-remove:focus-visible {
+  background: #7f2928;
+  outline: 2px solid rgb(159 58 56 / 0.28);
+  outline-offset: 2px;
 }
 
 .room-map-labels {

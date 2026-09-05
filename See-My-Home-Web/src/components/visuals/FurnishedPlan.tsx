@@ -1,7 +1,7 @@
 import type { DetectedRoom } from "../../data/rooms";
-import { PLAN_VIEWBOX, PRIMARY_FLOW, ROOM_RECTS, SECONDARY_FLOWS } from "./planGeometry";
+import { PLAN_VIEWBOX, ROOM_RECTS } from "./planGeometry";
 
-export type PlanView = "design" | "furniture" | "circulation" | "labels";
+export type PlanView = "design" | "furniture";
 
 interface FurnishedPlanProps {
   view: PlanView;
@@ -19,9 +19,7 @@ const FLOOR_FILLS: Record<string, string> = {
  * materials, furniture, and light depth (PRD §10 layers 1–4).
  */
 export function FurnishedPlan({ view, rooms }: FurnishedPlanProps) {
-  const muted = view === "furniture";
-  const showCirculation = view === "circulation";
-  const showLabels = view === "labels";
+  const showLabels = view === "design";
 
   return (
     <svg viewBox={PLAN_VIEWBOX} role="img" aria-label={`Generated home layout — ${view} view`} style={{ width: "100%", height: "auto" }}>
@@ -50,7 +48,7 @@ export function FurnishedPlan({ view, rooms }: FurnishedPlanProps) {
       <rect x="0" y="0" width="900" height="560" fill="#f4f1ea" />
 
       {/* Layer 2 — material floors */}
-      <g opacity={muted ? 0.25 : 1}>
+      <g>
         {ROOM_RECTS.map((r) => (
           <rect key={r.id} x={r.x} y={r.y} width={r.w} height={r.h} fill={FLOOR_FILLS[r.floor]} />
         ))}
@@ -170,20 +168,6 @@ export function FurnishedPlan({ view, rooms }: FurnishedPlanProps) {
         <line x1="460" y1="390" x2="460" y2="520" />
         <line x1="400" y1="390" x2="460" y2="390" />
       </g>
-
-      {/* Circulation overlay */}
-      {showCirculation && (
-        <g fill="none" strokeLinecap="round">
-          <path d={PRIMARY_FLOW} stroke="#2563eb" strokeWidth="5" strokeDasharray="2 14" />
-          {SECONDARY_FLOWS.map((d) => (
-            <path key={d} d={d} stroke="#16a34a" strokeWidth="4" strokeDasharray="2 12" />
-          ))}
-          <circle cx="870" cy="380" r="14" fill="#2563eb" />
-          <text x="870" y="385" textAnchor="middle" fontSize="12" fontWeight={700} fill="#fff" fontFamily="Inter, sans-serif">
-            E
-          </text>
-        </g>
-      )}
 
       {/* Room label overlay */}
       {showLabels &&

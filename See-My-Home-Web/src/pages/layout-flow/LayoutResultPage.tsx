@@ -7,7 +7,7 @@ import { ConfirmedLayoutPlan } from "../../components/visuals/ConfirmedLayoutPla
 import { useI18n } from "../../i18n/LanguageContext";
 import type { MsgKey } from "../../i18n/translations";
 import { LAYOUT_GENERATION_STEPS } from "../../lib/agents";
-import { downloadImageWithLabels, downloadSvgIn } from "../../lib/download";
+import { downloadImage, downloadImageWithLabels, downloadSvgIn } from "../../lib/download";
 import { refineLayout } from "../../lib/homeLayoutApi";
 import { useDesignStore } from "../../store/useDesignStore";
 import { GeneratingOverlay } from "../../components/ui/GeneratingOverlay";
@@ -17,8 +17,6 @@ import "./layout-result.css";
 const VIEWS: { id: PlanView; labelKey: MsgKey }[] = [
   { id: "design", labelKey: "result.view.design" },
   { id: "furniture", labelKey: "result.view.furniture" },
-  { id: "circulation", labelKey: "result.view.circulation" },
-  { id: "labels", labelKey: "result.view.labels" },
 ];
 
 export function LayoutResultPage() {
@@ -71,14 +69,18 @@ export function LayoutResultPage() {
       return;
     }
     try {
-      await downloadImageWithLabels(
-        generatedImage.url,
-        layout.rooms.map((room) => ({
-          text: tTag(room.label),
-          anchor: room.labelAnchor ?? [room.x / 900, room.y / 560],
-        })),
-        "see-my-home-layout",
-      );
+      if (view === "furniture") {
+        await downloadImage(generatedImage.url, "see-my-home-layout-furniture");
+      } else {
+        await downloadImageWithLabels(
+          generatedImage.url,
+          layout.rooms.map((room) => ({
+            text: tTag(room.label),
+            anchor: room.labelAnchor ?? [room.x / 900, room.y / 560],
+          })),
+          "see-my-home-layout-design",
+        );
+      }
     } catch {
       flash(t("result.downloadError"));
     }
@@ -138,14 +140,14 @@ export function LayoutResultPage() {
             ))}
           </div>
           <div className="card result-canvas" ref={canvasRef}>
-            {generatedImage && view !== "circulation" ? (
+            {generatedImage ? (
               <div className="generated-layout-stage">
                 <img
                   className="generated-layout-image"
                   src={generatedImage.url}
                   alt={t("result.title")}
                 />
-                {(view === "design" || view === "labels") && (
+                {view === "design" && (
                   <div className="generated-room-labels">
                     {layout.rooms.map((room) => {
                       const anchor = room.labelAnchor ?? [room.x / 900, room.y / 560];
@@ -171,13 +173,6 @@ export function LayoutResultPage() {
               />
             ) : (
               <FurnishedPlan view={view} rooms={layout.rooms.map((r) => ({ ...r, label: tTag(r.label) }))} />
-            )}
-            {view === "circulation" && (
-              <div className="legend card--pad">
-                <strong>{t("result.circulation")}</strong>
-                <span className="legend__item legend__item--primary">{t("result.primaryFlow")}</span>
-                <span className="legend__item legend__item--secondary">{t("result.secondaryFlow")}</span>
-              </div>
             )}
           </div>
         </section>

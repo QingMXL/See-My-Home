@@ -9,6 +9,13 @@ import { FloorPlanSketch } from "../../components/visuals/FloorPlanSketch";
 import { RoomMapOverlay } from "../../components/visuals/RoomMapOverlay";
 import { ROOM_RECTS } from "../../components/visuals/planGeometry";
 import {
+  createDemoLayoutResult,
+  createDemoRooms,
+  DEMO_LAYOUT_FILE_NAME,
+  DEMO_LAYOUT_RESULT_URL,
+  DEMO_LAYOUT_SOURCE_URL,
+} from "../../data/layoutDemo";
+import {
   ROOM_CONFIRMATION_OPTIONS,
   STEP_TWO_REQUIREMENT_GROUPS,
   roomFunctionFrom,
@@ -16,12 +23,13 @@ import {
   SAMPLE_DETECTED_ROOMS,
 } from "../../data/rooms";
 import { useI18n } from "../../i18n/LanguageContext";
-import { LAYOUT_GENERATION_STEPS } from "../../lib/agents";
+import { LAYOUT_GENERATION_STEPS, runGeneration } from "../../lib/agents";
 import {
   createLayoutProject,
   generateLayout,
   uploadLayoutFile,
   type AnalyzedLayoutRoom,
+  type GenerateLayoutInput,
 } from "../../lib/homeLayoutApi";
 import {
   insertPolygonVertex,
@@ -54,6 +62,15 @@ function sampleRoomGeometry(roomId: string) {
       [left, bottom],
     ],
   };
+}
+
+async function imageAssetAvailable(url: string) {
+  try {
+    const response = await fetch(url, { method: "HEAD", cache: "no-store" });
+    return response.ok && (response.headers.get("content-type") ?? "").startsWith("image/");
+  } catch {
+    return false;
+  }
 }
 
 function analyzedRoomToDetectedRoom(room: AnalyzedLayoutRoom) {
@@ -105,13 +122,15 @@ export function LayoutFlowPage() {
   } = useDesignStore();
 
   const [stage, setStage] = useState<Stage>(
-    layout.fileName && (layout.fileUrl || layout.fileName === "Hillcrest-Floorplan.pdf") ? "confirm" : "empty",
+    layout.fileName && (layout.fileUrl || layout.fileName === DEMO_LAYOUT_FILE_NAME) ? "confirm" : "empty",
   );
   const [confirmationStep, setConfirmationStep] = useState<ConfirmationStep>("rooms");
   const [activeRoomId, setActiveRoomId] = useState<string | null>(layout.rooms[0]?.id ?? null);
   const uploadedAsset = layout.uploadedAsset;
   const imageAnalysis = layout.imageAnalysis;
   const [sampleProjectId] = useState(() => `home_sample_${Date.now().toString(36)}`);
+  const [demoResultAvailable, setDemoResultAvailable] = useState(false);
+  const isDemoPlan = layout.fileName === DEMO_LAYOUT_FILE_NAME;
 
   const steps = [
     { title: t("layout.step1"), hint: t("layout.step1hint") },
@@ -119,17 +138,30 @@ export function LayoutFlowPage() {
     { title: t("layout.step3"), hint: t("layout.step3hint") },
   ];
 
-  const startDetection = (name: string, url: string | null) => {
+  const startDetection = (name: string, url: string | null, rooms = SAMPLE_DETECTED_ROOMS) => {
     if (layout.fileUrl?.startsWith("blob:")) URL.revokeObjectURL(layout.fileUrl);
     setLayoutFile(name, url);
     setLayoutUploadedAsset(null);
     setLayoutImageAnalysis(null);
-    setLayoutRooms(SAMPLE_DETECTED_ROOMS);
+    setLayoutRooms(rooms);
     setLayoutExcludedRooms([]);
-    setActiveRoomId(SAMPLE_DETECTED_ROOMS[0]?.id ?? null);
+    setActiveRoomId(rooms[0]?.id ?? null);
     setConfirmationStep("rooms");
     setStage("detecting");
     window.setTimeout(() => setStage("confirm"), 1400);
+  };
+
+  const startDemo = async () => {
+    const [sourceAvailable, resultAvailable] = await Promise.all([
+      imageAssetAvailable(DEMO_LAYOUT_SOURCE_URL),
+      imageAssetAvailable(DEMO_LAYOUT_RESULT_URL),
+    ]);
+    setDemoResultAvailable(resultAvailable);
+    startDetection(
+      DEMO_LAYOUT_FILE_NAME,
+      sourceAvailable ? DEMO_LAYOUT_SOURCE_URL : null,
+      createDemoRooms(),
+    );
   };
 
   const onFileChosen = async (file: File | undefined) => {
@@ -176,7 +208,7 @@ export function LayoutFlowPage() {
   };
 
   const onGenerate = async () => {
-    if (layout.fileUrl && (!uploadedAsset || !imageAnalysis)) {
+    if (layout.fileUrl && !isDemoPlan && (!uploadedAsset || !imageAnalysis)) {
       setLayoutAgentError(t("layout.uploadError"));
       setLayoutPhase("error");
       return;
@@ -195,7 +227,7 @@ export function LayoutFlowPage() {
       const labels = layout.rooms.map((room) => room.label).join(", ");
       const priorities = layout.lifestyleTags.length > 0 ? layout.lifestyleTags.join(", ") : "none selected";
       const considerations = (layout.specialConsiderations ?? "").trim();
-      const agentRun = await generateLayout({
+      const generationInput: GenerateLayoutInput = {
         home_id: uploadedAsset?.project_id ?? sampleProjectId,
         locale: lang === "zh" ? "zh-CN" : "en-US",
         user_message:
@@ -236,7 +268,18 @@ export function LayoutFlowPage() {
           questions: imageAnalysis.questions,
           warnings: imageAnalysis.warnings,
         } : undefined,
-      });
+      };
+      const agentRun = isDemoPlan
+        ? await runGeneration(
+            LAYOUT_GENERATION_STEPS,
+            (stepIndex) => setLayoutPhase("generating", stepIndex),
+          ).then(() => createDemoLayoutResult({
+            rooms: layout.rooms,
+            locale: generationInput.locale,
+            requestContext: generationInput,
+            resultImageAvailable: demoResultAvailable,
+          }))
+        : await generateLayout(generationInput);
       setLayoutAgentRun(agentRun);
       setLayoutPhase("done");
       navigate("/layout/result");
@@ -320,7 +363,7 @@ export function LayoutFlowPage() {
           <p>{t("upload.desc")}</p>
           <div className="upload-zone__actions">
             <Button onClick={() => fileInputRef.current?.click()}>{t("upload.choose")}</Button>
-            <Button variant="secondary" onClick={() => startDetection("Hillcrest-Floorplan.pdf", null)}>
+            <Button variant="secondary" onClick={() => void startDemo()}>
               {t("upload.sample")}
             </Button>
           </div>
@@ -429,7 +472,7 @@ export function LayoutFlowPage() {
           </section>
 
           <section className="card--pad card confirm-panel" aria-label={t("confirm.title")}>
-            {(imageAnalysis?.rooms.length ?? 0) > 0 || !layout.fileUrl ? (
+            {(imageAnalysis?.rooms.length ?? 0) > 0 || !layout.fileUrl || isDemoPlan ? (
               <div className="step-two">
                 <nav className="step-two__progress" aria-label={t("confirm.internalSteps")}>
                   <button

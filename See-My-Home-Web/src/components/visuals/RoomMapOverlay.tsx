@@ -1,4 +1,4 @@
-import { Plus, Trash2 } from "lucide-react";
+import { Minus, Plus } from "lucide-react";
 import { useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import type { DetectedRoom } from "../../data/rooms";
 import type { AnalyzedLayoutBoundary, AnalyzedLayoutOpening } from "../../lib/homeLayoutApi";
@@ -137,7 +137,8 @@ export function RoomMapOverlay({
             aria-label={controls.removeVertex}
             title={controls.removeVertex}
           >
-            <Trash2 size={15} aria-hidden="true" />
+            <Minus size={15} aria-hidden="true" />
+            {controls.removeVertex}
           </button>
         )}
         <button type="button" onClick={() => setZoom((value) => Math.max(1, value - 0.25))} aria-label={controls.zoomOut}>−</button>
@@ -237,6 +238,24 @@ export function RoomMapOverlay({
                 />
               )))}
             </div>
+          )}
+          {editable && activeRoom?.polygon && selectedVertexIndex !== null && activeRoom.polygon.length > 3 && (
+            <button
+              type="button"
+              className="room-map-vertex-remove"
+              style={{
+                left: `${activeRoom.polygon[selectedVertexIndex][0] * 100}%`,
+                top: `${activeRoom.polygon[selectedVertexIndex][1] * 100}%`,
+              }}
+              aria-label={controls.removeVertex}
+              title={controls.removeVertex}
+              onClick={() => {
+                onRemoveVertex(activeRoom.id, selectedVertexIndex);
+                setSelectedVertex(null);
+              }}
+            >
+              <Minus size={13} aria-hidden="true" />
+            </button>
           )}
         </div>
       </div>

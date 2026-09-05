@@ -64,3 +64,17 @@ export async function downloadImageWithLabels(
   link.remove();
   URL.revokeObjectURL(url);
 }
+
+export async function downloadImage(imageUrl: string, baseName: string): Promise<void> {
+  const response = await fetch(imageUrl);
+  if (!response.ok) throw new Error(`Image download failed (${response.status})`);
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${baseName}.${blob.type === "image/jpeg" ? "jpg" : blob.type === "image/webp" ? "webp" : "png"}`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
