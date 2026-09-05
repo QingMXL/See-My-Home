@@ -2,8 +2,7 @@ import { useRef, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { Breadcrumbs } from "../../components/layout/Breadcrumbs";
 import { Button, Sparkle } from "../../components/ui/Button";
-import { FurnishedPlan, type PlanView } from "../../components/visuals/FurnishedPlan";
-import { ConfirmedLayoutPlan } from "../../components/visuals/ConfirmedLayoutPlan";
+import { ConfirmedLayoutPlan, type PlanView } from "../../components/visuals/ConfirmedLayoutPlan";
 import { useI18n } from "../../i18n/LanguageContext";
 import type { MsgKey } from "../../i18n/translations";
 import { LAYOUT_GENERATION_STEPS } from "../../lib/agents";
@@ -172,7 +171,10 @@ export function LayoutResultPage() {
                 roomLabel={(room) => tTag(room.label)}
               />
             ) : (
-              <FurnishedPlan view={view} rooms={layout.rooms.map((r) => ({ ...r, label: tTag(r.label) }))} />
+              <div className="result-image-unavailable" role="status">
+                <strong>{t("result.imageUnavailable")}</strong>
+                <p>{t("result.imageUnavailableBody")}</p>
+              </div>
             )}
           </div>
         </section>

@@ -134,17 +134,6 @@ export const ROOM_CONFIRMATION_OPTIONS = [
   "other",
 ] as const satisfies readonly RoomFunctionCode[];
 
-/** Rooms "detected" in the bundled sample floor plan. */
-export const SAMPLE_DETECTED_ROOMS: DetectedRoom[] = [
-  { id: "primary-bedroom", label: "Primary Bedroom", functionCode: "primary_bedroom", functionStatus: "confirmed", boundaryStatus: "confirmed", x: 165, y: 150 },
-  { id: "bedroom-2", label: "Guest Bedroom", functionCode: "guest_bedroom", functionStatus: "confirmed", boundaryStatus: "confirmed", x: 150, y: 420 },
-  { id: "bathroom", label: "Bathroom", functionCode: "bathroom", functionStatus: "confirmed", boundaryStatus: "confirmed", x: 385, y: 120 },
-  { id: "laundry", label: "Laundry Room", functionCode: "laundry_room", functionStatus: "confirmed", boundaryStatus: "confirmed", x: 380, y: 440 },
-  { id: "kitchen", label: "Kitchen", functionCode: "kitchen", functionStatus: "confirmed", boundaryStatus: "confirmed", x: 590, y: 130 },
-  { id: "dining", label: "Dining Room", functionCode: "dining_room", functionStatus: "confirmed", boundaryStatus: "confirmed", x: 760, y: 165 },
-  { id: "living-room", label: "Living Room", functionCode: "living_room", functionStatus: "confirmed", boundaryStatus: "confirmed", x: 660, y: 400 },
-];
-
 export interface LifestyleTagGroup {
   group: string;
   tags: string[];

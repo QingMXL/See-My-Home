@@ -4,6 +4,15 @@ import { useDesignStore } from "./useDesignStore";
 describe("useDesignStore", () => {
   beforeEach(() => {
     useDesignStore.getState().resetLayout();
+    useDesignStore.getState().setLayoutRooms([{
+      id: "test-room",
+      label: "Guest Bedroom",
+      x: 100,
+      y: 100,
+      functionCode: "guest_bedroom",
+      functionStatus: "confirmed",
+      boundaryStatus: "confirmed",
+    }]);
     // Clear saved designs between tests.
     for (const d of useDesignStore.getState().saved) {
       useDesignStore.getState().deleteDesign(d.id);
@@ -15,28 +24,28 @@ describe("useDesignStore", () => {
     const before = useDesignStore.getState().layout.rooms;
 
     // Act
-    useDesignStore.getState().renameRoom("bedroom-2", "Home Office");
+    useDesignStore.getState().renameRoom("test-room", "Home Office");
 
     // Assert
     const after = useDesignStore.getState().layout.rooms;
-    expect(after.find((r) => r.id === "bedroom-2")?.label).toBe("Home Office");
-    expect(before.find((r) => r.id === "bedroom-2")?.label).toBe("Guest Bedroom");
+    expect(after.find((r) => r.id === "test-room")?.label).toBe("Home Office");
+    expect(before.find((r) => r.id === "test-room")?.label).toBe("Guest Bedroom");
     expect(after).not.toBe(before);
   });
 
   test("setRoomFunction supports Entry and a confirmed custom Other label", () => {
-    useDesignStore.getState().setRoomFunction("bedroom-2", "entry");
-    expect(useDesignStore.getState().layout.rooms.find((room) => room.id === "bedroom-2")).toMatchObject({
+    useDesignStore.getState().setRoomFunction("test-room", "entry");
+    expect(useDesignStore.getState().layout.rooms.find((room) => room.id === "test-room")).toMatchObject({
       label: "Entry",
       functionCode: "entry",
       functionStatus: "confirmed",
     });
 
-    useDesignStore.getState().setRoomFunction("bedroom-2", "other");
-    expect(useDesignStore.getState().layout.rooms.find((room) => room.id === "bedroom-2")?.functionStatus).toBe("inferred");
+    useDesignStore.getState().setRoomFunction("test-room", "other");
+    expect(useDesignStore.getState().layout.rooms.find((room) => room.id === "test-room")?.functionStatus).toBe("inferred");
 
-    useDesignStore.getState().setRoomFunction("bedroom-2", "other", "Music Room");
-    expect(useDesignStore.getState().layout.rooms.find((room) => room.id === "bedroom-2")).toMatchObject({
+    useDesignStore.getState().setRoomFunction("test-room", "other", "Music Room");
+    expect(useDesignStore.getState().layout.rooms.find((room) => room.id === "test-room")).toMatchObject({
       label: "Music Room",
       functionCode: "other",
       functionStatus: "confirmed",

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { roomFunctionFrom, roomFunctionLabel, SAMPLE_DETECTED_ROOMS, type DetectedRoom, type RoomFunctionCode, type StyleRoomType } from "../data/rooms";
+import { roomFunctionFrom, roomFunctionLabel, type DetectedRoom, type RoomFunctionCode, type StyleRoomType } from "../data/rooms";
 import { STYLE_TEMPLATES } from "../data/styleTemplates";
 import type { LayoutGenerationResult, LayoutImageAnalysisResult, UploadedLayoutAsset } from "../lib/homeLayoutApi";
 import type { StyleGenerationResult, UploadedStyleAsset } from "../lib/homeStyleApi";
@@ -129,7 +129,7 @@ interface DesignStore {
 const initialLayout: LayoutFlowState = {
   fileName: null,
   fileUrl: null,
-  rooms: SAMPLE_DETECTED_ROOMS,
+  rooms: [],
   excludedRooms: [],
   lifestyleTags: [],
   specialConsiderations: "",

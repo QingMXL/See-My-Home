@@ -240,6 +240,11 @@ export const MESSAGES = {
   "result.share": { en: "Share", zh: "分享" },
   "result.download": { en: "Download", zh: "下载" },
   "result.downloadError": { en: "The labeled image could not be downloaded.", zh: "带标签的图片下载失败，请重试。" },
+  "result.imageUnavailable": { en: "No generated image is available", zh: "暂时没有可用的生成图片" },
+  "result.imageUnavailableBody": {
+    en: "Return to the layout flow and generate this design again.",
+    zh: "请返回布局流程并重新生成这次设计。",
+  },
   "result.tryStyle": { en: "Try a Style", zh: "试试风格化" },
   "result.saved": { en: "Saved to My Designs", zh: "已保存到「我的设计」" },
   "result.copied": { en: "Share link copied", zh: "分享链接已复制" },

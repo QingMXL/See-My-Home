@@ -65,6 +65,26 @@
   line-height: 0;
 }
 
+.result-image-unavailable {
+  min-height: 28rem;
+  display: grid;
+  place-content: center;
+  gap: 0.45rem;
+  padding: var(--space-5);
+  text-align: center;
+  color: var(--color-ink-soft);
+  background: var(--color-surface-warm);
+  border-radius: var(--radius-md);
+}
+
+.result-image-unavailable strong {
+  color: var(--color-ink);
+}
+
+.result-image-unavailable p {
+  max-width: 28rem;
+}
+
 .confirmed-layout-stage {
   position: relative;
   line-height: 0;

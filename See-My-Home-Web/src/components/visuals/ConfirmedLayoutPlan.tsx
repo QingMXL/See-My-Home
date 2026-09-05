@@ -1,6 +1,7 @@
 import type { DetectedRoom } from "../../data/rooms";
 import type { AnalyzedLayoutBoundary, AnalyzedLayoutOpening, LayoutPlacement, LayoutRenderPlan } from "../../lib/homeLayoutApi";
-import type { PlanView } from "./FurnishedPlan";
+
+export type PlanView = "design" | "furniture";
 import {
   Armchair,
   Archive,

@@ -5,9 +5,7 @@ import { Breadcrumbs, Stepper } from "../../components/layout/Breadcrumbs";
 import { Button, Sparkle } from "../../components/ui/Button";
 import { GeneratingOverlay } from "../../components/ui/GeneratingOverlay";
 import { Tag } from "../../components/ui/Tag";
-import { FloorPlanSketch } from "../../components/visuals/FloorPlanSketch";
 import { RoomMapOverlay } from "../../components/visuals/RoomMapOverlay";
-import { ROOM_RECTS } from "../../components/visuals/planGeometry";
 import {
   createDemoLayoutResult,
   createDemoRooms,
@@ -49,24 +47,6 @@ const DEMO_DETECTION_DELAY_MS = 1250;
 
 function wait(ms: number) {
   return new Promise<void>((resolve) => window.setTimeout(resolve, ms));
-}
-
-function sampleRoomGeometry(roomId: string) {
-  const room = ROOM_RECTS.find((candidate) => candidate.id === roomId);
-  if (!room) return undefined;
-  const left = room.x / SAMPLE_PLAN_WIDTH;
-  const top = room.y / SAMPLE_PLAN_HEIGHT;
-  const right = (room.x + room.w) / SAMPLE_PLAN_WIDTH;
-  const bottom = (room.y + room.h) / SAMPLE_PLAN_HEIGHT;
-  return {
-    kind: "polygon" as const,
-    coordinates: [
-      [left, top],
-      [right, top],
-      [right, bottom],
-      [left, bottom],
-    ],
-  };
 }
 
 async function imageAssetAvailable(url: string) {
@@ -127,7 +107,7 @@ export function LayoutFlowPage() {
   } = useDesignStore();
 
   const [stage, setStage] = useState<Stage>(
-    layout.fileName && (layout.fileUrl || layout.fileName === DEMO_LAYOUT_FILE_NAME) ? "confirm" : "empty",
+    layout.fileName && layout.fileUrl ? "confirm" : "empty",
   );
   const [confirmationStep, setConfirmationStep] = useState<ConfirmationStep>("rooms");
   const [activeRoomId, setActiveRoomId] = useState<string | null>(layout.rooms[0]?.id ?? null);
@@ -263,7 +243,7 @@ export function LayoutFlowPage() {
               ? { kind: "polygon" as const, coordinates: polygon }
               : analyzedRoom
                 ? { kind: "polygon" as const, coordinates: analyzedRoom.polygon }
-                : sampleRoomGeometry(id),
+                : undefined,
           };
         }),
         excluded_regions: (layout.excludedRooms ?? []).flatMap((room) => room.polygon ? [{
@@ -499,11 +479,10 @@ export function LayoutFlowPage() {
                   />
                 )
               ) : (
-                <FloorPlanSketch
-                  rooms={layout.rooms.map((r) => ({ ...r, label: tTag(r.label) }))}
-                  activeRoomId={confirmationStep === "rooms" ? activeRoomId : null}
-                  onRoomClick={confirmationStep === "rooms" ? setActiveRoomId : undefined}
-                />
+                <div className="image-adapter-notice" role="alert">
+                  <strong>{t("imageAdapter.title")}</strong>
+                  <p>{t("layout.uploadError")}</p>
+                </div>
               )}
             </div>
             <p className="upload-zone__note">{t("upload.note")}</p>
