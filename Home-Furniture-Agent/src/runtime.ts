@@ -140,7 +140,11 @@ export class HomeFurnitureRuntime {
       && response.qa.dimensions_consistent
       && response.qa.function_plausible
       && response.qa.publishable;
-    const artifacts = response.status === 'completed' && passedQa
+    const generatedOrthographicCandidate = request.output_mode === 'orthographic_sheet'
+      && response.status !== 'failed'
+      && response.qa.function_plausible
+      && raw.toolCalls.some((call) => call.phase === 'end' && call.toolName === 'image_generate' && !call.isError);
+    const artifacts = (response.status === 'completed' && passedQa) || generatedOrthographicCandidate
       ? await this.artifactsForTurn(sessionId, raw.runId, raw.toolCalls, request.request_id)
       : [];
     const result: FurnitureTurnResult = {
@@ -186,9 +190,9 @@ export class HomeFurnitureRuntime {
           `Call image_generate exactly once with action="generate", render_asset_ref as the supported source image input, quality="high", and filename="${filename}". Use only arguments exposed by the current tool schema; never invent model, provider, numeric image-weight, or control-strength fields.`,
           'After generation starts, call sessions_yield exactly once and end the waiting run.',
           `In the attachment continuation, call media_materialize exactly once for the returned artifactId with path="/workspace/artifacts/${request.project_id}/${filename}". Inspect the materialized image exactly once.`,
-          'Publish only when all three views are present, mutually consistent, and recognizably match the confirmed render and component specification. Otherwise return failed with qa.publishable=false.',
+          'Publish whenever the image contains three readable front, side, and top geometry panels that recognizably match the confirmed furniture. Do not reject an otherwise usable geometry layer only because its raster proportions drift from the confirmed dimensions: report that drift in warnings, while the application normalizes each panel to the immutable width/depth/height ratios before annotation. Fail only when a view is missing, corrupt, perspective-only, or depicts materially different furniture.',
           'Echo request.confirmed_design_spec exactly and without changing any value in response.design_spec. Set absent sketch and inspiration QA fields to true.',
-          'Otherwise call artifact_publish exactly once and return status=completed with its artifact id.',
+          'For a readable three-panel geometry layer, call artifact_publish exactly once and return status=completed with its artifact id. Treat dimensions_consistent as confirmation that the returned structured specification is unchanged; use warnings for raster proportion drift.',
           `Write design_summary, questions, warnings, and other user-facing prose in ${request.locale === 'zh-CN' ? 'Simplified Chinese' : 'English'}. Do not expose internal QA reasoning as user guidance.`,
           'Return one compact JSON object matching response_schema without Markdown fences. This is concept-level only, not fabrication-ready engineering.',
         ]

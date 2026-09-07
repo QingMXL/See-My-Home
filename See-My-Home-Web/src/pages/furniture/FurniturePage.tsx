@@ -256,7 +256,9 @@ export function FurniturePage() {
       navigate("/furniture/drawings");
     } catch (error) {
       console.error("[furniture-orthographic]", error);
-      setOrthographicError(copy("The concept views could not be completed. Please try again.", "概念三视图未能完成，请重试。"));
+      setOrthographicError(error instanceof Error
+        ? error.message
+        : copy("The concept views could not be completed. Please try again.", "概念三视图未能完成，请重试。"));
     } finally {
       window.clearTimeout(stepOne);
       window.clearTimeout(stepTwo);

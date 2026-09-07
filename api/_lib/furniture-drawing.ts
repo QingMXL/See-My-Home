@@ -1,11 +1,81 @@
-import sharp from 'sharp';
+import sharp, { type OverlayOptions } from 'sharp';
 import type { FurnitureDesignSpec } from '../../Home-Furniture-Agent/src/contracts.js';
 
 const MAX_DRAWING_WIDTH = 2400;
+const VIEW_COUNT = 3;
 
 export interface DrawingDimensionItem {
   label: string;
   value: string;
+}
+
+export interface OrthographicViewFrame {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+export function orthographicTargetRatios(spec: FurnitureDesignSpec): [number, number, number] {
+  const { width, depth, height } = spec.dimensions_mm;
+  return [width / height, depth / height, width / depth];
+}
+
+export function orthographicViewFrames(width: number, height: number, spec: FurnitureDesignSpec): OrthographicViewFrame[] {
+  const panelEdges = Array.from({ length: VIEW_COUNT + 1 }, (_, index) => Math.round(width * index / VIEW_COUNT));
+  return orthographicTargetRatios(spec).map((ratio, index) => {
+    const panelLeft = panelEdges[index];
+    const panelWidth = panelEdges[index + 1] - panelLeft;
+    const availableWidth = Math.max(40, Math.round(panelWidth * 0.7));
+    const availableHeight = Math.max(40, Math.round(height * 0.72));
+    const targetHeight = Math.max(24, Math.round(Math.min(availableHeight, availableWidth / ratio)));
+    const targetWidth = Math.max(24, Math.round(targetHeight * ratio));
+    return {
+      left: panelLeft + Math.round((panelWidth - targetWidth) / 2),
+      top: Math.round((height - targetHeight) / 2),
+      width: targetWidth,
+      height: targetHeight,
+    };
+  });
+}
+
+export async function normalizeOrthographicPanels(input: {
+  source: Buffer;
+  width: number;
+  height: number;
+  spec: FurnitureDesignSpec;
+}): Promise<Buffer> {
+  const panelEdges = Array.from({ length: VIEW_COUNT + 1 }, (_, index) => Math.round(input.width * index / VIEW_COUNT));
+  const frames = orthographicViewFrames(input.width, input.height, input.spec);
+  const composites: OverlayOptions[] = [];
+
+  for (let index = 0; index < VIEW_COUNT; index += 1) {
+    const left = panelEdges[index];
+    const panelWidth = panelEdges[index + 1] - left;
+    const panel = await sharp(input.source)
+      .extract({ left, top: 0, width: panelWidth, height: input.height })
+      .png()
+      .toBuffer();
+    const extracted = await sharp(panel)
+      .trim({ background: '#ffffff', threshold: 8 })
+      .png()
+      .toBuffer({ resolveWithObject: true });
+    const frame = frames[index];
+    const normalized = await sharp(extracted.data)
+      .resize({ width: frame.width, height: frame.height, fit: 'fill' })
+      .flatten({ background: '#ffffff' })
+      .png()
+      .toBuffer();
+    composites.push({
+      input: normalized,
+      left: frame.left,
+      top: frame.top,
+    });
+  }
+
+  return sharp({
+    create: { width: input.width, height: input.height, channels: 3, background: '#ffffff' },
+  }).composite(composites).png().toBuffer();
 }
 
 function dimensionText(dimensions: Partial<FurnitureDesignSpec['dimensions_mm']>): string {
@@ -51,6 +121,14 @@ function verticalLineWithArrows(x: number, y1: number, y2: number, label: string
   ].join('');
 }
 
+function widthWitnesses(x1: number, x2: number, objectBottom: number, rail: number): string {
+  return `<path d="M ${x1} ${objectBottom + 8} V ${rail - 9} M ${x2} ${objectBottom + 8} V ${rail - 9}" class="dimension"/>`;
+}
+
+function heightWitnesses(objectRight: number, rail: number, y1: number, y2: number): string {
+  return `<path d="M ${objectRight + 8} ${y1} H ${rail - 9} M ${objectRight + 8} ${y2} H ${rail - 9}" class="dimension"/>`;
+}
+
 export function buildDimensionAnnotationSvg(input: {
   width: number;
   sourceHeight: number;
@@ -65,9 +143,11 @@ export function buildDimensionAnnotationSvg(input: {
   const sourceBottom = topMargin + sourceHeight;
   const titleY = Math.round(topMargin * 0.5);
   const firstRail = sourceBottom + Math.round(bottomMargin * 0.28);
-  const inset = column * 0.09;
-  const verticalTop = sourceTop + sourceHeight * 0.12;
-  const verticalBottom = sourceTop + sourceHeight * 0.88;
+  const inset = column * 0.06;
+  const frames = orthographicViewFrames(width, sourceHeight, spec).map((frame) => ({
+    ...frame,
+    top: frame.top + sourceTop,
+  }));
   const details = drawingDimensionItems(spec);
   const detailText = details.map((item, index) => {
     const x = column * ((index % 3) + 0.5);
@@ -89,12 +169,18 @@ export function buildDimensionAnnotationSvg(input: {
     <text x="${column * 0.5}" y="${titleY}" class="view" text-anchor="middle">FRONT</text>
     <text x="${column * 1.5}" y="${titleY}" class="view" text-anchor="middle">SIDE</text>
     <text x="${column * 2.5}" y="${titleY}" class="view" text-anchor="middle">TOP</text>
-    ${lineWithArrows(inset, column - inset, firstRail, `W ${spec.dimensions_mm.width} mm`)}
-    ${verticalLineWithArrows(column - inset * 0.45, verticalTop, verticalBottom, `H ${spec.dimensions_mm.height} mm`)}
-    ${lineWithArrows(column + inset, column * 2 - inset, firstRail, `D ${spec.dimensions_mm.depth} mm`)}
-    ${verticalLineWithArrows(column * 2 - inset * 0.45, verticalTop, verticalBottom, `H ${spec.dimensions_mm.height} mm`)}
-    ${lineWithArrows(column * 2 + inset, width - inset, firstRail, `W ${spec.dimensions_mm.width} mm`)}
-    ${verticalLineWithArrows(width - inset * 0.45, verticalTop, verticalBottom, `D ${spec.dimensions_mm.depth} mm`)}
+    ${widthWitnesses(frames[0].left, frames[0].left + frames[0].width, frames[0].top + frames[0].height, firstRail)}
+    ${lineWithArrows(frames[0].left, frames[0].left + frames[0].width, firstRail, `W ${spec.dimensions_mm.width} mm`)}
+    ${heightWitnesses(frames[0].left + frames[0].width, column - inset, frames[0].top, frames[0].top + frames[0].height)}
+    ${verticalLineWithArrows(column - inset, frames[0].top, frames[0].top + frames[0].height, `H ${spec.dimensions_mm.height} mm`)}
+    ${widthWitnesses(frames[1].left, frames[1].left + frames[1].width, frames[1].top + frames[1].height, firstRail)}
+    ${lineWithArrows(frames[1].left, frames[1].left + frames[1].width, firstRail, `D ${spec.dimensions_mm.depth} mm`)}
+    ${heightWitnesses(frames[1].left + frames[1].width, column * 2 - inset, frames[1].top, frames[1].top + frames[1].height)}
+    ${verticalLineWithArrows(column * 2 - inset, frames[1].top, frames[1].top + frames[1].height, `H ${spec.dimensions_mm.height} mm`)}
+    ${widthWitnesses(frames[2].left, frames[2].left + frames[2].width, frames[2].top + frames[2].height, firstRail)}
+    ${lineWithArrows(frames[2].left, frames[2].left + frames[2].width, firstRail, `W ${spec.dimensions_mm.width} mm`)}
+    ${heightWitnesses(frames[2].left + frames[2].width, width - inset, frames[2].top, frames[2].top + frames[2].height)}
+    ${verticalLineWithArrows(width - inset, frames[2].top, frames[2].top + frames[2].height, `D ${spec.dimensions_mm.depth} mm`)}
     <line x1="${inset}" y1="${sourceBottom + Math.round(bottomMargin * 0.64)}" x2="${width - inset}" y2="${sourceBottom + Math.round(bottomMargin * 0.64)}" class="dimension"/>
     ${detailText}
   </svg>`;
@@ -113,6 +199,12 @@ export async function createDimensionedOrthographicPng(input: {
     .png();
   const { data, info } = await normalized.toBuffer({ resolveWithObject: true });
   if (!info.width || !info.height) throw new Error('ZooWork orthographic image has no readable dimensions');
+  const dimensionallyNormalized = await normalizeOrthographicPanels({
+    source: data,
+    width: info.width,
+    height: info.height,
+    spec: input.spec,
+  });
   const topMargin = Math.max(72, Math.round(info.height * 0.08));
   const bottomMargin = Math.max(260, Math.round(info.height * 0.25));
   const svg = buildDimensionAnnotationSvg({
@@ -122,7 +214,7 @@ export async function createDimensionedOrthographicPng(input: {
     bottomMargin,
     spec: input.spec,
   });
-  return sharp(data)
+  return sharp(dimensionallyNormalized)
     .extend({ top: topMargin, bottom: bottomMargin, background: '#ffffff' })
     .composite([{ input: Buffer.from(svg) }])
     .png()

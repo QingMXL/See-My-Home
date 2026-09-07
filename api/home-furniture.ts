@@ -98,6 +98,7 @@ interface FurnitureJob {
   requestId: string;
   projectId: string;
   type: 'agent.generate' | 'agent.refine' | 'agent.orthographic';
+  retryAttempt?: number;
   expiresAt: number;
 }
 
@@ -134,6 +135,12 @@ function verifyJob(value: unknown): FurnitureJob | null {
     || typeof job.requestId !== 'string'
     || typeof job.projectId !== 'string'
     || (job.type !== 'agent.generate' && job.type !== 'agent.refine' && job.type !== 'agent.orthographic')
+    || (job.retryAttempt !== undefined && (
+      typeof job.retryAttempt !== 'number'
+      || !Number.isSafeInteger(job.retryAttempt)
+      || job.retryAttempt < 0
+      || job.retryAttempt > 1
+    ))
     || typeof job.expiresAt !== 'number'
     || job.expiresAt < Date.now()
   ) throw new Error('job_token is invalid or expired');
@@ -397,6 +404,7 @@ async function orthographic(request: VercelRequest, response: VercelResponse): P
         requestId,
         projectId,
         type: 'agent.orthographic',
+        retryAttempt: 0,
         expiresAt: Date.now() + 30 * 60 * 1000,
       }),
       poll_after_ms: 3_000,
@@ -414,8 +422,45 @@ async function orthographic(request: VercelRequest, response: VercelResponse): P
   const result = polled.result;
   const artifact = result.artifacts.find((candidate) => candidate.status === 'ready'
     && (candidate.contentType?.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(candidate.fileName ?? '')));
-  if (!artifact) throw new Error(result.response.warnings.join(' ') || 'Home Furniture Agent completed without a readable orthographic image artifact');
+  if (!artifact && (job.retryAttempt ?? 0) < 1) {
+    console.warn(JSON.stringify({
+      level: 'warning',
+      message: 'orthographic artifact unavailable; starting automatic retry',
+      requestId: turn.request_id,
+      projectId,
+      agentStatus: result.response.status,
+    }));
+    const retryTurn: FurnitureTurnRequest = { ...turn, request_id: newId('ortho_retry') };
+    const retryConversation = await zoo.createConversation(projectId, newId(`furniture_orthographic_retry_${projectId}`));
+    const retryStarted = await zoo.startFurnitureTurn(retryConversation, retryTurn);
+    sendJson(response, 202, {
+      status: 'processing',
+      job_token: signJob({
+        version: 1,
+        sessionId: retryConversation.sessionId,
+        postedSeq: retryStarted.postedSeq,
+        requestId: retryTurn.request_id,
+        projectId,
+        type: 'agent.orthographic',
+        retryAttempt: 1,
+        expiresAt: Date.now() + 30 * 60 * 1000,
+      }),
+      poll_after_ms: 3_000,
+    });
+    return;
+  }
+  if (!artifact) {
+    throw new Error(locale === 'zh-CN'
+      ? 'ZooWork 已完成三视图生图，但没有发布可读取的底图；系统自动重试一次后仍未成功。'
+      : 'ZooWork generated the orthographic views but did not publish a readable source image after one automatic retry.');
+  }
   const signedUrl = await zoo.resolveArtifactUrl(artifact.artifactId);
+  console.info(JSON.stringify({
+    level: 'info',
+    message: 'normalizing orthographic geometry and applying confirmed dimensions',
+    requestId: turn.request_id,
+    retryAttempt: job.retryAttempt ?? 0,
+  }));
   const upstream = await fetch(signedUrl);
   if (!upstream.ok) throw new Error(`ZooWork orthographic artifact download failed (${upstream.status})`);
   const dimensionedPng = await createDimensionedOrthographicPng({
@@ -431,6 +476,12 @@ async function orthographic(request: VercelRequest, response: VercelResponse): P
     artifactId: artifact.artifactId,
     reportedSize: dimensionedPng.byteLength,
   });
+  console.info(JSON.stringify({
+    level: 'info',
+    message: 'orthographic PNG stored',
+    requestId: turn.request_id,
+    sizeBytes: stored.size_bytes,
+  }));
 
   sendJson(response, 200, {
     session_id: conversation.sessionId,
