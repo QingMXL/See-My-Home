@@ -41,6 +41,19 @@ export function privateBlobUrl(value: unknown, kind: 'layout' | 'style' | 'furni
   return url.toString();
 }
 
+export function privateResultBlobUrl(value: unknown, kind: 'layout' | 'style' | 'furniture', projectId: string): string {
+  const raw = requireString(value, 'render_image_url');
+  let url: URL;
+  try { url = new URL(raw); } catch { throw new Error('render_image_url is not a valid Blob URL'); }
+  if (url.protocol !== 'https:' || !url.hostname.endsWith('.blob.vercel-storage.com')) {
+    throw new Error('render_image_url must reference this application’s Vercel Blob storage');
+  }
+  const requiredPrefix = `/results/${kind}/${encodeURIComponent(projectId)}/`;
+  if (!url.pathname.startsWith(requiredPrefix)) throw new Error('render_image_url does not belong to project_id');
+  url.search = '';
+  return url.toString();
+}
+
 export async function temporaryBlobReadUrl(blobUrl: string, lifetimeMs = 60 * 60 * 1000): Promise<string> {
   const url = new URL(blobUrl);
   const pathname = decodeURIComponent(url.pathname.replace(/^\//, ''));

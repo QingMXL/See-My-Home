@@ -127,6 +127,20 @@ export interface FurnitureGenerationResult {
   request_context?: FurnitureGenerateInput;
 }
 
+export interface FurnitureOrthographicResult {
+  session_id: string;
+  request_id: string;
+  project_id: string;
+  response: FurnitureAgentResponse;
+  orthographic_image: {
+    asset_id: string;
+    url: string;
+    mime_type: "image/png" | "image/jpeg" | "image/webp";
+    size_bytes: number;
+    provider_model: string;
+  };
+}
+
 async function readResponse<T>(response: Response): Promise<T> {
   const raw = await response.text();
   let data: T & { error?: string };
@@ -199,6 +213,15 @@ export async function uploadFurnitureImage(
   return readResponse<UploadedFurnitureAsset>(response);
 }
 
+export async function deleteFurnitureImage(asset: UploadedFurnitureAsset): Promise<void> {
+  const response = await fetchWithTimeout("/api/home-furniture/upload", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ project_id: asset.project_id, asset_id: asset.asset_id }),
+  }, 30_000, "The furniture image could not be removed. Please try again.");
+  await readResponse<{ deleted: true }>(response);
+}
+
 export async function generateFurniture(input: FurnitureGenerateInput): Promise<FurnitureGenerationResult> {
   return runFurnitureGeneration(
     "/api/home-furniture/events/agent.generate",
@@ -220,11 +243,25 @@ export async function refineFurniture(
   );
 }
 
-async function runFurnitureGeneration(
+export async function generateFurnitureOrthographic(input: {
+  project_id: string;
+  locale: "en-US" | "zh-CN";
+  render_asset_id: string;
+  render_image_url: string;
+  design_response: FurnitureAgentResponse;
+}): Promise<FurnitureOrthographicResult> {
+  return runFurnitureGeneration<FurnitureOrthographicResult>(
+    "/api/home-furniture/events/agent.orthographic",
+    input,
+    input.locale === "zh-CN" ? "概念三视图生成超时，请重试。" : "The concept views timed out. Please try again.",
+  );
+}
+
+async function runFurnitureGeneration<TResult extends object = FurnitureGenerationResult>(
   endpoint: string,
   input: object,
   timeoutMessage: string,
-): Promise<FurnitureGenerationResult> {
+): Promise<TResult> {
   const deadline = Date.now() + 900_000;
   let jobToken: string | undefined;
   while (Date.now() < deadline) {
@@ -232,8 +269,8 @@ async function runFurnitureGeneration(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...input, ...(jobToken ? { job_token: jobToken } : {}) }),
-    }, 60_000, timeoutMessage);
-    const result = await readResponse<FurnitureGenerationResult | FurnitureGenerationPending>(response);
+    }, import.meta.env.DEV ? 900_000 : 60_000, timeoutMessage);
+    const result = await readResponse<TResult | FurnitureGenerationPending>(response);
     if (result && "status" in result && result.status === "processing") {
       if (typeof result.job_token !== "string" || !result.job_token) {
         throw new Error("The Home Furniture Agent returned an invalid processing ticket.");
@@ -243,7 +280,7 @@ async function runFurnitureGeneration(
       await new Promise((resolveDelay) => window.setTimeout(resolveDelay, delayMs));
       continue;
     }
-    return result as FurnitureGenerationResult;
+    return result as TResult;
   }
   throw new Error(timeoutMessage);
 }

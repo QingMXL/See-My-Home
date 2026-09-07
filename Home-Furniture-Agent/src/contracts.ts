@@ -12,6 +12,7 @@ export type TableType =
   | 'other_table';
 
 export type TopShape = 'rectangular' | 'round' | 'oval' | 'square' | 'freeform';
+export type FurnitureOutputMode = 'concept_render' | 'orthographic_sheet';
 
 export type FurnitureControlKey =
   | 'dimensions_mm'
@@ -44,12 +45,17 @@ export interface FurnitureDesignControls {
 
 export interface FurnitureTurnRequest {
   contract_version: 'home-furniture-v1';
+  output_mode: FurnitureOutputMode;
   request_id: string;
   project_id: string;
   locale: SupportedLocale;
   table_type: TableType;
   sketch_asset_ref?: string;
   inspiration_asset_ref?: string;
+  /** Required only when output_mode is orthographic_sheet. */
+  render_asset_ref?: string;
+  /** The confirmed specification must be echoed unchanged by an orthographic turn. */
+  confirmed_design_spec?: FurnitureDesignSpec;
   description?: string;
   source_priority: {
     sketch: number;

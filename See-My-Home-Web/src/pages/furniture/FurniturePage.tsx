@@ -1,13 +1,15 @@
 import { useRef, useState, type ChangeEvent } from "react";
+import { Download, X } from "lucide-react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Breadcrumbs, Stepper } from "../../components/layout/Breadcrumbs";
 import { Button, Sparkle } from "../../components/ui/Button";
 import { GeneratingOverlay } from "../../components/ui/GeneratingOverlay";
-import { FrontViewDrawing, SideViewDrawing, TopViewDrawing } from "../../components/visuals/FurnitureDrawings";
 import { useI18n } from "../../i18n/LanguageContext";
 import { FURNITURE_GENERATION_STEPS } from "../../lib/agents";
 import {
+  deleteFurnitureImage,
   generateFurniture,
+  generateFurnitureOrthographic,
   refineFurniture,
   uploadFurnitureImage,
   type FurnitureControlKey,
@@ -80,6 +82,7 @@ export function FurniturePage() {
     setFurniturePrompt,
     setFurnitureRefinementPrompt,
     setFurnitureSource,
+    removeFurnitureSource,
     setFurnitureUploadedAsset,
     setFurnitureSketchWeight,
     setFurnitureTableType,
@@ -88,6 +91,7 @@ export function FurniturePage() {
     unlockFurnitureControl,
     setFurniturePhase,
     setFurnitureAgentRun,
+    setFurnitureOrthographicRun,
     setFurnitureAgentError,
     confirmFurniture,
     saveDesign,
@@ -96,6 +100,8 @@ export function FurniturePage() {
   const inspirationInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState<FurnitureSourceKind | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [generatingOrthographic, setGeneratingOrthographic] = useState(false);
+  const [orthographicStep, setOrthographicStep] = useState(0);
 
   const copy = (en: string, zh: string) => (lang === "zh" ? zh : en);
   const autoLabel = copy("Auto · follow inputs", "自动 · 跟随输入");
@@ -108,6 +114,7 @@ export function FurniturePage() {
   const lockedControls = furniture.lockedControls ?? [];
   const isLocked = (control: FurnitureControlKey) => lockedControls.includes(control);
   const generated = furniture.agentRun;
+  const orthographic = furniture.orthographicRun;
   const spec = generated?.response.design_spec;
   const tableLabel = TABLE_TYPES.find((option) => option.value === furniture.tableType);
   const canGenerate = Boolean(furniture.sketchAsset || furniture.inspirationAsset || furniture.prompt.trim()) && !uploading;
@@ -158,6 +165,18 @@ export function FurniturePage() {
     }
   };
 
+  const onRemoveSource = (kind: FurnitureSourceKind) => {
+    const asset = kind === "sketch" ? furniture.sketchAsset : furniture.inspirationAsset;
+    const localUrl = kind === "sketch" ? furniture.sketchUrl : furniture.inspirationUrl;
+    if (localUrl?.startsWith("blob:")) URL.revokeObjectURL(localUrl);
+    removeFurnitureSource(kind);
+    if (asset) {
+      void deleteFurnitureImage(asset).catch((error) => {
+        setFurnitureAgentError(error instanceof Error ? error.message : copy("Image removal failed.", "图片删除失败。"));
+      });
+    }
+  };
+
   const onGenerate = async (isRefinement = false) => {
     if (!isRefinement && !furniture.sketchAsset && !furniture.inspirationAsset && !furniture.prompt.trim()) {
       setFurnitureAgentError(copy("Add a sketch, an inspiration image, or a written description.", "请添加草图、灵感图或文字描述。"));
@@ -195,16 +214,55 @@ export function FurniturePage() {
     }
   };
 
-  const onConfirm = () => {
+  const onConfirm = async () => {
     if (!generated || !spec) return;
-    confirmFurniture();
-    saveDesign({
-      project: "My Home",
-      title: `${lang === "zh" ? tableLabel?.zh : tableLabel?.en} · ${spec.materials[0]?.material ?? furniture.material}`,
-      kind: "Furniture",
-      detail: `${spec.dimensions_mm.width} × ${spec.dimensions_mm.depth} × ${spec.dimensions_mm.height} mm`,
-    });
-    navigate("/furniture/drawings");
+    setFurnitureAgentError(null);
+    setGeneratingOrthographic(true);
+    setOrthographicStep(0);
+    const stepOne = window.setTimeout(() => setOrthographicStep(1), 1200);
+    const stepTwo = window.setTimeout(() => setOrthographicStep(2), 3200);
+    try {
+      const result = await generateFurnitureOrthographic({
+        project_id: generated.project_id,
+        locale: lang === "zh" ? "zh-CN" : "en-US",
+        render_asset_id: generated.generated_image.asset_id,
+        render_image_url: generated.generated_image.url,
+        design_response: generated.response,
+      });
+      setFurnitureOrthographicRun(result);
+      confirmFurniture();
+      saveDesign({
+        project: "My Home",
+        title: `${lang === "zh" ? tableLabel?.zh : tableLabel?.en} · ${spec.materials[0]?.material ?? furniture.material}`,
+        kind: "Furniture",
+        detail: `${spec.dimensions_mm.width} × ${spec.dimensions_mm.depth} × ${spec.dimensions_mm.height} mm`,
+      });
+      navigate("/furniture/drawings");
+    } catch (error) {
+      setFurnitureAgentError(error instanceof Error ? error.message : copy("Concept view generation failed.", "概念三视图生成失败。"));
+    } finally {
+      window.clearTimeout(stepOne);
+      window.clearTimeout(stepTwo);
+      setGeneratingOrthographic(false);
+    }
+  };
+
+  const downloadOrthographic = async () => {
+    if (!orthographic) return;
+    try {
+      const response = await fetch(orthographic.orthographic_image.url);
+      if (!response.ok) throw new Error(`Download failed (${response.status})`);
+      const blobUrl = URL.createObjectURL(await response.blob());
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      const extension = orthographic.orthographic_image.mime_type === "image/webp" ? "webp" : orthographic.orthographic_image.mime_type === "image/jpeg" ? "jpg" : "png";
+      link.download = `${generated?.table_type ?? "table"}-orthographic-views.${extension}`;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 0);
+      flash(copy("Concept views downloaded.", "概念三视图已下载。"));
+    } catch {
+      flash(copy("The image could not be downloaded. Please try again.", "图片下载失败，请重试。"));
+    }
   };
 
   const flash = (message: string) => {
@@ -212,7 +270,7 @@ export function FurniturePage() {
     window.setTimeout(() => setFeedback(null), 2400);
   };
 
-  if (stage === "drawings" && (!generated || !spec || !furniture.confirmed)) {
+  if (stage === "drawings" && (!generated || !spec || !orthographic || !furniture.confirmed)) {
     return <Navigate to={generated ? "/furniture/render" : "/furniture"} replace />;
   }
   if (stage === "render" && !generated && furniture.phase === "idle") {
@@ -220,15 +278,12 @@ export function FurniturePage() {
   }
 
   const currentStep = stage === "input" ? 0 : stage === "render" ? 1 : 2;
-  const drawingProps = spec
-    ? { dimensions: spec.dimensions_mm, topShape: spec.top.shape, baseStyle: spec.base.style, supportCount: spec.base.support_count }
-    : null;
   const uniqueMaterials = spec?.materials.filter((material, index, items) =>
     items.findIndex((candidate) => candidate.material === material.material && candidate.finish === material.finish) === index,
   ).slice(0, 3) ?? [];
 
   return (
-    <main className="page flow-page furniture-flow" aria-busy={furniture.phase === "generating"}>
+    <main className="page flow-page furniture-flow" aria-busy={furniture.phase === "generating" || generatingOrthographic}>
       <Breadcrumbs crumbs={[{ label: t("crumb.home"), to: "/" }, { label: t("furn.crumb") }]} />
       <div className="flow-head">
         <div>
@@ -248,37 +303,40 @@ export function FurniturePage() {
             <p>{copy("Upload either image or both. When both are present, choose which one should lead.", "手绘草图和灵感图可以二选一，也可以同时上传；两张都有时再决定更接近哪一张。")}</p>
           </header>
           <div className="furniture-source-grid">
-            <button type="button" className="furniture-upload furniture-upload--large" disabled={Boolean(uploading)} onClick={() => sketchInputRef.current?.click()}>
-              {furniture.sketchUrl ? <img src={furniture.sketchUrl} alt={furniture.sketchName ?? t("furn.sketch")} /> : <span className="furniture-upload__plus">+</span>}
-              <span><strong>{t("furn.sketch")}</strong><small>{copy("Defines form and structure", "决定造型与结构")}</small></span>
-              <em>{uploading === "sketch" ? copy("Uploading…", "上传中…") : furniture.sketchName ?? copy("Choose image", "选择图片")}</em>
-            </button>
-            <button type="button" className="furniture-upload furniture-upload--large" disabled={Boolean(uploading)} onClick={() => inspirationInputRef.current?.click()}>
-              {furniture.inspirationUrl ? <img src={furniture.inspirationUrl} alt={furniture.inspirationName ?? t("furn.inspiration")} /> : <span className="furniture-upload__plus">+</span>}
-              <span><strong>{t("furn.inspiration")}</strong><small>{copy("Defines style and material", "决定风格与材质")}</small></span>
-              <em>{uploading === "inspiration" ? copy("Uploading…", "上传中…") : furniture.inspirationName ?? copy("Choose image", "选择图片")}</em>
-            </button>
-          </div>
-          {hasBothImages ? (
-            <div className="source-mix source-mix--intake">
-              <div className="source-mix__labels" aria-hidden="true">
-                <span><strong>{copy("Sketch", "草图")}</strong><small>{visibleSketchWeight}%</small></span>
-                <span><small>{visibleInspirationWeight}%</small><strong>{copy("Inspiration", "灵感")}</strong></span>
-              </div>
-              <input
-                aria-label={copy("Balance sketch and inspiration", "调整草图与灵感图倾向")}
-                aria-valuetext={copy(`Sketch ${visibleSketchWeight}%, inspiration ${visibleInspirationWeight}%`, `草图 ${visibleSketchWeight}%，灵感图 ${visibleInspirationWeight}%`)}
-                type="range"
-                min="5"
-                max="95"
-                step="5"
-                value={100 - sketchWeight}
-                onChange={(event) => setFurnitureSketchWeight(100 - Number(event.target.value))}
-              />
+            <div className="furniture-upload-shell">
+              <button type="button" className="furniture-upload furniture-upload--large" disabled={Boolean(uploading)} onClick={() => sketchInputRef.current?.click()}>
+                {furniture.sketchUrl ? <img src={furniture.sketchUrl} alt={furniture.sketchName ?? t("furn.sketch")} /> : <span className="furniture-upload__plus">+</span>}
+                <span><strong>{t("furn.sketch")}</strong><small>{copy("Defines form and structure", "决定造型与结构")}</small></span>
+                <em>{uploading === "sketch" ? copy("Uploading…", "上传中…") : furniture.sketchName ?? copy("Choose image", "选择图片")}</em>
+              </button>
+              {(furniture.sketchUrl || furniture.sketchAsset) && <button type="button" className="furniture-upload__remove" aria-label={copy("Remove sketch", "删除手绘草图")} disabled={Boolean(uploading)} onClick={() => onRemoveSource("sketch")}><X size={15} /></button>}
             </div>
-          ) : (hasSketch || hasInspiration) ? (
-            <p className="source-single-note">{hasSketch ? copy("Sketch leads · 100%", "以草图为准 · 100%") : copy("Inspiration leads · 100%", "以灵感图为准 · 100%")}</p>
-          ) : null}
+            <div className="furniture-upload-shell">
+              <button type="button" className="furniture-upload furniture-upload--large" disabled={Boolean(uploading)} onClick={() => inspirationInputRef.current?.click()}>
+                {furniture.inspirationUrl ? <img src={furniture.inspirationUrl} alt={furniture.inspirationName ?? t("furn.inspiration")} /> : <span className="furniture-upload__plus">+</span>}
+                <span><strong>{t("furn.inspiration")}</strong><small>{copy("Defines style and material", "决定风格与材质")}</small></span>
+                <em>{uploading === "inspiration" ? copy("Uploading…", "上传中…") : furniture.inspirationName ?? copy("Choose image", "选择图片")}</em>
+              </button>
+              {(furniture.inspirationUrl || furniture.inspirationAsset) && <button type="button" className="furniture-upload__remove" aria-label={copy("Remove inspiration", "删除灵感图")} disabled={Boolean(uploading)} onClick={() => onRemoveSource("inspiration")}><X size={15} /></button>}
+            </div>
+          </div>
+          <div className={`source-mix source-mix--intake${hasBothImages ? "" : " source-mix--disabled"}`}>
+            <div className="source-mix__labels" aria-hidden="true">
+              <span><strong>{copy("Sketch", "草图")}</strong><small>{visibleSketchWeight}%</small></span>
+              <span><small>{visibleInspirationWeight}%</small><strong>{copy("Inspiration", "灵感")}</strong></span>
+            </div>
+            <input
+              aria-label={copy("Balance sketch and inspiration", "调整草图与灵感图倾向")}
+              aria-valuetext={copy(`Sketch ${visibleSketchWeight}%, inspiration ${visibleInspirationWeight}%`, `草图 ${visibleSketchWeight}%，灵感图 ${visibleInspirationWeight}%`)}
+              type="range"
+              min="5"
+              max="95"
+              step="5"
+              disabled={!hasBothImages}
+              value={hasBothImages ? 100 - sketchWeight : hasSketch ? 5 : hasInspiration ? 95 : 20}
+              onChange={(event) => setFurnitureSketchWeight(100 - Number(event.target.value))}
+            />
+          </div>
           <div className="input-panel__prompt">
             <label htmlFor="furniture-prompt" className="tag-group__name">{t("furn.prompt")}</label>
             <textarea id="furniture-prompt" rows={5} value={furniture.prompt} onChange={(event) => setFurniturePrompt(event.target.value)} placeholder={copy("Describe the table, key features, dimensions, and what must stay unchanged.", "描述桌子的用途、关键造型、尺寸，以及哪些部分必须保留。")}/>
@@ -317,10 +375,6 @@ export function FurniturePage() {
               </div>
               {furniture.agentError && <p className="furniture-error" role="alert">{furniture.agentError}</p>}
             </div>
-            <div className="input-summary-panel__footer">
-              <p>{copy("Happy with the result? Continue to concept drawings.", "确认效果后，进入概念三视图与规格。")}</p>
-              <Button full size="lg" disabled={!generated || furniture.phase === "generating" || generated.response.status === "failed"} onClick={onConfirm}>{t("furn.thisIsIt")}</Button>
-            </div>
           </aside>
 
           <section className="card render-panel render-panel--stage" aria-label={t("furn.step2")}>
@@ -328,7 +382,10 @@ export function FurniturePage() {
               <>
                 <div className="render-panel__media"><img className="render-panel__image" src={generated.generated_image.url} alt={generated.response.design_summary} /></div>
                 <div className="render-panel__meta">
-                  <div className="render-panel__swatches">{uniqueMaterials.map((material) => <span className="swatch" key={`${material.material}-${material.finish}`}><i className="swatch__dot" style={{ background: MATERIAL_COLORS[material.material] ?? "#806044" }} aria-hidden="true" />{material.material}</span>)}</div>
+                  <div className="render-panel__decision">
+                    <div className="render-panel__swatches">{uniqueMaterials.map((material) => <span className="swatch" key={`${material.material}-${material.finish}`}><i className="swatch__dot" style={{ background: MATERIAL_COLORS[material.material] ?? "#806044" }} aria-hidden="true" />{material.material}</span>)}</div>
+                    <Button disabled={furniture.phase === "generating" || generatingOrthographic || generated.response.status === "failed"} onClick={() => void onConfirm()}>{t("furn.thisIsIt")}</Button>
+                  </div>
                   <details className="render-panel__details">
                     <summary>{copy("Design details", "设计说明")}</summary>
                     <p>{generated.response.design_summary}</p>
@@ -361,14 +418,6 @@ export function FurniturePage() {
                 {isLocked("primary_material") && <button type="button" className="text-action" onClick={() => unlockFurnitureControl("primary_material")}>{copy("Use input material", "恢复跟随输入")}</button>}
               </fieldset>
 
-              <div className="refine-reference">
-                <span className="refine-label">{copy("Reference image", "补充参考图")}</span>
-                <button type="button" className="refine-reference__button" disabled={Boolean(uploading)} onClick={() => inspirationInputRef.current?.click()}>
-                  {furniture.inspirationUrl && <img src={furniture.inspirationUrl} alt="" />}
-                  <span><strong>{furniture.inspirationName ? copy("Replace inspiration", "替换灵感图") : copy("Add inspiration", "添加灵感图")}</strong><small>{uploading === "inspiration" ? copy("Uploading…", "上传中…") : copy("JPG, PNG or WebP", "JPG、PNG 或 WebP")}</small></span>
-                </button>
-              </div>
-
               <div className="refine-request">
                 <label className="refine-label" htmlFor="furniture-refinement">{copy("What should change?", "还想怎么调整？")}</label>
                 <textarea id="furniture-refinement" rows={5} value={furniture.refinementPrompt ?? ""} onChange={(event) => setFurnitureRefinementPrompt(event.target.value)} placeholder={copy("For example: keep both drawers, make the legs slimmer, and use a lighter wood.", "例如：保留两个抽屉、桌腿更细、木色再浅一点。")}/>
@@ -389,23 +438,21 @@ export function FurniturePage() {
                 </ul>
               </details>
             </div>
-            <Button full size="lg" disabled={!generated || Boolean(uploading) || furniture.phase === "generating"} onClick={() => onGenerate(true)}><Sparkle />{copy("Generate again", "重新生成")}</Button>
+            <Button full size="lg" disabled={!generated || Boolean(uploading) || furniture.phase === "generating"} onClick={() => onGenerate(true)}><Sparkle />{copy("Apply changes & regenerate", "应用调整并重新生成")}</Button>
           </aside>
         </div>
       )}
 
-      {stage === "drawings" && generated && spec && drawingProps && (
+      {stage === "drawings" && generated && spec && orthographic && (
         <section className="furniture-drawings-stage" aria-label={t("furn.drawings")}>
           <div className="drawings-stage__toolbar"><button type="button" className="text-action" onClick={() => navigate("/furniture/render")}>← {copy("Back to render", "返回调整效果图")}</button></div>
           <div className="drawings__grid">
             <div className="card card--pad drawings__views">
               <h2>{copy("Concept Orthographic Views", "概念级三视图")}</h2>
-              <div className="drawings__row">
-                <figure><figcaption>{t("furn.front")}</figcaption><FrontViewDrawing {...drawingProps} /></figure>
-                <figure><figcaption>{t("furn.side")}</figcaption><SideViewDrawing {...drawingProps} /></figure>
-                <figure><figcaption>{t("furn.top")}</figcaption><TopViewDrawing {...drawingProps} /></figure>
+              <div className="orthographic-sheet-frame">
+                <img src={orthographic.orthographic_image.url} alt={copy("One orthographic sheet showing the confirmed table from the front, side, and top", "与已确认效果图一致的桌子正视、侧视和顶视三视图合成图")} />
               </div>
-              <p className="drawings__note">{copy("All three views use the same canonical dimensions in millimetres.", "三张视图共用同一组毫米制标准尺寸。")}</p>
+              <p className="drawings__note">{copy("Generated from the confirmed render as one front / side / top concept sheet.", "基于已确认效果图生成的一张正视 / 侧视 / 顶视概念图。")}</p>
             </div>
             <aside className="card card--pad spec">
               <h2>{t("furn.spec")}</h2>
@@ -416,7 +463,7 @@ export function FurniturePage() {
                 <li><strong>{t("furn.spec.finish")}</strong><span>{[...new Set(spec.materials.map((item) => item.finish))].join(" · ")}</span></li>
                 <li><strong>{t("furn.spec.components")}</strong><span>{spec.components.map((item) => `${item.name} × ${item.quantity}`).join(" · ")}</span></li>
               </ul>
-              <Button full onClick={() => window.print()}>{copy("Print / Save Views", "打印 / 保存三视图")}</Button>
+              <Button full onClick={() => void downloadOrthographic()}><Download size={16} />{copy("Download views", "下载三视图")}</Button>
               <Button full variant="secondary" onClick={async () => { try { await navigator.clipboard.writeText(`${generated.response.design_summary}\n${spec.dimensions_mm.width} × ${spec.dimensions_mm.depth} × ${spec.dimensions_mm.height} mm`); flash(copy("Specification copied.", "规格已复制。")); } catch { flash(copy("Clipboard is unavailable.", "暂时无法使用剪贴板。")); } }}>{copy("Copy Specification", "复制规格")}</Button>
               {feedback && <p className="drawings__note" role="status">{feedback}</p>}
               <p className="drawings__note">{copy("Concept only—not fabrication-ready. A furniture engineer or fabricator must verify structure, joints, tolerances, and final dimensions before production.", "当前为概念级图纸，不可直接下单生产。结构、节点、公差和最终尺寸需由家具工程师或制造商复核。")}</p>
@@ -426,6 +473,7 @@ export function FurniturePage() {
       )}
 
       {furniture.phase === "generating" && <GeneratingOverlay title={copy("Designing your table", "正在设计你的桌子")} steps={FURNITURE_GENERATION_STEPS} activeIndex={furniture.stepIndex} />}
+      {generatingOrthographic && <GeneratingOverlay title={copy("Creating the concept views", "正在生成概念三视图")} steps={FURNITURE_GENERATION_STEPS} activeIndex={orthographicStep} />}
     </main>
   );
 }

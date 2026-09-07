@@ -132,6 +132,17 @@ export async function syncFurnitureSkills(client: ZooworkClient): Promise<SkillR
   requireRemoteWriteGuard();
   const agentId = process.env.ZOOWORK_FURNITURE_AGENT_ID?.trim();
   if (!agentId) throw new Error('ZOOWORK_FURNITURE_AGENT_ID is required to advance pinned Skill versions');
+  const currentAgent = await client.getAgent(agentId);
+  const declaredModel = currentAgent.declared?.model;
+  const modelId = typeof declaredModel === 'object'
+    && declaredModel !== null
+    && 'primary' in declaredModel
+    && typeof declaredModel.primary === 'string'
+    ? declaredModel.primary
+    : process.env.ZOOWORK_MODEL_ID?.trim();
+  if (!modelId) throw new Error('The existing Agent has no declared primary model and ZOOWORK_MODEL_ID is not configured');
+  const agent = await reconcileAgent(client, currentAgent, modelId);
+  await ensureRunning(client, agent);
   const updated: SkillRecord[] = [];
   for (const skillName of HOME_FURNITURE_SKILLS) {
     const matches = (await client.listSkills({ q: skillName }))

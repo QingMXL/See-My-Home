@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { resolve } from 'node:path';
 import { loadEnvFile } from 'node:process';
@@ -7,6 +7,7 @@ import { createZooworkClient, ZooworkError } from '@zoowork-ai/sdk';
 import type {
   FurnitureControlKey,
   FurnitureDesignControls,
+  FurnitureDesignSpec,
   FurnitureTurnRequest,
   SupportedLocale,
   TableType,
@@ -14,6 +15,7 @@ import type {
 } from './contracts.js';
 import { projectRoot } from './paths.js';
 import { HomeFurnitureRuntime, HomeFurnitureTurnTimeoutError } from './runtime.js';
+import { assertFurnitureAgentResponse } from './validation.js';
 
 const envPath = resolve(projectRoot, '.env');
 if (existsSync(envPath)) loadEnvFile(envPath);
@@ -257,6 +259,7 @@ async function runGeneration(input: Record<string, unknown>) {
   const conversation = await runtime.createConversation(projectId, newId(`furniture_${projectId}`));
   const request: FurnitureTurnRequest = {
     contract_version: 'home-furniture-v1',
+    output_mode: 'concept_render',
     request_id: newId('req'),
     project_id: projectId,
     locale: selectedLocale(input.locale),
@@ -287,6 +290,63 @@ async function runGeneration(input: Record<string, unknown>) {
       provider_model: 'ZooWork imageGenerationModel',
     },
     request_context: input,
+  };
+}
+
+function confirmedControls(spec: FurnitureDesignSpec): FurnitureDesignControls {
+  const primary = spec.materials[0];
+  const secondary = spec.materials[1];
+  return {
+    dimensions_mm: spec.dimensions_mm,
+    primary_material: primary?.material ?? 'Confirmed material',
+    secondary_material: secondary?.material ?? '',
+    top_shape: spec.top.shape,
+    edge_profile: spec.top.edge_profile,
+    base_style: spec.base.style,
+    finish: primary?.finish ?? 'Confirmed finish',
+    storage: spec.components.filter((component) => component.role === 'drawer' || component.role === 'shelf').map((component) => `${component.quantity} ${component.name}`).join(', '),
+    component_notes: spec.components.map((component) => `${component.quantity} × ${component.name}`).join('; '),
+  };
+}
+
+async function runOrthographic(input: Record<string, unknown>) {
+  const projectId = requireString(input.project_id, 'project_id');
+  const designResponse = input.design_response;
+  assertFurnitureAgentResponse(designResponse);
+  if (designResponse.status === 'failed') throw new Error('A failed furniture design cannot produce orthographic views');
+  const renderAssetId = requireString(input.render_asset_id, 'render_asset_id');
+  if (!artifacts.has(renderAssetId)) throw new Error('render_asset_id is not a generated image from this runtime');
+  const request: FurnitureTurnRequest = {
+    contract_version: 'home-furniture-v1',
+    output_mode: 'orthographic_sheet',
+    request_id: newId('ortho'),
+    project_id: projectId,
+    locale: selectedLocale(input.locale),
+    table_type: designResponse.table_type,
+    render_asset_ref: `${publicBaseUrl()}/api/site/furniture/artifacts/${encodeURIComponent(renderAssetId)}`,
+    confirmed_design_spec: designResponse.design_spec,
+    description: designResponse.design_summary,
+    source_priority: { sketch: 0, inspiration: 0 },
+    locked_controls: [],
+    design_controls: confirmedControls(designResponse.design_spec),
+  };
+  const conversation = await runtime.createConversation(projectId, newId(`furniture_orthographic_${projectId}`));
+  const result = await runtime.runFurnitureTurn(conversation, request);
+  const artifact = result.artifacts.find((candidate) => candidate.status === 'ready' && (candidate.contentType?.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(candidate.fileName ?? '')));
+  if (!artifact) throw new Error(result.response.warnings.join(' ') || 'Furniture generation completed without a readable orthographic image artifact');
+  artifacts.set(artifact.artifactId, { contentType: artifact.contentType });
+  return {
+    session_id: conversation.sessionId,
+    request_id: request.request_id,
+    project_id: projectId,
+    response: result.response,
+    orthographic_image: {
+      asset_id: artifact.artifactId,
+      url: `/api/home-furniture/artifacts/${encodeURIComponent(artifact.artifactId)}`,
+      mime_type: artifact.contentType ?? 'image/png',
+      size_bytes: artifact.size ?? 0,
+      provider_model: 'ZooWork imageGenerationModel',
+    },
   };
 }
 
@@ -324,6 +384,18 @@ const server = createServer(async (request, response) => {
       json(response, 201, { project_id: asset.projectId, asset_id: asset.assetId, source_kind: asset.sourceKind, file_name: asset.fileName, mime_type: asset.mimeType, size_bytes: asset.sizeBytes, sha256: asset.sha256, storage: 'application_backend', image_processing_status: 'uploaded' });
       return;
     }
+    if (request.method === 'DELETE' && url.pathname === '/api/site/furniture/upload') {
+      if (!isLocalSite(request)) { json(response, 403, { error: 'Delete only accepts the local See My Home UI' }); return; }
+      const body = await readJson(request);
+      const projectId = requireString(body.project_id, 'project_id');
+      const assetId = requireString(body.asset_id, 'asset_id');
+      const asset = assets.get(assetId);
+      if (!asset || asset.projectId !== projectId) { json(response, 404, { error: 'Source asset not found' }); return; }
+      if (existsSync(asset.path)) unlinkSync(asset.path);
+      assets.delete(assetId);
+      json(response, 200, { deleted: true });
+      return;
+    }
     if (request.method === 'POST' && (url.pathname === '/api/site/furniture/events/agent.generate' || url.pathname === '/api/site/furniture/events/agent.refine')) {
       if (!isLocalSite(request)) { json(response, 403, { error: 'Generation only accepts the local See My Home UI' }); return; }
       const body = await readJson(request);
@@ -335,6 +407,11 @@ const server = createServer(async (request, response) => {
       if (body.locale !== undefined) input.locale = body.locale;
       if (body.description !== undefined) input.description = body.description;
       json(response, 200, await runGeneration(input));
+      return;
+    }
+    if (request.method === 'POST' && url.pathname === '/api/site/furniture/events/agent.orthographic') {
+      if (!isLocalSite(request)) { json(response, 403, { error: 'Generation only accepts the local See My Home UI' }); return; }
+      json(response, 200, await runOrthographic(await readJson(request)));
       return;
     }
     if (request.method === 'POST' && url.pathname === '/api/site/furniture/reset') { json(response, 200, { reset: true }); return; }

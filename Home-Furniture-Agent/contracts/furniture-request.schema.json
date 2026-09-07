@@ -3,15 +3,18 @@
   "$id": "https://see-my-home.example/contracts/home-furniture-v1-request.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["contract_version", "request_id", "project_id", "locale", "table_type", "source_priority", "locked_controls", "design_controls"],
+  "required": ["contract_version", "output_mode", "request_id", "project_id", "locale", "table_type", "source_priority", "locked_controls", "design_controls"],
   "properties": {
     "contract_version": { "const": "home-furniture-v1" },
+    "output_mode": { "enum": ["concept_render", "orthographic_sheet"] },
     "request_id": { "type": "string", "minLength": 1, "maxLength": 160 },
     "project_id": { "type": "string", "minLength": 1, "maxLength": 160 },
     "locale": { "enum": ["en-US", "zh-CN"] },
     "table_type": { "enum": ["dining_table", "coffee_table", "console_table", "side_table", "desk", "bedside_table", "nesting_tables", "bar_table", "other_table"] },
     "sketch_asset_ref": { "type": "string", "format": "uri", "maxLength": 4096 },
     "inspiration_asset_ref": { "type": "string", "format": "uri", "maxLength": 4096 },
+    "render_asset_ref": { "type": "string", "format": "uri", "maxLength": 4096 },
+    "confirmed_design_spec": { "type": "object" },
     "description": { "type": "string", "maxLength": 4000 },
     "source_priority": {
       "type": "object",
@@ -58,6 +61,13 @@
   "anyOf": [
     { "required": ["sketch_asset_ref"], "properties": { "sketch_asset_ref": {} } },
     { "required": ["inspiration_asset_ref"], "properties": { "inspiration_asset_ref": {} } },
-    { "required": ["description"], "properties": { "description": { "type": "string", "minLength": 1 } } }
+    { "required": ["description"], "properties": { "description": { "type": "string", "minLength": 1 } } },
+    {
+      "required": ["render_asset_ref", "confirmed_design_spec"],
+      "properties": {
+        "render_asset_ref": {},
+        "confirmed_design_spec": {}
+      }
+    }
   ]
 }

@@ -6,6 +6,7 @@ import { HomeFurnitureRuntime } from '../src/runtime.js';
 
 const request: FurnitureTurnRequest = {
   contract_version: 'home-furniture-v1',
+  output_mode: 'concept_render',
   request_id: 'req_async_001',
   project_id: 'furniture_async_001',
   locale: 'zh-CN',

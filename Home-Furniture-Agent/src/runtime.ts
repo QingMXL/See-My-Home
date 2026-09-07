@@ -162,30 +162,31 @@ export class HomeFurnitureRuntime {
   }
 
   private buildEvents(request: FurnitureTurnRequest): OutboundEvent[] {
-    const filename = `${request.project_id}_${request.request_id}_table.png`;
+    const orthographic = request.output_mode === 'orthographic_sheet';
+    const filename = `${request.project_id}_${request.request_id}_${orthographic ? 'orthographic' : 'table'}.png`;
     const sources = [
       request.sketch_asset_ref ? `Inspect sketch_asset_ref exactly once with image: ${request.sketch_asset_ref}` : '',
       request.inspiration_asset_ref ? `Inspect inspiration_asset_ref exactly once with image: ${request.inspiration_asset_ref}` : '',
+      request.render_asset_ref ? `Inspect render_asset_ref exactly once with image: ${request.render_asset_ref}` : '',
     ].filter(Boolean).join(' ');
-    return [{
-      type: 'user.message',
-      idempotency_key: `${request.request_id}:furniture`,
-      content: JSON.stringify({
-        runtime_contract: 'home-furniture-v1',
-        runtime_timestamp: new Date().toISOString(),
-        source_authority: {
-          primary: request.sketch_asset_ref && request.inspiration_asset_ref
-            ? request.source_priority.sketch === request.source_priority.inspiration
-              ? 'balanced'
-              : request.source_priority.sketch > request.source_priority.inspiration ? 'sketch' : 'inspiration'
-            : request.sketch_asset_ref ? 'sketch' : request.inspiration_asset_ref ? 'inspiration' : 'text',
-          priority: request.source_priority,
-          rule: 'Move the design closer to the higher-weight image and retain proportionally fewer cues from the lower-weight image. Equal weights require a balanced synthesis. Only fields named in request.locked_controls are hard UI constraints; all other design_controls are fallbacks and must yield to clear sketch or text evidence. Numeric priority is design-decision guidance, not an image-tool parameter.',
-        },
-        contracts: { request_schema: REQUEST_SCHEMA, response_schema: RESPONSE_SCHEMA },
-        request,
-        output_requirement: [
-          'Use table-design-spec, then table-concept-renderer.',
+    const outputRequirement = orthographic
+      ? [
+          'Use table-concept-renderer in orthographic-sheet mode. The confirmed design specification is immutable.',
+          sources,
+          'Treat render_asset_ref as the sole visual authority. Do not inspect any image URL more than once.',
+          'Generate one landscape raster image containing exactly three clean line-art panels from left to right: front elevation, side elevation, and top plan.',
+          'The three panels must depict the same confirmed furniture shown in render_asset_ref, including the same silhouette, top, drawers, shelves, supports, hardware, proportions, and component placement.',
+          'Use a warm-white background with crisp dark monochrome technical lines. No perspective view, room scene, material rendering, shadows, decorative props, extra panels, title block, written labels, dimension numbers, logos, or watermark.',
+          `Call image_generate exactly once with action="generate", render_asset_ref as the supported source image input, quality="high", and filename="${filename}". Use only arguments exposed by the current tool schema; never invent model, provider, numeric image-weight, or control-strength fields.`,
+          'After generation starts, call sessions_yield exactly once and end the waiting run.',
+          `In the attachment continuation, call media_materialize exactly once for the returned artifactId with path="/workspace/artifacts/${request.project_id}/${filename}". Inspect the materialized image exactly once.`,
+          'Publish only when all three views are present, mutually consistent, and recognizably match the confirmed render and component specification. Otherwise return failed with qa.publishable=false.',
+          'Echo request.confirmed_design_spec exactly and without changing any value in response.design_spec. Set absent sketch and inspiration QA fields to true.',
+          'Otherwise call artifact_publish exactly once and return status=completed with its artifact id.',
+          'Return one compact JSON object matching response_schema without Markdown fences. This is concept-level only, not fabrication-ready engineering.',
+        ]
+      : [
+          'Use table-design-spec, then table-concept-renderer in concept-render mode.',
           sources,
           'Do not call any image URL more than once for inspection.',
           'Treat only request.locked_controls as hard UI constraints. Unlocked design_controls are fallback suggestions; do not report a conflict merely because clear sketch or text evidence differs from an unlocked fallback.',
@@ -202,7 +203,27 @@ export class HomeFurnitureRuntime {
           'Otherwise call artifact_publish exactly once and return status=completed with its artifact id.',
           'Treat absent sketch or inspiration QA as satisfied when that source was not provided.',
           'Return one compact JSON object matching response_schema without Markdown fences. This is concept-level only, not fabrication-ready engineering.',
-        ].filter(Boolean).join(' '),
+        ];
+    return [{
+      type: 'user.message',
+      idempotency_key: `${request.request_id}:furniture`,
+      content: JSON.stringify({
+        runtime_contract: 'home-furniture-v1',
+        runtime_timestamp: new Date().toISOString(),
+        source_authority: {
+          primary: orthographic ? 'confirmed_render' : request.sketch_asset_ref && request.inspiration_asset_ref
+            ? request.source_priority.sketch === request.source_priority.inspiration
+              ? 'balanced'
+              : request.source_priority.sketch > request.source_priority.inspiration ? 'sketch' : 'inspiration'
+            : request.sketch_asset_ref ? 'sketch' : request.inspiration_asset_ref ? 'inspiration' : 'text',
+          priority: request.source_priority,
+          rule: orthographic
+            ? 'The confirmed render and confirmed_design_spec are immutable authorities for the orthographic sheet.'
+            : 'Move the design closer to the higher-weight image and retain proportionally fewer cues from the lower-weight image. Equal weights require a balanced synthesis. Only fields named in request.locked_controls are hard UI constraints; all other design_controls are fallbacks and must yield to clear sketch or text evidence. Numeric priority is design-decision guidance, not an image-tool parameter.',
+        },
+        contracts: { request_schema: REQUEST_SCHEMA, response_schema: RESPONSE_SCHEMA },
+        request,
+        output_requirement: outputRequirement.filter(Boolean).join(' '),
       }),
     }];
   }

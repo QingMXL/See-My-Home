@@ -11,6 +11,7 @@ import type { FurnitureAgentResponse, FurnitureTurnRequest } from '../src/contra
 
 const validRequest: FurnitureTurnRequest = {
   contract_version: 'home-furniture-v1',
+  output_mode: 'concept_render',
   request_id: 'req_1',
   project_id: 'furniture_1',
   locale: 'zh-CN',
@@ -110,6 +111,25 @@ test('enforces the same canonical dimensions in request and response', () => {
 test('rejects unknown or duplicate locked controls', () => {
   assert.throws(() => assertFurnitureTurnRequest({ ...validRequest, locked_controls: ['unknown'] }), ContractValidationError);
   assert.throws(() => assertFurnitureTurnRequest({ ...validRequest, locked_controls: ['storage', 'storage'] }), ContractValidationError);
+});
+
+test('accepts only a confirmed render and unchanged specification for orthographic generation', () => {
+  const orthographicRequest: FurnitureTurnRequest = {
+    ...validRequest,
+    output_mode: 'orthographic_sheet',
+    sketch_asset_ref: undefined,
+    inspiration_asset_ref: undefined,
+    render_asset_ref: 'https://example.com/confirmed-render.png',
+    confirmed_design_spec: validResponse.design_spec,
+    source_priority: { sketch: 0, inspiration: 0 },
+  };
+  assert.doesNotThrow(() => assertFurnitureTurnRequest(orthographicRequest));
+  assert.doesNotThrow(() => assertResponseMatchesRequest(validResponse, orthographicRequest));
+  assert.throws(() => assertFurnitureTurnRequest({ ...orthographicRequest, sketch_asset_ref: 'https://example.com/sketch.png' }), ContractValidationError);
+  assert.throws(() => assertResponseMatchesRequest({
+    ...validResponse,
+    design_spec: { ...validResponse.design_spec, base: { ...validResponse.design_spec.base, support_count: 3 } },
+  }, orthographicRequest), /changed/);
 });
 
 test('extracts a JSON response without trusting Markdown framing', () => {

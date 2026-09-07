@@ -1,15 +1,20 @@
 import { readFileSync } from 'node:fs';
+import { isDeepStrictEqual } from 'node:util';
 import { Ajv2020, type ErrorObject, type ValidateFunction } from 'ajv/dist/2020.js';
 import addFormatsImport from 'ajv-formats';
-import type { FurnitureAgentResponse, FurnitureTurnRequest } from './contracts.js';
+import type { FurnitureAgentResponse, FurnitureDesignSpec, FurnitureTurnRequest } from './contracts.js';
 import { requestSchemaPath, responseSchemaPath } from './paths.js';
 
 const ajv = new Ajv2020({ allErrors: true, strict: true, validateFormats: true });
 const addFormats = addFormatsImport as unknown as (instance: Ajv2020) => Ajv2020;
 addFormats(ajv);
 
-const requestValidator = ajv.compile(JSON.parse(readFileSync(requestSchemaPath, 'utf8')) as object);
-const responseValidator = ajv.compile(JSON.parse(readFileSync(responseSchemaPath, 'utf8')) as object);
+const requestSchema = JSON.parse(readFileSync(requestSchemaPath, 'utf8')) as Record<string, unknown>;
+const responseSchema = JSON.parse(readFileSync(responseSchemaPath, 'utf8')) as Record<string, unknown>;
+const requestValidator = ajv.compile(requestSchema);
+const responseValidator = ajv.compile(responseSchema);
+const responseProperties = responseSchema.properties as Record<string, unknown>;
+const designSpecValidator = ajv.compile(responseProperties.design_spec as object);
 
 function formatted(errors: ErrorObject[] | null | undefined): string {
   return errors?.map((error) => `${error.instancePath || '/'} ${error.message ?? 'is invalid'}`).join('; ')
@@ -29,6 +34,24 @@ function assertWith<T>(name: string, validator: ValidateFunction, value: unknown
 
 export function assertFurnitureTurnRequest(value: unknown): asserts value is FurnitureTurnRequest {
   assertWith<FurnitureTurnRequest>('FurnitureTurnRequest', requestValidator, value);
+  if (value.output_mode === 'orthographic_sheet') {
+    if (!value.render_asset_ref || !value.confirmed_design_spec) {
+      throw new ContractValidationError('FurnitureTurnRequest', 'orthographic_sheet requires render_asset_ref and confirmed_design_spec');
+    }
+    assertWith<FurnitureDesignSpec>('FurnitureDesignSpec', designSpecValidator, value.confirmed_design_spec);
+    if (value.sketch_asset_ref || value.inspiration_asset_ref || value.source_priority.sketch !== 0 || value.source_priority.inspiration !== 0) {
+      throw new ContractValidationError('FurnitureTurnRequest', 'orthographic_sheet must use only the confirmed render as its image source');
+    }
+    const confirmed = value.confirmed_design_spec.dimensions_mm;
+    const controls = value.design_controls.dimensions_mm;
+    if (confirmed.width !== controls.width || confirmed.depth !== controls.depth || confirmed.height !== controls.height) {
+      throw new ContractValidationError('FurnitureTurnRequest', 'orthographic dimensions must match the confirmed specification');
+    }
+    return;
+  }
+  if (value.render_asset_ref || value.confirmed_design_spec) {
+    throw new ContractValidationError('FurnitureTurnRequest', 'concept_render cannot include orthographic source fields');
+  }
   const total = value.source_priority.sketch + value.source_priority.inspiration;
   const hasSketch = Boolean(value.sketch_asset_ref);
   const hasInspiration = Boolean(value.inspiration_asset_ref);
@@ -85,6 +108,12 @@ export function parseFurnitureAgentResponse(raw: string): FurnitureAgentResponse
 export function assertResponseMatchesRequest(response: FurnitureAgentResponse, request: FurnitureTurnRequest): void {
   if (response.request_id !== request.request_id) throw new Error('Furniture response request_id does not match request');
   if (response.table_type !== request.table_type) throw new Error('Furniture response table_type does not match request');
+  if (request.output_mode === 'orthographic_sheet') {
+    if (!isDeepStrictEqual(response.design_spec, request.confirmed_design_spec)) {
+      throw new Error('Furniture orthographic response changed the confirmed design specification');
+    }
+    return;
+  }
   if (request.locked_controls.includes('dimensions_mm')) {
     const expected = request.design_controls.dimensions_mm;
     const actual = response.design_spec.dimensions_mm;

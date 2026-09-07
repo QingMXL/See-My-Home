@@ -123,6 +123,34 @@ describe("useDesignStore", () => {
     expect(useDesignStore.getState().furniture.sketchWeight).toBe(95);
   });
 
+  test("removing a furniture image clears its source and invalidates generated outputs", () => {
+    useDesignStore.getState().setFurnitureSource("sketch", "desk.png", "blob:desk-preview");
+    useDesignStore.getState().setFurnitureUploadedAsset("sketch", {
+      project_id: "furniture_test",
+      asset_id: "asset_test",
+      source_kind: "sketch",
+      file_name: "desk.png",
+      mime_type: "image/png",
+      size_bytes: 128,
+      sha256: "0".repeat(64),
+      storage: "application_backend",
+      image_processing_status: "uploaded",
+    });
+    useDesignStore.getState().confirmFurniture();
+
+    useDesignStore.getState().removeFurnitureSource("sketch");
+
+    expect(useDesignStore.getState().furniture).toMatchObject({
+      sketchName: null,
+      sketchUrl: null,
+      sketchAsset: null,
+      agentRun: null,
+      orthographicRun: null,
+      phase: "idle",
+      confirmed: false,
+    });
+  });
+
   test("editing furniture text clears a prior drawing confirmation", () => {
     useDesignStore.getState().confirmFurniture();
     useDesignStore.getState().setFurnitureRefinementPrompt("Make the legs slimmer.");

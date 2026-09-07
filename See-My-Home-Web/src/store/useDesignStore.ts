@@ -6,6 +6,7 @@ import type { LayoutGenerationResult, LayoutImageAnalysisResult, UploadedLayoutA
 import type { StyleGenerationResult, UploadedStyleAsset } from "../lib/homeStyleApi";
 import type {
   FurnitureGenerationResult,
+  FurnitureOrthographicResult,
   FurnitureControlKey,
   FurnitureTableType,
   FurnitureTopShape,
@@ -79,6 +80,7 @@ interface FurnitureFlowState {
   stepIndex: number;
   confirmed: boolean;
   agentRun: FurnitureGenerationResult | null;
+  orthographicRun: FurnitureOrthographicResult | null;
   agentError: string | null;
 }
 
@@ -116,6 +118,7 @@ interface DesignStore {
   setFurniturePrompt: (prompt: string) => void;
   setFurnitureRefinementPrompt: (prompt: string) => void;
   setFurnitureSource: (kind: "sketch" | "inspiration", name: string | null, url: string | null) => void;
+  removeFurnitureSource: (kind: "sketch" | "inspiration") => void;
   setFurnitureUploadedAsset: (kind: "sketch" | "inspiration", asset: UploadedFurnitureAsset | null) => void;
   setFurnitureSketchWeight: (weight: number) => void;
   setFurnitureTableType: (tableType: FurnitureTableType) => void;
@@ -124,6 +127,7 @@ interface DesignStore {
   unlockFurnitureControl: (control: FurnitureControlKey) => void;
   setFurniturePhase: (phase: GenerationPhase, stepIndex?: number) => void;
   setFurnitureAgentRun: (run: FurnitureGenerationResult) => void;
+  setFurnitureOrthographicRun: (run: FurnitureOrthographicResult) => void;
   setFurnitureAgentError: (message: string | null) => void;
   confirmFurniture: () => void;
 
@@ -186,6 +190,7 @@ const initialFurniture: FurnitureFlowState = {
   stepIndex: 0,
   confirmed: false,
   agentRun: null,
+  orthographicRun: null,
   agentError: null,
 };
 
@@ -338,9 +343,9 @@ export const useDesignStore = create<DesignStore>()(
   setStyleAgentError: (agentError) =>
     set((s) => ({ style: { ...s.style, agentError } })),
 
-  setFurniturePrompt: (prompt) => set((s) => ({ furniture: { ...s.furniture, prompt, confirmed: false } })),
+  setFurniturePrompt: (prompt) => set((s) => ({ furniture: { ...s.furniture, prompt, confirmed: false, orthographicRun: null } })),
   setFurnitureRefinementPrompt: (refinementPrompt) =>
-    set((s) => ({ furniture: { ...s.furniture, refinementPrompt, confirmed: false } })),
+    set((s) => ({ furniture: { ...s.furniture, refinementPrompt, confirmed: false, orthographicRun: null } })),
   setFurnitureSource: (kind, name, url) =>
     set((s) => ({
       furniture: {
@@ -348,6 +353,22 @@ export const useDesignStore = create<DesignStore>()(
         ...(kind === "sketch"
           ? { sketchName: name, sketchUrl: url, sketchAsset: null }
           : { inspirationName: name, inspirationUrl: url, inspirationAsset: null }),
+        confirmed: false,
+        orthographicRun: null,
+      },
+    })),
+  removeFurnitureSource: (kind) =>
+    set((s) => ({
+      furniture: {
+        ...s.furniture,
+        ...(kind === "sketch"
+          ? { sketchName: null, sketchUrl: null, sketchAsset: null }
+          : { inspirationName: null, inspirationUrl: null, inspirationAsset: null }),
+        agentRun: null,
+        orthographicRun: null,
+        agentError: null,
+        phase: "idle",
+        stepIndex: 0,
         confirmed: false,
       },
     })),
@@ -357,6 +378,8 @@ export const useDesignStore = create<DesignStore>()(
         ...s.furniture,
         projectId: asset?.project_id ?? s.furniture.projectId,
         ...(kind === "sketch" ? { sketchAsset: asset } : { inspirationAsset: asset }),
+        orthographicRun: null,
+        confirmed: false,
       },
     })),
   setFurnitureSketchWeight: (sketchWeight) =>
@@ -365,10 +388,11 @@ export const useDesignStore = create<DesignStore>()(
         ...s.furniture,
         sketchWeight: Math.min(95, Math.max(5, Math.round(sketchWeight / 5) * 5)),
         confirmed: false,
+        orthographicRun: null,
       },
     })),
   setFurnitureTableType: (tableType) =>
-    set((s) => ({ furniture: { ...s.furniture, tableType, confirmed: false } })),
+    set((s) => ({ furniture: { ...s.furniture, tableType, confirmed: false, orthographicRun: null } })),
   setFurnitureOption: (key, value) =>
     set((s) => {
       const controlByKey = {
@@ -379,7 +403,7 @@ export const useDesignStore = create<DesignStore>()(
         shelves: "storage",
       } as const;
       const control = controlByKey[key];
-      return { furniture: { ...s.furniture, [key]: value, lockedControls: [...new Set([...(s.furniture.lockedControls ?? []), control])], confirmed: false } };
+      return { furniture: { ...s.furniture, [key]: value, lockedControls: [...new Set([...(s.furniture.lockedControls ?? []), control])], confirmed: false, orthographicRun: null } };
     }),
   setFurnitureAppearance: (key, value) =>
     set((s) => {
@@ -390,7 +414,7 @@ export const useDesignStore = create<DesignStore>()(
         finish: "finish",
       } as const;
       const control = controlByKey[key];
-      return { furniture: { ...s.furniture, [key]: value, lockedControls: [...new Set([...(s.furniture.lockedControls ?? []), control])], confirmed: false } };
+      return { furniture: { ...s.furniture, [key]: value, lockedControls: [...new Set([...(s.furniture.lockedControls ?? []), control])], confirmed: false, orthographicRun: null } };
     }),
   unlockFurnitureControl: (control) =>
     set((s) => ({
@@ -398,12 +422,15 @@ export const useDesignStore = create<DesignStore>()(
         ...s.furniture,
         lockedControls: (s.furniture.lockedControls ?? []).filter((candidate) => candidate !== control),
         confirmed: false,
+        orthographicRun: null,
       },
     })),
   setFurniturePhase: (phase, stepIndex) =>
     set((s) => ({ furniture: { ...s.furniture, phase, stepIndex: stepIndex ?? s.furniture.stepIndex } })),
   setFurnitureAgentRun: (agentRun) =>
-    set((s) => ({ furniture: { ...s.furniture, agentRun, agentError: null, confirmed: false } })),
+    set((s) => ({ furniture: { ...s.furniture, agentRun, orthographicRun: null, agentError: null, confirmed: false } })),
+  setFurnitureOrthographicRun: (orthographicRun) =>
+    set((s) => ({ furniture: { ...s.furniture, orthographicRun, agentError: null } })),
   setFurnitureAgentError: (agentError) =>
     set((s) => ({ furniture: { ...s.furniture, agentError } })),
   confirmFurniture: () => set((s) => ({ furniture: { ...s.furniture, confirmed: true } })),
@@ -462,6 +489,7 @@ export const useDesignStore = create<DesignStore>()(
           confirmed: s.furniture.confirmed,
           phase: s.furniture.phase === "done" ? "done" : "idle",
           agentRun: s.furniture.agentRun,
+          orthographicRun: s.furniture.orthographicRun ?? null,
           agentError: null,
         },
       }),

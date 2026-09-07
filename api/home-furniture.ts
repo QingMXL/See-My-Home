@@ -1,10 +1,12 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
+import { del } from '@vercel/blob';
 import { ZooworkError } from '@zoowork-ai/sdk';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type {
   FurnitureControlKey,
   FurnitureDesignControls,
+  FurnitureDesignSpec,
   FurnitureTurnRequest,
   TableType,
   TopShape,
@@ -19,11 +21,13 @@ import {
   parseLocale,
   persistGeneratedImage,
   privateBlobUrl,
+  privateResultBlobUrl,
   requestPath,
   requireString,
   sendJson,
   temporaryBlobReadUrl,
 } from './_lib/common.js';
+import { assertFurnitureAgentResponse } from '../Home-Furniture-Agent/src/validation.js';
 
 export const config = { maxDuration: 300 };
 
@@ -91,7 +95,7 @@ interface FurnitureJob {
   postedSeq: number;
   requestId: string;
   projectId: string;
-  type: 'agent.generate' | 'agent.refine';
+  type: 'agent.generate' | 'agent.refine' | 'agent.orthographic';
   expiresAt: number;
 }
 
@@ -127,7 +131,7 @@ function verifyJob(value: unknown): FurnitureJob | null {
     || job.postedSeq < 0
     || typeof job.requestId !== 'string'
     || typeof job.projectId !== 'string'
-    || (job.type !== 'agent.generate' && job.type !== 'agent.refine')
+    || (job.type !== 'agent.generate' && job.type !== 'agent.refine' && job.type !== 'agent.orthographic')
     || typeof job.expiresAt !== 'number'
     || job.expiresAt < Date.now()
   ) throw new Error('job_token is invalid or expired');
@@ -249,6 +253,7 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
   const requestId = job?.requestId ?? newId('req');
   const turn: FurnitureTurnRequest = {
     contract_version: 'home-furniture-v1',
+    output_mode: 'concept_render',
     request_id: requestId,
     project_id: projectId,
     locale,
@@ -330,6 +335,113 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
   });
 }
 
+function confirmedControls(spec: FurnitureDesignSpec): FurnitureDesignControls {
+  const primary = spec.materials[0];
+  const secondary = spec.materials[1];
+  return {
+    dimensions_mm: spec.dimensions_mm,
+    primary_material: primary?.material ?? 'Confirmed material',
+    secondary_material: secondary?.material ?? '',
+    top_shape: spec.top.shape,
+    edge_profile: spec.top.edge_profile,
+    base_style: spec.base.style,
+    finish: primary?.finish ?? 'Confirmed finish',
+    storage: spec.components.filter((component) => component.role === 'drawer' || component.role === 'shelf').map((component) => `${component.quantity} ${component.name}`).join(', '),
+    component_notes: spec.components.map((component) => `${component.quantity} × ${component.name}`).join('; '),
+  };
+}
+
+async function orthographic(request: VercelRequest, response: VercelResponse): Promise<void> {
+  const body = objectBody(request.body);
+  const job = verifyJob(body.job_token);
+  const projectId = requireString(body.project_id, 'project_id');
+  const locale = parseLocale(body.locale);
+  const baseResponse = body.design_response;
+  assertFurnitureAgentResponse(baseResponse);
+  if (baseResponse.status === 'failed') throw new Error('A failed furniture design cannot produce orthographic views');
+  const tableType = baseResponse.table_type;
+  const renderBlobUrl = privateResultBlobUrl(body.render_image_url, 'furniture', projectId);
+  if (job && (job.projectId !== projectId || job.type !== 'agent.orthographic')) {
+    throw new Error('job_token does not match this orthographic request');
+  }
+
+  const zoo = runtime();
+  const requestId = job?.requestId ?? newId('ortho');
+  const turn: FurnitureTurnRequest = {
+    contract_version: 'home-furniture-v1',
+    output_mode: 'orthographic_sheet',
+    request_id: requestId,
+    project_id: projectId,
+    locale,
+    table_type: tableType,
+    render_asset_ref: await temporaryBlobReadUrl(renderBlobUrl),
+    confirmed_design_spec: baseResponse.design_spec,
+    description: baseResponse.design_summary,
+    source_priority: { sketch: 0, inspiration: 0 },
+    locked_controls: [],
+    design_controls: confirmedControls(baseResponse.design_spec),
+  };
+
+  if (!job) {
+    await zoo.ensureRunning();
+    const conversation = await zoo.createConversation(projectId, newId(`furniture_orthographic_${projectId}`));
+    const started = await zoo.startFurnitureTurn(conversation, turn);
+    sendJson(response, 202, {
+      status: 'processing',
+      job_token: signJob({
+        version: 1,
+        sessionId: conversation.sessionId,
+        postedSeq: started.postedSeq,
+        requestId,
+        projectId,
+        type: 'agent.orthographic',
+        expiresAt: Date.now() + 30 * 60 * 1000,
+      }),
+      poll_after_ms: 3_000,
+    });
+    return;
+  }
+
+  const conversation = { agentId: zoo.agentId, sessionId: job.sessionId };
+  const polled = await zoo.pollFurnitureTurn(conversation, turn, job.postedSeq);
+  if (polled.status === 'processing') {
+    sendJson(response, 202, { status: 'processing', job_token: signJob(job), poll_after_ms: 3_000 });
+    return;
+  }
+
+  const result = polled.result;
+  const artifact = result.artifacts.find((candidate) => candidate.status === 'ready'
+    && (candidate.contentType?.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(candidate.fileName ?? '')));
+  if (!artifact) throw new Error(result.response.warnings.join(' ') || 'Home Furniture Agent completed without a readable orthographic image artifact');
+  const signedUrl = await zoo.resolveArtifactUrl(artifact.artifactId);
+  const stored = await persistGeneratedImage({
+    signedUrl,
+    kind: 'furniture',
+    projectId,
+    requestId: turn.request_id,
+    artifactId: artifact.artifactId,
+    contentType: artifact.contentType,
+    fileName: artifact.fileName,
+    size: artifact.size,
+  });
+
+  sendJson(response, 200, {
+    session_id: conversation.sessionId,
+    request_id: turn.request_id,
+    project_id: projectId,
+    response: result.response,
+    orthographic_image: { ...stored, provider_model: 'ZooWork imageGenerationModel' },
+  });
+}
+
+async function deleteUpload(request: VercelRequest, response: VercelResponse): Promise<void> {
+  const body = objectBody(request.body);
+  const projectId = requireString(body.project_id, 'project_id');
+  const blobUrl = privateBlobUrl(body.asset_id, 'furniture', projectId);
+  await del(blobUrl);
+  sendJson(response, 200, { deleted: true });
+}
+
 export default async function handler(request: VercelRequest, response: VercelResponse): Promise<void> {
   response.setHeader('Cache-Control', 'no-store');
   response.setHeader('X-Content-Type-Options', 'nosniff');
@@ -339,10 +451,12 @@ export default async function handler(request: VercelRequest, response: VercelRe
       sendJson(response, 200, { ok: true, runtime: 'vercel', storage: 'vercel-blob', contract: 'home-furniture-v1' });
       return;
     }
+    if (request.method === 'DELETE' && path === 'upload') { await deleteUpload(request, response); return; }
     if (request.method !== 'POST') { sendJson(response, 405, { error: 'Method not allowed' }); return; }
     if (path === 'upload') { await uploadToken(request, response); return; }
     if (path === 'events/agent.generate') { await generate(request, response, false); return; }
     if (path === 'events/agent.refine') { await generate(request, response, true); return; }
+    if (path === 'events/agent.orthographic') { await orthographic(request, response); return; }
     if (path === 'reset') { sendJson(response, 200, { reset: true }); return; }
     sendJson(response, 404, { error: 'Not found' });
   } catch (error) {
