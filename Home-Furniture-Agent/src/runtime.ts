@@ -167,7 +167,8 @@ export class HomeFurnitureRuntime {
 
   private buildEvents(request: FurnitureTurnRequest): OutboundEvent[] {
     const orthographic = request.output_mode === 'orthographic_sheet';
-    const filename = `${request.project_id}_${request.request_id}_${orthographic ? 'orthographic' : 'table'}.png`;
+    const view = request.orthographic_view;
+    const filename = `${request.project_id}_${request.request_id}_${orthographic ? `orthographic-${view}` : 'table'}.png`;
     const sources = [
       request.sketch_asset_ref ? `Inspect sketch_asset_ref exactly once with image: ${request.sketch_asset_ref}` : '',
       request.inspiration_asset_ref ? `Inspect inspiration_asset_ref exactly once with image: ${request.inspiration_asset_ref}` : '',
@@ -179,20 +180,20 @@ export class HomeFurnitureRuntime {
       .join('; ');
     const outputRequirement = orthographic
       ? [
-          'Use table-concept-renderer in orthographic-sheet mode. The confirmed design specification is immutable.',
+          `Use table-concept-renderer in orthographic-sheet mode for the ${view} view. The confirmed design specification is immutable.`,
           sources,
           'Treat render_asset_ref as the sole visual authority. Do not inspect any image URL more than once.',
-          'Generate one landscape raster image containing exactly three equal-width clean line-art panels from left to right: front elevation, side elevation, and top plan. Keep a clear white margin around each panel so the application can add a separate annotation band after generation.',
-          `The confirmed overall dimensions are width ${orthographicDimensions?.width} mm, depth ${orthographicDimensions?.depth} mm, and height ${orthographicDimensions?.height} mm. Preserve their recognizable ratios across front, side, and top views; the application will typeset these exact values after generation.`,
-          `Required component inventory: ${orthographicInventory || 'use confirmed_design_spec exactly'}. Every listed component count and placement must match render_asset_ref in every view where that component is visible. Do not redesign, stylize, simplify, merge, open, close, add, or remove components.`,
-          'This raster is the geometry layer for a CAD-like concept sheet. Keep enough clean exterior whitespace for front width/height, side depth/height, and top width/depth dimension rails. The application will add extension lines, arrowheads, exact millimetre values, confirmed top thickness, base inset, and available major-component dimensions from confirmed_design_spec before storing the final PNG.',
-          'Use a pure white background with crisp solid-black technical outlines. No beige or grey background, perspective view, room scene, material rendering, tonal fill, shading, shadows, decorative props, extra panels, title block, written labels, dimension numbers, logos, or watermark.',
+          `Generate one single full-object ${view} orthographic line view. Do not generate the other two views and do not make a three-panel sheet. Center the complete furniture with clear, even margins on every side.`,
+          `The confirmed overall dimensions are width ${orthographicDimensions?.width} mm, depth ${orthographicDimensions?.depth} mm, and height ${orthographicDimensions?.height} mm. Preserve the ${view === 'front' ? 'width-to-height' : view === 'side' ? 'depth-to-height' : 'width-to-depth'} proportion recognizably; the application will typeset the exact values after generation.`,
+          `Required component inventory: ${orthographicInventory || 'use confirmed_design_spec exactly'}. Every listed component that is visible from the ${view} direction must match render_asset_ref in count, placement, silhouette, open-or-closed state, and major curved details. Do not redesign, stylize, simplify, merge, add, or remove components.`,
+          `This raster is the ${view} geometry layer for a CAD-like concept sheet. Use true orthographic projection with no perspective convergence and keep the whole object comfortably inside the canvas.`,
+          'Use a pure white background with crisp solid-black technical outlines. No beige or grey background, room scene, material rendering, tonal fill, shading, shadows, decorative props, extra views, border, title block, written labels, dimension numbers, logos, or watermark.',
           `Call image_generate exactly once with action="generate", render_asset_ref as the supported source image input, quality="high", and filename="${filename}". Use only arguments exposed by the current tool schema; never invent model, provider, numeric image-weight, or control-strength fields.`,
           'After generation starts, call sessions_yield exactly once and end the waiting run.',
           `In the attachment continuation, call media_materialize exactly once for the returned artifactId with path="/workspace/artifacts/${request.project_id}/${filename}". Inspect the materialized image exactly once.`,
-          'Publish whenever the image contains three readable front, side, and top geometry panels that recognizably match the confirmed furniture. Do not reject an otherwise usable geometry layer only because its raster proportions drift from the confirmed dimensions: report that drift in warnings, while the application normalizes each panel to the immutable width/depth/height ratios before annotation. Fail only when a view is missing, corrupt, perspective-only, or depicts materially different furniture.',
+          `Publish only when the image contains one readable, complete ${view} orthographic view that recognizably matches the confirmed furniture. Fail when it is missing, cropped, perspective-only, materially different, contains multiple views, or loses visible major components. Minor raster proportion drift may be reported as a warning because the application adds the exact dimension labels without deforming the image.`,
           'Echo request.confirmed_design_spec exactly and without changing any value in response.design_spec. Set absent sketch and inspiration QA fields to true.',
-          'For a readable three-panel geometry layer, call artifact_publish exactly once and return status=completed with its artifact id. Treat dimensions_consistent as confirmation that the returned structured specification is unchanged; use warnings for raster proportion drift.',
+          `For a readable single ${view} geometry layer, call artifact_publish exactly once and return status=completed with its artifact id. Treat dimensions_consistent as confirmation that the returned structured specification is unchanged; use warnings for minor raster proportion drift.`,
           `Write design_summary, questions, warnings, and other user-facing prose in ${request.locale === 'zh-CN' ? 'Simplified Chinese' : 'English'}. Do not expose internal QA reasoning as user guidance.`,
           'Return one compact JSON object matching response_schema without Markdown fences. This is concept-level only, not fabrication-ready engineering.',
         ]

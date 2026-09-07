@@ -35,8 +35,8 @@ function assertWith<T>(name: string, validator: ValidateFunction, value: unknown
 export function assertFurnitureTurnRequest(value: unknown): asserts value is FurnitureTurnRequest {
   assertWith<FurnitureTurnRequest>('FurnitureTurnRequest', requestValidator, value);
   if (value.output_mode === 'orthographic_sheet') {
-    if (!value.render_asset_ref || !value.confirmed_design_spec) {
-      throw new ContractValidationError('FurnitureTurnRequest', 'orthographic_sheet requires render_asset_ref and confirmed_design_spec');
+    if (!value.render_asset_ref || !value.confirmed_design_spec || !value.orthographic_view) {
+      throw new ContractValidationError('FurnitureTurnRequest', 'orthographic_sheet requires render_asset_ref, confirmed_design_spec, and orthographic_view');
     }
     assertWith<FurnitureDesignSpec>('FurnitureDesignSpec', designSpecValidator, value.confirmed_design_spec);
     if (value.sketch_asset_ref || value.inspiration_asset_ref || value.source_priority.sketch !== 0 || value.source_priority.inspiration !== 0) {
@@ -49,7 +49,7 @@ export function assertFurnitureTurnRequest(value: unknown): asserts value is Fur
     }
     return;
   }
-  if (value.render_asset_ref || value.confirmed_design_spec) {
+  if (value.render_asset_ref || value.confirmed_design_spec || value.orthographic_view) {
     throw new ContractValidationError('FurnitureTurnRequest', 'concept_render cannot include orthographic source fields');
   }
   const total = value.source_priority.sketch + value.source_priority.inspiration;

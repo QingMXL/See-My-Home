@@ -13,6 +13,7 @@ export type TableType =
 
 export type TopShape = 'rectangular' | 'round' | 'oval' | 'square' | 'freeform';
 export type FurnitureOutputMode = 'concept_render' | 'orthographic_sheet';
+export type OrthographicView = 'front' | 'side' | 'top';
 
 export type FurnitureControlKey =
   | 'dimensions_mm'
@@ -56,6 +57,8 @@ export interface FurnitureTurnRequest {
   render_asset_ref?: string;
   /** The confirmed specification must be echoed unchanged by an orthographic turn. */
   confirmed_design_spec?: FurnitureDesignSpec;
+  /** Required only when output_mode is orthographic_sheet. Each turn renders one view. */
+  orthographic_view?: OrthographicView;
   description?: string;
   source_priority: {
     sketch: number;

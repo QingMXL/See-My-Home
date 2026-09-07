@@ -117,6 +117,7 @@ test('accepts only a confirmed render and unchanged specification for orthograph
   const orthographicRequest: FurnitureTurnRequest = {
     ...validRequest,
     output_mode: 'orthographic_sheet',
+    orthographic_view: 'front',
     sketch_asset_ref: undefined,
     inspiration_asset_ref: undefined,
     render_asset_ref: 'https://example.com/confirmed-render.png',

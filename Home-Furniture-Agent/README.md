@@ -5,9 +5,11 @@ from a hand sketch, one inspiration image, text, or any supported combination.
 When both images are present, the UI sends an adjustable sketch-versus-inspiration
 weight (80/20 by default) that controls which reference the concept should resemble more.
 
-The Agent publishes one concept render plus a validated JSON specification. The
-web application derives front, side, and top line drawings from the same canonical
-millimetre dimensions. These are concept views, not fabrication-ready shop drawings.
+The Agent publishes one concept render plus a validated JSON specification. After
+confirmation, the application starts three independent Agent turns that derive the
+front, side, and top line views from that render. It then combines them without
+distortion and adds the canonical overall millimetre dimensions. These are concept
+views, not fabrication-ready shop drawings.
 
 ## Local setup
 

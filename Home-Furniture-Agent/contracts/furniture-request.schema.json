@@ -15,6 +15,7 @@
     "inspiration_asset_ref": { "type": "string", "format": "uri", "maxLength": 4096 },
     "render_asset_ref": { "type": "string", "format": "uri", "maxLength": 4096 },
     "confirmed_design_spec": { "type": "object" },
+    "orthographic_view": { "enum": ["front", "side", "top"] },
     "description": { "type": "string", "maxLength": 4000 },
     "source_priority": {
       "type": "object",
@@ -63,10 +64,11 @@
     { "required": ["inspiration_asset_ref"], "properties": { "inspiration_asset_ref": {} } },
     { "required": ["description"], "properties": { "description": { "type": "string", "minLength": 1 } } },
     {
-      "required": ["render_asset_ref", "confirmed_design_spec"],
+      "required": ["render_asset_ref", "confirmed_design_spec", "orthographic_view"],
       "properties": {
         "render_asset_ref": {},
-        "confirmed_design_spec": {}
+        "confirmed_design_spec": {},
+        "orthographic_view": {}
       }
     }
   ]

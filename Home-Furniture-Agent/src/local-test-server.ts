@@ -9,6 +9,7 @@ import type {
   FurnitureDesignControls,
   FurnitureDesignSpec,
   FurnitureTurnRequest,
+  OrthographicView,
   SupportedLocale,
   TableType,
   TopShape,
@@ -16,6 +17,7 @@ import type {
 import { projectRoot } from './paths.js';
 import { HomeFurnitureRuntime, HomeFurnitureTurnTimeoutError } from './runtime.js';
 import { assertFurnitureAgentResponse } from './validation.js';
+import { createDimensionedOrthographicPng } from '../../api/_lib/furniture-drawing.js';
 
 const envPath = resolve(projectRoot, '.env');
 if (existsSync(envPath)) loadEnvFile(envPath);
@@ -42,7 +44,7 @@ interface UploadedAsset {
 }
 
 const assets = new Map<string, UploadedAsset>();
-const artifacts = new Map<string, { contentType: string | null }>();
+const artifacts = new Map<string, { contentType: string | null; path?: string }>();
 
 function json(response: ServerResponse, status: number, value: unknown): void {
   response.writeHead(status, {
@@ -316,36 +318,50 @@ async function runOrthographic(input: Record<string, unknown>) {
   if (designResponse.status === 'failed') throw new Error('A failed furniture design cannot produce orthographic views');
   const renderAssetId = requireString(input.render_asset_id, 'render_asset_id');
   if (!artifacts.has(renderAssetId)) throw new Error('render_asset_id is not a generated image from this runtime');
-  const request: FurnitureTurnRequest = {
-    contract_version: 'home-furniture-v1',
-    output_mode: 'orthographic_sheet',
-    request_id: newId('ortho'),
-    project_id: projectId,
-    locale: selectedLocale(input.locale),
-    table_type: designResponse.table_type,
-    render_asset_ref: `${publicBaseUrl()}/api/site/furniture/artifacts/${encodeURIComponent(renderAssetId)}`,
-    confirmed_design_spec: designResponse.design_spec,
-    description: designResponse.design_summary,
-    source_priority: { sketch: 0, inspiration: 0 },
-    locked_controls: [],
-    design_controls: confirmedControls(designResponse.design_spec),
-  };
-  const conversation = await runtime.createConversation(projectId, newId(`furniture_orthographic_${projectId}`));
-  const result = await runtime.runFurnitureTurn(conversation, request);
-  const artifact = result.artifacts.find((candidate) => candidate.status === 'ready' && (candidate.contentType?.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(candidate.fileName ?? '')));
-  if (!artifact) throw new Error(result.response.warnings.join(' ') || 'Furniture generation completed without a readable orthographic image artifact');
-  artifacts.set(artifact.artifactId, { contentType: artifact.contentType });
+  const views: OrthographicView[] = ['front', 'side', 'top'];
+  const generated = await Promise.all(views.map(async (view) => {
+    const request: FurnitureTurnRequest = {
+      contract_version: 'home-furniture-v1',
+      output_mode: 'orthographic_sheet',
+      orthographic_view: view,
+      request_id: newId(`ortho_${view}`),
+      project_id: projectId,
+      locale: selectedLocale(input.locale),
+      table_type: designResponse.table_type,
+      render_asset_ref: `${publicBaseUrl()}/api/site/furniture/artifacts/${encodeURIComponent(renderAssetId)}`,
+      confirmed_design_spec: designResponse.design_spec,
+      description: designResponse.design_summary,
+      source_priority: { sketch: 0, inspiration: 0 },
+      locked_controls: [],
+      design_controls: confirmedControls(designResponse.design_spec),
+    };
+    const conversation = await runtime.createConversation(projectId, newId(`furniture_orthographic_${view}_${projectId}`));
+    const result = await runtime.runFurnitureTurn(conversation, request);
+    const artifact = result.artifacts.find((candidate) => candidate.status === 'ready' && (candidate.contentType?.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(candidate.fileName ?? '')));
+    if (!artifact) throw new Error(result.response.warnings.join(' ') || `Furniture generation completed without a readable ${view} image artifact`);
+    const upstream = await fetch(await runtime.resolveArtifactUrl(artifact.artifactId));
+    if (!upstream.ok) throw new Error(`ZooWork ${view} artifact download failed (${upstream.status})`);
+    return { view, result, conversation, bytes: Buffer.from(await upstream.arrayBuffer()) };
+  }));
+  const sources = Object.fromEntries(generated.map((item) => [item.view, item.bytes])) as Record<OrthographicView, Buffer>;
+  const sheet = await createDimensionedOrthographicPng({ sources, spec: designResponse.design_spec });
+  const artifactId = newId('orthographic_sheet');
+  const outputDirectory = resolve(projectRoot, '.runtime', 'artifacts');
+  mkdirSync(outputDirectory, { recursive: true });
+  const outputPath = resolve(outputDirectory, `${artifactId}.png`);
+  writeFileSync(outputPath, sheet);
+  artifacts.set(artifactId, { contentType: 'image/png', path: outputPath });
   return {
-    session_id: conversation.sessionId,
-    request_id: request.request_id,
+    session_id: generated[0]!.conversation.sessionId,
+    request_id: generated[0]!.result.response.request_id,
     project_id: projectId,
-    response: result.response,
+    response: designResponse,
     orthographic_image: {
-      asset_id: artifact.artifactId,
-      url: `/api/home-furniture/artifacts/${encodeURIComponent(artifact.artifactId)}`,
-      mime_type: artifact.contentType ?? 'image/png',
-      size_bytes: artifact.size ?? 0,
-      provider_model: 'ZooWork imageGenerationModel',
+      asset_id: artifactId,
+      url: `/api/home-furniture/artifacts/${encodeURIComponent(artifactId)}`,
+      mime_type: 'image/png',
+      size_bytes: sheet.byteLength,
+      provider_model: '3 × ZooWork imageGenerationModel + See My Home dimension renderer',
     },
   };
 }
@@ -371,6 +387,12 @@ const server = createServer(async (request, response) => {
       const artifactId = decodeURIComponent(url.pathname.slice('/api/site/furniture/artifacts/'.length));
       const known = artifacts.get(artifactId);
       if (!known) { json(response, 404, { error: 'Artifact not found' }); return; }
+      if (known.path) {
+        const bytes = readFileSync(known.path);
+        response.writeHead(200, { 'Content-Type': known.contentType ?? 'image/png', 'Content-Length': String(bytes.byteLength), 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' });
+        response.end(bytes);
+        return;
+      }
       const upstream = await fetch(await runtime.resolveArtifactUrl(artifactId));
       if (!upstream.ok) throw new Error(`ZooWork artifact download failed (${upstream.status})`);
       const bytes = Buffer.from(await upstream.arrayBuffer());

@@ -13,7 +13,8 @@ test('creates a session-scoped Home Furniture Agent resource', () => {
   const persona = resource.persona?.docs?.[0]?.content ?? '';
   assert.match(persona, /relative design-evidence weight/i);
   assert.match(persona, /concept design/i);
-  assert.match(persona, /front, side, and top line views/i);
+  assert.match(persona, /one `orthographic_view`/i);
+  assert.match(persona, /three independent turns/i);
 });
 
 test('requires a model id returned by ZooWork', () => {

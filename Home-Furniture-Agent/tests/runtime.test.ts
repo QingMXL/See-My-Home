@@ -116,7 +116,7 @@ test('starts a furniture turn and completes it through durable polling', async (
   }
 });
 
-test('builds a strict black-and-white orthographic request with deterministic annotation space', async () => {
+test('builds a strict single-view black-and-white orthographic request', async () => {
   let postedContent = '';
   const fakeClient = {
     async postEvents(_agentId: string, _sessionId: string, events: { content?: string }[]) {
@@ -128,6 +128,7 @@ test('builds a strict black-and-white orthographic request with deterministic an
   const orthographicRequest: FurnitureTurnRequest = {
     ...request,
     output_mode: 'orthographic_sheet',
+    orthographic_view: 'front',
     render_asset_ref: 'https://example.com/confirmed.png',
     confirmed_design_spec: response.design_spec,
     description: response.design_summary,
@@ -139,14 +140,16 @@ test('builds a strict black-and-white orthographic request with deterministic an
 
   assert.match(postedContent, /pure white background with crisp solid-black technical outlines/i);
   assert.match(postedContent, /width 1800 mm, depth 900 mm, and height 750 mm/i);
-  assert.match(postedContent, /separate annotation band/i);
+  assert.match(postedContent, /single full-object front orthographic line view/i);
+  assert.match(postedContent, /do not make a three-panel sheet/i);
   assert.match(postedContent, /Write design_summary, questions, warnings.*Simplified Chinese/i);
 });
 
-test('keeps a readable orthographic candidate when only its raster proportions need normalization', async () => {
+test('keeps a readable orthographic candidate when only its raster proportions drift slightly', async () => {
   const orthographicRequest: FurnitureTurnRequest = {
     ...request,
     output_mode: 'orthographic_sheet',
+    orthographic_view: 'front',
     render_asset_ref: 'https://example.com/confirmed.png',
     confirmed_design_spec: response.design_spec,
     description: response.design_summary,
@@ -157,7 +160,7 @@ test('keeps a readable orthographic candidate when only its raster proportions n
     ...response,
     status: 'needs_confirmation',
     design_spec: response.design_spec,
-    warnings: ['The raster proportions will be normalized by the application.'],
+    warnings: ['The raster proportions drift slightly; the application will preserve the image and add exact labels.'],
     qa: { ...response.qa, dimensions_consistent: false, publishable: false },
   };
   const fakeClient = {

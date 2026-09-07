@@ -7,7 +7,9 @@ import type {
   FurnitureControlKey,
   FurnitureDesignControls,
   FurnitureDesignSpec,
+  FurnitureTurnResult,
   FurnitureTurnRequest,
+  OrthographicView,
   TableType,
   TopShape,
 } from '../Home-Furniture-Agent/src/contracts.js';
@@ -99,7 +101,41 @@ interface FurnitureJob {
   projectId: string;
   type: 'agent.generate' | 'agent.refine' | 'agent.orthographic';
   retryAttempt?: number;
+  orthographicViews?: OrthographicJobPart[];
   expiresAt: number;
+}
+
+interface OrthographicJobPart {
+  view: OrthographicView;
+  sessionId: string;
+  postedSeq: number;
+  requestId: string;
+  retryAttempt: number;
+  artifactId?: string;
+}
+
+const orthographicViews: OrthographicView[] = ['front', 'side', 'top'];
+
+function validOrthographicJobParts(value: unknown): value is OrthographicJobPart[] {
+  if (!Array.isArray(value) || value.length !== orthographicViews.length) return false;
+  const seen = new Set<string>();
+  for (const item of value) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return false;
+    const part = item as Record<string, unknown>;
+    if (!orthographicViews.includes(part.view as OrthographicView) || seen.has(String(part.view))) return false;
+    seen.add(String(part.view));
+    if (typeof part.sessionId !== 'string'
+      || typeof part.postedSeq !== 'number'
+      || !Number.isSafeInteger(part.postedSeq)
+      || part.postedSeq < 0
+      || typeof part.requestId !== 'string'
+      || typeof part.retryAttempt !== 'number'
+      || !Number.isSafeInteger(part.retryAttempt)
+      || part.retryAttempt < 0
+      || part.retryAttempt > 1
+      || (part.artifactId !== undefined && typeof part.artifactId !== 'string')) return false;
+  }
+  return true;
 }
 
 function jobSecret(): string {
@@ -141,6 +177,7 @@ function verifyJob(value: unknown): FurnitureJob | null {
       || job.retryAttempt < 0
       || job.retryAttempt > 1
     ))
+    || (job.orthographicViews !== undefined && !validOrthographicJobParts(job.orthographicViews))
     || typeof job.expiresAt !== 'number'
     || job.expiresAt < Date.now()
   ) throw new Error('job_token is invalid or expired');
@@ -360,6 +397,44 @@ function confirmedControls(spec: FurnitureDesignSpec): FurnitureDesignControls {
   };
 }
 
+function orthographicTurn(input: {
+  requestId: string;
+  projectId: string;
+  locale: 'en-US' | 'zh-CN';
+  tableType: TableType;
+  renderAssetRef: string;
+  spec: FurnitureDesignSpec;
+  summary: string;
+  view: OrthographicView;
+}): FurnitureTurnRequest {
+  return {
+    contract_version: 'home-furniture-v1',
+    output_mode: 'orthographic_sheet',
+    request_id: input.requestId,
+    project_id: input.projectId,
+    locale: input.locale,
+    table_type: input.tableType,
+    render_asset_ref: input.renderAssetRef,
+    confirmed_design_spec: input.spec,
+    orthographic_view: input.view,
+    description: input.summary,
+    source_priority: { sketch: 0, inspiration: 0 },
+    locked_controls: [],
+    design_controls: confirmedControls(input.spec),
+  };
+}
+
+function jobWithOrthographicParts(base: Omit<FurnitureJob, 'sessionId' | 'postedSeq'>, parts: OrthographicJobPart[]): FurnitureJob {
+  const first = parts[0];
+  if (!first) throw new Error('orthographic job has no view tasks');
+  return { ...base, sessionId: first.sessionId, postedSeq: first.postedSeq, orthographicViews: parts };
+}
+
+function readableImageArtifact(result: FurnitureTurnResult) {
+  return result.artifacts.find((candidate) => candidate.status === 'ready'
+    && (candidate.contentType?.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(candidate.fileName ?? '')));
+}
+
 async function orthographic(request: VercelRequest, response: VercelResponse): Promise<void> {
   const body = objectBody(request.body);
   const job = verifyJob(body.job_token);
@@ -376,95 +451,147 @@ async function orthographic(request: VercelRequest, response: VercelResponse): P
 
   const zoo = runtime();
   const requestId = job?.requestId ?? newId('ortho');
-  const turn: FurnitureTurnRequest = {
-    contract_version: 'home-furniture-v1',
-    output_mode: 'orthographic_sheet',
-    request_id: requestId,
-    project_id: projectId,
-    locale,
-    table_type: tableType,
-    render_asset_ref: await temporaryBlobReadUrl(renderBlobUrl),
-    confirmed_design_spec: baseResponse.design_spec,
-    description: baseResponse.design_summary,
-    source_priority: { sketch: 0, inspiration: 0 },
-    locked_controls: [],
-    design_controls: confirmedControls(baseResponse.design_spec),
-  };
+  const renderAssetRef = await temporaryBlobReadUrl(renderBlobUrl);
 
   if (!job) {
     await zoo.ensureRunning();
-    const conversation = await zoo.createConversation(projectId, newId(`furniture_orthographic_${projectId}`));
-    const started = await zoo.startFurnitureTurn(conversation, turn);
+    const parts = await Promise.all(orthographicViews.map(async (view): Promise<OrthographicJobPart> => {
+      const viewRequestId = newId(`ortho_${view}`);
+      const turn = orthographicTurn({
+        requestId: viewRequestId,
+        projectId,
+        locale,
+        tableType,
+        renderAssetRef,
+        spec: baseResponse.design_spec,
+        summary: baseResponse.design_summary,
+        view,
+      });
+      const conversation = await zoo.createConversation(projectId, newId(`furniture_orthographic_${view}_${projectId}`));
+      const started = await zoo.startFurnitureTurn(conversation, turn);
+      return { view, sessionId: conversation.sessionId, postedSeq: started.postedSeq, requestId: viewRequestId, retryAttempt: 0 };
+    }));
     sendJson(response, 202, {
       status: 'processing',
-      job_token: signJob({
+      job_token: signJob(jobWithOrthographicParts({
         version: 1,
-        sessionId: conversation.sessionId,
-        postedSeq: started.postedSeq,
         requestId,
         projectId,
         type: 'agent.orthographic',
-        retryAttempt: 0,
         expiresAt: Date.now() + 30 * 60 * 1000,
-      }),
+      }, parts)),
       poll_after_ms: 3_000,
     });
     return;
   }
 
-  const conversation = { agentId: zoo.agentId, sessionId: job.sessionId };
-  const polled = await zoo.pollFurnitureTurn(conversation, turn, job.postedSeq);
-  if (polled.status === 'processing') {
+  if (!job.orthographicViews) {
+    throw new Error(locale === 'zh-CN' ? '三视图生成流程已经升级，请重新点击生成。' : 'The drawing workflow was upgraded. Please start it again.');
+  }
+
+  const polledParts = await Promise.all(job.orthographicViews.map(async (part) => {
+    if (part.artifactId) return { part, status: 'ready' as const, artifactId: part.artifactId };
+    const turn = orthographicTurn({
+      requestId: part.requestId,
+      projectId,
+      locale,
+      tableType,
+      renderAssetRef,
+      spec: baseResponse.design_spec,
+      summary: baseResponse.design_summary,
+      view: part.view,
+    });
+    const polled = await zoo.pollFurnitureTurn(
+      { agentId: zoo.agentId, sessionId: part.sessionId },
+      turn,
+      part.postedSeq,
+    );
+    if (polled.status === 'processing') return { part, status: 'processing' as const };
+    const artifact = readableImageArtifact(polled.result);
+    return artifact
+      ? { part, status: 'ready' as const, artifactId: artifact.artifactId, result: polled.result }
+      : { part, status: 'missing' as const, result: polled.result };
+  }));
+
+  if (polledParts.some((part) => part.status === 'processing')) {
     sendJson(response, 202, { status: 'processing', job_token: signJob(job), poll_after_ms: 3_000 });
     return;
   }
 
-  const result = polled.result;
-  const artifact = result.artifacts.find((candidate) => candidate.status === 'ready'
-    && (candidate.contentType?.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(candidate.fileName ?? '')));
-  if (!artifact && (job.retryAttempt ?? 0) < 1) {
+  const nextParts: OrthographicJobPart[] = [];
+  let startedRetry = false;
+  for (const polledPart of polledParts) {
+    if (polledPart.status === 'ready') {
+      nextParts.push({ ...polledPart.part, artifactId: polledPart.artifactId });
+      continue;
+    }
+    if (polledPart.status !== 'missing') throw new Error('orthographic view is still processing');
+    if (polledPart.part.retryAttempt >= 1) {
+      throw new Error(locale === 'zh-CN'
+        ? `${polledPart.part.view} 三视图未能生成完整、可读取的图片，自动重试后仍未成功。`
+        : `The ${polledPart.part.view} view did not produce a complete readable image after an automatic retry.`);
+    }
+    startedRetry = true;
     console.warn(JSON.stringify({
       level: 'warning',
-      message: 'orthographic artifact unavailable; starting automatic retry',
-      requestId: turn.request_id,
+      message: 'orthographic view artifact unavailable; starting targeted retry',
+      requestId: polledPart.part.requestId,
       projectId,
-      agentStatus: result.response.status,
+      view: polledPart.part.view,
+      agentStatus: polledPart.result.response.status,
     }));
-    const retryTurn: FurnitureTurnRequest = { ...turn, request_id: newId('ortho_retry') };
-    const retryConversation = await zoo.createConversation(projectId, newId(`furniture_orthographic_retry_${projectId}`));
+    const retryRequestId = newId(`ortho_${polledPart.part.view}_retry`);
+    const retryTurn = orthographicTurn({
+      requestId: retryRequestId,
+      projectId,
+      locale,
+      tableType,
+      renderAssetRef,
+      spec: baseResponse.design_spec,
+      summary: baseResponse.design_summary,
+      view: polledPart.part.view,
+    });
+    const retryConversation = await zoo.createConversation(projectId, newId(`furniture_orthographic_${polledPart.part.view}_retry_${projectId}`));
     const retryStarted = await zoo.startFurnitureTurn(retryConversation, retryTurn);
+    nextParts.push({
+      view: polledPart.part.view,
+      sessionId: retryConversation.sessionId,
+      postedSeq: retryStarted.postedSeq,
+      requestId: retryRequestId,
+      retryAttempt: 1,
+    });
+  }
+
+  if (startedRetry) {
     sendJson(response, 202, {
       status: 'processing',
-      job_token: signJob({
+      job_token: signJob(jobWithOrthographicParts({
         version: 1,
-        sessionId: retryConversation.sessionId,
-        postedSeq: retryStarted.postedSeq,
-        requestId: retryTurn.request_id,
+        requestId,
         projectId,
         type: 'agent.orthographic',
-        retryAttempt: 1,
-        expiresAt: Date.now() + 30 * 60 * 1000,
-      }),
+        expiresAt: job.expiresAt,
+      }, nextParts)),
       poll_after_ms: 3_000,
     });
     return;
   }
-  if (!artifact) {
-    throw new Error(locale === 'zh-CN'
-      ? 'ZooWork 已完成三视图生图，但没有发布可读取的底图；系统自动重试一次后仍未成功。'
-      : 'ZooWork generated the orthographic views but did not publish a readable source image after one automatic retry.');
-  }
-  const signedUrl = await zoo.resolveArtifactUrl(artifact.artifactId);
+
+  const artifactIds = Object.fromEntries(nextParts.map((part) => [part.view, part.artifactId])) as Record<OrthographicView, string>;
   console.info(JSON.stringify({
     level: 'info',
-    message: 'normalizing orthographic geometry and applying confirmed dimensions',
-    requestId: turn.request_id,
-    retryAttempt: job.retryAttempt ?? 0,
+    message: 'composing independent orthographic views and applying confirmed dimensions',
+    requestId,
+    views: orthographicViews,
   }));
-  const upstream = await fetch(signedUrl);
-  if (!upstream.ok) throw new Error(`ZooWork orthographic artifact download failed (${upstream.status})`);
+  const viewBuffers = Object.fromEntries(await Promise.all(orthographicViews.map(async (view) => {
+    const signedUrl = await zoo.resolveArtifactUrl(artifactIds[view]);
+    const upstream = await fetch(signedUrl);
+    if (!upstream.ok) throw new Error(`ZooWork ${view} orthographic artifact download failed (${upstream.status})`);
+    return [view, Buffer.from(await upstream.arrayBuffer())] as const;
+  }))) as Record<OrthographicView, Buffer>;
   const dimensionedPng = await createDimensionedOrthographicPng({
-    source: Buffer.from(await upstream.arrayBuffer()),
+    sources: viewBuffers,
     spec: baseResponse.design_spec,
   });
   const stored = await persistGeneratedImageBytes({
@@ -472,23 +599,23 @@ async function orthographic(request: VercelRequest, response: VercelResponse): P
     mime: 'image/png',
     kind: 'furniture',
     projectId,
-    requestId: turn.request_id,
-    artifactId: artifact.artifactId,
+    requestId,
+    artifactId: orthographicViews.map((view) => artifactIds[view]).join('+'),
     reportedSize: dimensionedPng.byteLength,
   });
   console.info(JSON.stringify({
     level: 'info',
     message: 'orthographic PNG stored',
-    requestId: turn.request_id,
+    requestId,
     sizeBytes: stored.size_bytes,
   }));
 
   sendJson(response, 200, {
-    session_id: conversation.sessionId,
-    request_id: turn.request_id,
+    session_id: nextParts[0]?.sessionId ?? job.sessionId,
+    request_id: requestId,
     project_id: projectId,
-    response: result.response,
-    orthographic_image: { ...stored, provider_model: 'ZooWork imageGenerationModel + See My Home dimension renderer' },
+    response: baseResponse,
+    orthographic_image: { ...stored, provider_model: '3 × ZooWork imageGenerationModel + See My Home dimension renderer' },
   });
 }
 
