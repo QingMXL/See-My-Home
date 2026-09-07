@@ -170,4 +170,25 @@ describe("useDesignStore", () => {
     expect(useDesignStore.getState().furniture.orthographicRun).toBeNull();
     expect(useDesignStore.getState().furniture.confirmed).toBe(false);
   });
+
+  test("migrates old persisted furniture sources without ghost upload names", async () => {
+    const migrate = useDesignStore.persist.getOptions().migrate;
+    expect(migrate).toBeTypeOf("function");
+    const migrated = await migrate?.({
+      furniture: {
+        ...useDesignStore.getState().furniture,
+        sketchName: "old-sketch.png",
+        inspirationName: "old-reference.png",
+      },
+    }, 1) as ReturnType<typeof useDesignStore.getState>;
+
+    expect(migrated.furniture).toMatchObject({
+      sketchName: null,
+      sketchUrl: null,
+      sketchAsset: null,
+      inspirationName: null,
+      inspirationUrl: null,
+      inspirationAsset: null,
+    });
+  });
 });

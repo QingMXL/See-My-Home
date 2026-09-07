@@ -20,6 +20,7 @@ import {
   objectBody,
   parseLocale,
   persistGeneratedImage,
+  persistGeneratedImageBytes,
   privateBlobUrl,
   privateResultBlobUrl,
   requestPath,
@@ -27,6 +28,7 @@ import {
   sendJson,
   temporaryBlobReadUrl,
 } from './_lib/common.js';
+import { createDimensionedOrthographicPng } from './_lib/furniture-drawing.js';
 import { assertFurnitureAgentResponse } from '../Home-Furniture-Agent/src/validation.js';
 
 export const config = { maxDuration: 300 };
@@ -414,15 +416,20 @@ async function orthographic(request: VercelRequest, response: VercelResponse): P
     && (candidate.contentType?.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(candidate.fileName ?? '')));
   if (!artifact) throw new Error(result.response.warnings.join(' ') || 'Home Furniture Agent completed without a readable orthographic image artifact');
   const signedUrl = await zoo.resolveArtifactUrl(artifact.artifactId);
-  const stored = await persistGeneratedImage({
-    signedUrl,
+  const upstream = await fetch(signedUrl);
+  if (!upstream.ok) throw new Error(`ZooWork orthographic artifact download failed (${upstream.status})`);
+  const dimensionedPng = await createDimensionedOrthographicPng({
+    source: Buffer.from(await upstream.arrayBuffer()),
+    spec: baseResponse.design_spec,
+  });
+  const stored = await persistGeneratedImageBytes({
+    bytes: dimensionedPng,
+    mime: 'image/png',
     kind: 'furniture',
     projectId,
     requestId: turn.request_id,
     artifactId: artifact.artifactId,
-    contentType: artifact.contentType,
-    fileName: artifact.fileName,
-    size: artifact.size,
+    reportedSize: dimensionedPng.byteLength,
   });
 
   sendJson(response, 200, {
@@ -430,7 +437,7 @@ async function orthographic(request: VercelRequest, response: VercelResponse): P
     request_id: turn.request_id,
     project_id: projectId,
     response: result.response,
-    orthographic_image: { ...stored, provider_model: 'ZooWork imageGenerationModel' },
+    orthographic_image: { ...stored, provider_model: 'ZooWork imageGenerationModel + See My Home dimension renderer' },
   });
 }
 

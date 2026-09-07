@@ -89,6 +89,29 @@ export async function persistGeneratedImage(input: {
   if (bytes.byteLength === 0) throw new Error('ZooWork generated an empty image artifact');
   const mime = imageMime(upstream.headers.get('content-type') ?? input.contentType, input.fileName);
   if (!mime) throw new Error('ZooWork artifact is not a supported raster image');
+  return persistGeneratedImageBytes({
+    bytes,
+    mime,
+    kind: input.kind,
+    projectId: input.projectId,
+    requestId: input.requestId,
+    artifactId: input.artifactId,
+    reportedSize: input.size,
+  });
+}
+
+export async function persistGeneratedImageBytes(input: {
+  bytes: Buffer;
+  mime: 'image/png' | 'image/jpeg' | 'image/webp';
+  kind: 'layout' | 'style' | 'furniture';
+  projectId: string;
+  requestId: string;
+  artifactId: string;
+  reportedSize?: number | null;
+}): Promise<{ asset_id: string; url: string; mime_type: 'image/png' | 'image/jpeg' | 'image/webp'; size_bytes: number }> {
+  if (input.bytes.byteLength === 0) throw new Error('Cannot persist an empty generated image');
+  const bytes = input.bytes;
+  const mime = input.mime;
   const extension = mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg';
   const blob = await put(
     `results/${input.kind}/${encodeURIComponent(input.projectId)}/${encodeURIComponent(input.requestId)}.${extension}`,
@@ -99,7 +122,7 @@ export async function persistGeneratedImage(input: {
     asset_id: input.artifactId,
     url: await temporaryBlobReadUrl(blob.url),
     mime_type: mime,
-    size_bytes: input.size && input.size > 0 ? input.size : bytes.byteLength,
+    size_bytes: input.reportedSize && input.reportedSize > 0 ? input.reportedSize : bytes.byteLength,
   };
 }
 

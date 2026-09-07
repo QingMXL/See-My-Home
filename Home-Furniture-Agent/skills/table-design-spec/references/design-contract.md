@@ -24,6 +24,7 @@ For unlocked fields, use this authority order: explicit written facts; the highe
 - Use runtime-provided dimensions exactly only when `dimensions_mm` is locked. Otherwise use explicit written dimensions when present, then infer a coherent concept size, and use the provided dimensions only as a fallback.
 - Keep every component within the overall envelope.
 - Component quantities must match the described base and storage arrangement.
+- Give each major visible component the coherent concept dimensions supported by the input and overall envelope. These values drive the final drawing's detail dimension band; omit unsupported axes and never imply manufacturing tolerance.
 - A top thickness, leg section, apron, drawer, shelf, or stretcher not supported by input may be proposed, but must remain explicitly conceptual.
 - The three application-rendered views all consume the same `design_spec.dimensions_mm`; never return separate conflicting view dimensions.
 

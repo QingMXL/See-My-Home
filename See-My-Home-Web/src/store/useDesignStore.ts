@@ -443,7 +443,7 @@ export const useDesignStore = create<DesignStore>()(
       name: "see-my-home",
       // Keep completed Agent results addressable across a page refresh. Blob URLs,
       // in-flight upload adapters, and transient Agent errors are session-only.
-      partialize: (s) => ({
+      partialize: (s): Pick<DesignStore, "saved" | "layout" | "style" | "furniture"> => ({
         saved: s.saved,
         layout: {
           ...initialLayout,
@@ -470,8 +470,10 @@ export const useDesignStore = create<DesignStore>()(
         furniture: {
           ...initialFurniture,
           projectId: s.furniture.projectId,
-          sketchName: s.furniture.sketchName,
-          inspirationName: s.furniture.inspirationName,
+          // Uploads are session-scoped. Persisting only their names creates a
+          // misleading "uploaded" source after the actual asset is gone.
+          sketchName: null,
+          inspirationName: null,
           sketchWeight: s.furniture.sketchWeight ?? initialFurniture.sketchWeight,
           tableType: s.furniture.tableType,
           prompt: s.furniture.prompt,
@@ -493,6 +495,25 @@ export const useDesignStore = create<DesignStore>()(
           agentError: null,
         },
       }),
+      version: 2,
+      migrate: (persistedState, version) => {
+        const state = persistedState as Partial<Pick<DesignStore, "saved" | "layout" | "style" | "furniture">>;
+        if (version >= 2 || !state.furniture) {
+          return state as Pick<DesignStore, "saved" | "layout" | "style" | "furniture">;
+        }
+        return {
+          ...state,
+          furniture: {
+            ...state.furniture,
+            sketchName: null,
+            sketchUrl: null,
+            sketchAsset: null,
+            inspirationName: null,
+            inspirationUrl: null,
+            inspirationAsset: null,
+          },
+        } as Pick<DesignStore, "saved" | "layout" | "style" | "furniture">;
+      },
     },
   ),
 );

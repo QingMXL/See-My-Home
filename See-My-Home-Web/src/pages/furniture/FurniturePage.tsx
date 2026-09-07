@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 import { Download, X } from "lucide-react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Breadcrumbs, Stepper } from "../../components/layout/Breadcrumbs";
@@ -19,7 +19,6 @@ import {
   type FurnitureTopShape,
 } from "../../lib/homeFurnitureApi";
 import {
-  createAnnotatedOrthographicSheet,
   localizeComponentLine,
   localizeFinishLine,
   localizeFurnitureNarrative,
@@ -111,7 +110,6 @@ export function FurniturePage() {
   const [generatingOrthographic, setGeneratingOrthographic] = useState(false);
   const [orthographicStep, setOrthographicStep] = useState(0);
   const [orthographicError, setOrthographicError] = useState<string | null>(null);
-  const [annotatedOrthographic, setAnnotatedOrthographic] = useState<{ url: string; blob: Blob } | null>(null);
 
   const copy = (en: string, zh: string) => (lang === "zh" ? zh : en);
   const autoLabel = copy("Auto · follow inputs", "自动 · 跟随输入");
@@ -126,6 +124,8 @@ export function FurniturePage() {
   const generated = furniture.agentRun;
   const orthographic = furniture.orthographicRun;
   const spec = generated?.response.design_spec;
+  const summaryHasSketch = Boolean(generated?.request_context?.sketch_asset_id);
+  const summaryHasInspiration = Boolean(generated?.request_context?.inspiration_asset_id);
   const tableLabel = TABLE_TYPES.find((option) => option.value === furniture.tableType);
   const canGenerate = Boolean(furniture.sketchAsset || furniture.inspirationAsset || furniture.prompt.trim()) && !uploading;
   const steps = [
@@ -137,27 +137,6 @@ export function FurniturePage() {
     en: "A furniture concept generated from your confirmed inputs and adjustments.",
     zh: "已根据你确认的输入和调整生成家具概念方案。",
   }) : "";
-
-  useEffect(() => {
-    if (!orthographic || !spec) return;
-    let active = true;
-    let objectUrl: string | null = null;
-    void createAnnotatedOrthographicSheet({
-      imageUrl: orthographic.orthographic_image.url,
-      dimensions: spec.dimensions_mm,
-      language: lang,
-    }).then((blob) => {
-      if (!active) return;
-      objectUrl = URL.createObjectURL(blob);
-      setAnnotatedOrthographic({ url: objectUrl, blob });
-    }).catch(() => {
-      if (active) setAnnotatedOrthographic(null);
-    });
-    return () => {
-      active = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [lang, orthographic, spec]);
 
   const makeInput = (description: string): FurnitureGenerateInput => ({
     project_id: furniture.projectId ?? `furniture_${crypto.randomUUID()}`,
@@ -229,14 +208,13 @@ export function FurniturePage() {
       : originalDescription;
     const input = makeInput(description);
     setOrthographicError(null);
-    setAnnotatedOrthographic(null);
     setFurnitureAgentError(null);
     setFurniturePhase("generating", 0);
     navigate("/furniture/render");
     const stepOne = window.setTimeout(() => setFurniturePhase("generating", 1), 1200);
     const stepTwo = window.setTimeout(() => setFurniturePhase("generating", 2), 3200);
     try {
-      const result = furniture.agentRun?.request_context
+      const result = isRefinement && furniture.agentRun?.request_context
         ? await refineFurniture(furniture.agentRun.request_context, input.locale, input, input.description)
         : await generateFurniture(input);
       setFurnitureAgentRun(result);
@@ -254,7 +232,6 @@ export function FurniturePage() {
   const onConfirm = async () => {
     if (!generated || !spec) return;
     setOrthographicError(null);
-    setAnnotatedOrthographic(null);
     setFurnitureOrthographicRun(null);
     setGeneratingOrthographic(true);
     setOrthographicStep(0);
@@ -290,12 +267,9 @@ export function FurniturePage() {
   const downloadOrthographic = async () => {
     if (!orthographic || !spec) return;
     try {
-      const blob = annotatedOrthographic?.blob ?? await createAnnotatedOrthographicSheet({
-        imageUrl: orthographic.orthographic_image.url,
-        dimensions: spec.dimensions_mm,
-        language: lang,
-      });
-      const blobUrl = URL.createObjectURL(blob);
+      const response = await fetch(orthographic.orthographic_image.url);
+      if (!response.ok) throw new Error(`Download failed (${response.status})`);
+      const blobUrl = URL.createObjectURL(await response.blob());
       const link = document.createElement("a");
       link.href = blobUrl;
       link.download = `${generated?.table_type ?? "table"}-orthographic-views.png`;
@@ -397,18 +371,18 @@ export function FurniturePage() {
             </header>
             <div className="input-summary-panel__body">
               <div className="input-summary__sources">
-                {(furniture.sketchName || furniture.sketchUrl) && (
-                  <figure>{furniture.sketchUrl ? <img src={furniture.sketchUrl} alt="" /> : <span>{copy("Ready", "已上传")}</span>}<figcaption>{copy("Sketch", "草图")} · {furniture.sketchName}</figcaption></figure>
+                {summaryHasSketch && (
+                  <figure>{hasSketch && furniture.sketchUrl ? <img src={furniture.sketchUrl} alt="" /> : <span>{copy("Used", "已采用")}</span>}<figcaption>{copy("Sketch", "草图")}{hasSketch && furniture.sketchName ? ` · ${furniture.sketchName}` : ""}</figcaption></figure>
                 )}
-                {(furniture.inspirationName || furniture.inspirationUrl) && (
-                  <figure>{furniture.inspirationUrl ? <img src={furniture.inspirationUrl} alt="" /> : <span>{copy("Ready", "已上传")}</span>}<figcaption>{copy("Inspiration", "灵感")} · {furniture.inspirationName}</figcaption></figure>
+                {summaryHasInspiration && (
+                  <figure>{hasInspiration && furniture.inspirationUrl ? <img src={furniture.inspirationUrl} alt="" /> : <span>{copy("Used", "已采用")}</span>}<figcaption>{copy("Inspiration", "灵感")}{hasInspiration && furniture.inspirationName ? ` · ${furniture.inspirationName}` : ""}</figcaption></figure>
                 )}
               </div>
-              {(hasSketch || hasInspiration || (generated && generated.source_priority.sketch + generated.source_priority.inspiration > 0)) && (
+              {generated && generated.source_priority.sketch + generated.source_priority.inspiration > 0 && (
                 <div className="input-summary__weight">
-                  <span>{copy("Sketch", "草图")} {Math.round((generated?.source_priority.sketch ?? (hasSketch ? 1 : 0)) * 100)}%</span>
-                  <i aria-hidden="true"><b style={{ width: `${Math.round((generated?.source_priority.sketch ?? (hasSketch ? 1 : 0)) * 100)}%` }} /></i>
-                  <span>{copy("Inspiration", "灵感")} {Math.round((generated?.source_priority.inspiration ?? (hasInspiration ? 1 : 0)) * 100)}%</span>
+                  <span>{copy("Sketch", "草图")} {Math.round(generated.source_priority.sketch * 100)}%</span>
+                  <i aria-hidden="true"><b style={{ width: `${Math.round(generated.source_priority.sketch * 100)}%` }} /></i>
+                  <span>{copy("Inspiration", "灵感")} {Math.round(generated.source_priority.inspiration * 100)}%</span>
                 </div>
               )}
               <div className="input-summary__brief">
@@ -500,8 +474,7 @@ export function FurniturePage() {
             <div className="card card--pad drawings__views">
               <h2>{copy("Concept Orthographic Views", "概念级三视图")}</h2>
               <div className="orthographic-sheet-frame">
-                <img src={annotatedOrthographic?.url ?? orthographic.orthographic_image.url} alt={copy("One dimensioned black-and-white orthographic sheet showing the confirmed table from the front, side, and top", "与已确认效果图一致、带尺寸的黑白正视、侧视和顶视三视图合成图")} />
-                {!annotatedOrthographic && <span className="orthographic-sheet-frame__status">{copy("Applying exact dimensions…", "正在标注精确尺寸…")}</span>}
+                <img src={orthographic.orthographic_image.url} alt={copy("One dimensioned black-and-white orthographic sheet showing the confirmed table from the front, side, and top", "与已确认效果图一致、带尺寸的黑白正视、侧视和顶视三视图合成图")} />
               </div>
               <p className="drawings__note">{copy("Generated from the confirmed render; exact overall dimensions are applied from the confirmed specification.", "基于已确认效果图生成，并按确认规格标注准确的整体尺寸。")}</p>
             </div>
