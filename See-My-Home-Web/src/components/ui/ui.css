@@ -124,9 +124,11 @@
 .generating {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  z-index: 1000;
   display: grid;
-  place-items: center;
+  place-items: start center;
+  overflow-y: auto;
+  padding: clamp(7rem, 20vh, 11rem) var(--space-4) var(--space-6);
   background: oklch(99% 0.004 95 / 0.92);
   backdrop-filter: blur(8px);
 }
@@ -202,4 +204,10 @@
 
 .generating__step[data-state="active"] .generating__dot {
   animation: spark-pulse 1.2s ease-in-out infinite;
+}
+
+@media (max-height: 640px) {
+  .generating {
+    padding-top: var(--space-6);
+  }
 }

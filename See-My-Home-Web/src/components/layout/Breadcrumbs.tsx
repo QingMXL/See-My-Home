@@ -37,7 +37,7 @@ export function Stepper({ steps, current }: StepperProps) {
       {steps.map((step, i) => {
         const state = i < current ? "done" : i === current ? "active" : "pending";
         return (
-          <li key={step.title} className="stepper__step" data-state={state} style={{ flex: 1 }}>
+          <li key={step.title} className="stepper__step" data-state={state} aria-current={state === "active" ? "step" : undefined} style={{ flex: 1 }}>
             <div className="stepper__row">
               {i > 0 ? <span className="stepper__line" aria-hidden="true" /> : <span style={{ flex: 1 }} />}
               <span className="stepper__dot">

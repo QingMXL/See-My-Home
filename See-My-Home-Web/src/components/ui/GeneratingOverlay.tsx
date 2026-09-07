@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useI18n } from "../../i18n/LanguageContext";
 import type { GenerationStep } from "../../lib/agents";
 import { Sparkle } from "./Button";
@@ -12,13 +14,19 @@ interface GeneratingOverlayProps {
 /** Full-screen generation state with lightweight staged progress (PRD §9). */
 export function GeneratingOverlay({ title, steps, activeIndex }: GeneratingOverlayProps) {
   const { t } = useI18n();
-  return (
-    <div className="generating" role="status" aria-live="polite">
-      <div className="generating__panel">
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previousOverflow; };
+  }, []);
+
+  return createPortal(
+    <div className="generating" role="dialog" aria-modal="true" aria-labelledby="generating-title">
+      <div className="generating__panel" aria-live="polite">
         <div className="generating__spark" aria-hidden="true">
           <Sparkle size={48} />
         </div>
-        <p className="generating__title">{title}</p>
+        <p className="generating__title" id="generating-title">{title}</p>
         <ol className="generating__steps">
           {steps.map((step, i) => {
             const state = i < activeIndex ? "done" : i === activeIndex ? "active" : "pending";
@@ -37,6 +45,7 @@ export function GeneratingOverlay({ title, steps, activeIndex }: GeneratingOverl
           })}
         </ol>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

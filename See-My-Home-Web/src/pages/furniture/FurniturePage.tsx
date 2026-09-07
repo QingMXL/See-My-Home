@@ -1,17 +1,17 @@
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Breadcrumbs, Stepper } from "../../components/layout/Breadcrumbs";
 import { Button, Sparkle } from "../../components/ui/Button";
 import { GeneratingOverlay } from "../../components/ui/GeneratingOverlay";
 import { FrontViewDrawing, SideViewDrawing, TopViewDrawing } from "../../components/visuals/FurnitureDrawings";
-import { FurnitureRender } from "../../components/visuals/FurnitureRender";
 import { useI18n } from "../../i18n/LanguageContext";
 import { FURNITURE_GENERATION_STEPS } from "../../lib/agents";
 import {
   generateFurniture,
   refineFurniture,
   uploadFurnitureImage,
-  type FurnitureGenerateInput,
   type FurnitureControlKey,
+  type FurnitureGenerateInput,
   type FurnitureSourceKind,
   type FurnitureTableType,
   type FurnitureTopShape,
@@ -42,6 +42,14 @@ const SIZE_PRESETS = [
 ] as const;
 
 const MATERIALS = ["Walnut", "White Oak", "Ash", "Cherry", "Travertine", "Matte Black"];
+const MATERIAL_COLORS: Record<string, string> = {
+  Walnut: "#765037",
+  "White Oak": "#cdb894",
+  Ash: "#d8ccb1",
+  Cherry: "#9a4d37",
+  Travertine: "#d9cebd",
+  "Matte Black": "#353330",
+};
 const SECONDARY_MATERIALS = ["Blackened Steel", "Brushed Brass", "Solid Wood", "Natural Stone", "None"];
 const BASE_STYLES = ["Four Tapered Legs", "Trestle Base", "Twin Pedestal", "Central Pedestal", "Plinth Base"];
 const TOP_SHAPES: FurnitureTopShape[] = ["rectangular", "round", "oval", "square", "freeform"];
@@ -50,15 +58,27 @@ const FINISHES = ["Matte Clear Oil", "Satin Lacquer", "Natural Soap", "High Glos
 const STORAGE_OPTIONS = ["No Storage", "One Drawer", "Two Drawers", "Open Shelf", "Cable Management"];
 const HARDWARE_OPTIONS = ["No Hardware", "Round Knob", "Bar Pull", "Integrated Pull"];
 
+type FurnitureStage = "input" | "render" | "drawings";
+
 function sizeDimensions(size: string) {
   return SIZE_PRESETS.find((preset) => preset.label === size)?.dimensions ?? SIZE_PRESETS[0].dimensions;
 }
 
+function routeStage(pathname: string): FurnitureStage {
+  if (pathname.endsWith("/drawings")) return "drawings";
+  if (pathname.endsWith("/render")) return "render";
+  return "input";
+}
+
 export function FurniturePage() {
   const { t, tTag, lang } = useI18n();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const stage = routeStage(location.pathname);
   const furniture = useDesignStore((state) => state.furniture);
   const {
     setFurniturePrompt,
+    setFurnitureRefinementPrompt,
     setFurnitureSource,
     setFurnitureUploadedAsset,
     setFurnitureSketchWeight,
@@ -74,9 +94,11 @@ export function FurniturePage() {
   } = useDesignStore();
   const sketchInputRef = useRef<HTMLInputElement>(null);
   const inspirationInputRef = useRef<HTMLInputElement>(null);
-  const drawingsRef = useRef<HTMLElement>(null);
   const [uploading, setUploading] = useState<FurnitureSourceKind | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+
+  const copy = (en: string, zh: string) => (lang === "zh" ? zh : en);
+  const autoLabel = copy("Auto · follow inputs", "自动 · 跟随输入");
   const hasSketch = Boolean(furniture.sketchAsset);
   const hasInspiration = Boolean(furniture.inspirationAsset);
   const hasBothImages = hasSketch && hasInspiration;
@@ -85,22 +107,23 @@ export function FurniturePage() {
   const visibleInspirationWeight = hasBothImages ? 100 - sketchWeight : hasInspiration ? 100 : hasSketch ? 0 : 100 - sketchWeight;
   const lockedControls = furniture.lockedControls ?? [];
   const isLocked = (control: FurnitureControlKey) => lockedControls.includes(control);
-
-  const copy = (en: string, zh: string) => (lang === "zh" ? zh : en);
-  const autoLabel = copy("Auto · follow inputs", "自动 · 跟随输入");
+  const generated = furniture.agentRun;
+  const spec = generated?.response.design_spec;
+  const tableLabel = TABLE_TYPES.find((option) => option.value === furniture.tableType);
+  const canGenerate = Boolean(furniture.sketchAsset || furniture.inspirationAsset || furniture.prompt.trim()) && !uploading;
   const steps = [
-    { title: t("furn.step1"), hint: t("furn.step1hint") },
-    { title: t("furn.step2"), hint: t("furn.step2hint") },
-    { title: t("furn.step3"), hint: copy("Concept views", "概念三视图") },
+    { title: copy("Collect", "收集灵感"), hint: copy("Images & brief", "图片与描述") },
+    { title: t("furn.step2"), hint: copy("Render & refine", "渲染与调整") },
+    { title: t("furn.step3"), hint: copy("Views & specification", "三视图与规格") },
   ];
 
-  const makeInput = (): FurnitureGenerateInput => ({
+  const makeInput = (description: string): FurnitureGenerateInput => ({
     project_id: furniture.projectId ?? `furniture_${crypto.randomUUID()}`,
     ...(furniture.sketchAsset ? { sketch_asset_id: furniture.sketchAsset.asset_id } : {}),
     ...(furniture.inspirationAsset ? { inspiration_asset_id: furniture.inspirationAsset.asset_id } : {}),
     locale: lang === "zh" ? "zh-CN" : "en-US",
     table_type: furniture.tableType,
-    description: furniture.prompt.trim(),
+    description,
     locked_controls: lockedControls,
     dimensions_mm: { ...sizeDimensions(furniture.size) },
     primary_material: furniture.material,
@@ -135,8 +158,8 @@ export function FurniturePage() {
     }
   };
 
-  const onGenerate = async () => {
-    if (!furniture.sketchAsset && !furniture.inspirationAsset && !furniture.prompt.trim()) {
+  const onGenerate = async (isRefinement = false) => {
+    if (!isRefinement && !furniture.sketchAsset && !furniture.inspirationAsset && !furniture.prompt.trim()) {
       setFurnitureAgentError(copy("Add a sketch, an inspiration image, or a written description.", "请添加草图、灵感图或文字描述。"));
       return;
     }
@@ -144,9 +167,16 @@ export function FurniturePage() {
       setFurnitureAgentError(copy("Wait for the image upload to finish.", "请等待图片上传完成。"));
       return;
     }
-    const input = makeInput();
+    const originalDescription = furniture.prompt.trim();
+    const previousDescription = furniture.agentRun?.request_context?.description?.trim() || originalDescription;
+    const refinement = (furniture.refinementPrompt ?? "").trim();
+    const description = isRefinement
+      ? refinement ? `${previousDescription}\n\n${copy("Requested revision:", "本次调整：")} ${refinement}` : previousDescription
+      : originalDescription;
+    const input = makeInput(description);
     setFurnitureAgentError(null);
     setFurniturePhase("generating", 0);
+    navigate("/furniture/render");
     const stepOne = window.setTimeout(() => setFurniturePhase("generating", 1), 1200);
     const stepTwo = window.setTimeout(() => setFurniturePhase("generating", 2), 3200);
     try {
@@ -154,6 +184,7 @@ export function FurniturePage() {
         ? await refineFurniture(furniture.agentRun.request_context, input.locale, input, input.description)
         : await generateFurniture(input);
       setFurnitureAgentRun(result);
+      setFurnitureRefinementPrompt("");
       setFurniturePhase("done");
     } catch (error) {
       setFurnitureAgentError(error instanceof Error ? error.message : copy("Furniture generation failed.", "家具生成失败。"));
@@ -164,26 +195,40 @@ export function FurniturePage() {
     }
   };
 
-  useEffect(() => {
-    if (furniture.confirmed) drawingsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [furniture.confirmed]);
-
-  const currentStep = furniture.phase !== "done" ? 0 : furniture.confirmed ? 2 : 1;
-  const generated = furniture.agentRun;
-  const spec = generated?.response.design_spec;
-  const drawingProps = spec
-    ? { dimensions: spec.dimensions_mm, topShape: spec.top.shape, baseStyle: spec.base.style, supportCount: spec.base.support_count }
-    : null;
-  const tableLabel = TABLE_TYPES.find((option) => option.value === furniture.tableType);
-  const canGenerate = Boolean(furniture.sketchAsset || furniture.inspirationAsset || furniture.prompt.trim()) && !uploading;
+  const onConfirm = () => {
+    if (!generated || !spec) return;
+    confirmFurniture();
+    saveDesign({
+      project: "My Home",
+      title: `${lang === "zh" ? tableLabel?.zh : tableLabel?.en} · ${spec.materials[0]?.material ?? furniture.material}`,
+      kind: "Furniture",
+      detail: `${spec.dimensions_mm.width} × ${spec.dimensions_mm.depth} × ${spec.dimensions_mm.height} mm`,
+    });
+    navigate("/furniture/drawings");
+  };
 
   const flash = (message: string) => {
     setFeedback(message);
     window.setTimeout(() => setFeedback(null), 2400);
   };
 
+  if (stage === "drawings" && (!generated || !spec || !furniture.confirmed)) {
+    return <Navigate to={generated ? "/furniture/render" : "/furniture"} replace />;
+  }
+  if (stage === "render" && !generated && furniture.phase === "idle") {
+    return <Navigate to="/furniture" replace />;
+  }
+
+  const currentStep = stage === "input" ? 0 : stage === "render" ? 1 : 2;
+  const drawingProps = spec
+    ? { dimensions: spec.dimensions_mm, topShape: spec.top.shape, baseStyle: spec.base.style, supportCount: spec.base.support_count }
+    : null;
+  const uniqueMaterials = spec?.materials.filter((material, index, items) =>
+    items.findIndex((candidate) => candidate.material === material.material && candidate.finish === material.finish) === index,
+  ).slice(0, 3) ?? [];
+
   return (
-    <main className="page flow-page">
+    <main className="page flow-page furniture-flow" aria-busy={furniture.phase === "generating"}>
       <Breadcrumbs crumbs={[{ label: t("crumb.home"), to: "/" }, { label: t("furn.crumb") }]} />
       <div className="flow-head">
         <div>
@@ -193,79 +238,165 @@ export function FurniturePage() {
         <div className="flow-stepper"><Stepper steps={steps} current={currentStep} /></div>
       </div>
 
-      <div className="furniture-grid">
-        <section className="card card--pad input-panel" aria-label={t("furn.input")}>
-          <div><h2 className="input-panel__title">{t("furn.input")}</h2></div>
-          <input ref={sketchInputRef} className="furniture-file-input" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => onUpload("sketch", event)} />
-          <input ref={inspirationInputRef} className="furniture-file-input" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => onUpload("inspiration", event)} />
-          <button type="button" className="furniture-upload" disabled={Boolean(uploading)} onClick={() => sketchInputRef.current?.click()}>
-            {furniture.sketchUrl ? <img src={furniture.sketchUrl} alt={furniture.sketchName ?? t("furn.sketch")} /> : <span className="furniture-upload__plus">+</span>}
-            <span><strong>{t("furn.sketch")}</strong><small>{copy("Form", "造型")}</small></span>
-            <em>{uploading === "sketch" ? copy("Uploading…", "上传中…") : furniture.sketchName ?? copy("Choose image", "选择图片")}</em>
-          </button>
-          <button type="button" className="furniture-upload" disabled={Boolean(uploading)} onClick={() => inspirationInputRef.current?.click()}>
-            {furniture.inspirationUrl ? <img src={furniture.inspirationUrl} alt={furniture.inspirationName ?? t("furn.inspiration")} /> : <span className="furniture-upload__plus">+</span>}
-            <span><strong>{t("furn.inspiration")}</strong><small>{copy("Style", "风格")}</small></span>
-            <em>{uploading === "inspiration" ? copy("Uploading…", "上传中…") : furniture.inspirationName ?? copy("Choose image", "选择图片")}</em>
-          </button>
-          <div className={`source-mix${hasBothImages ? "" : " source-mix--disabled"}`}>
-            <div className="source-mix__labels" aria-hidden="true">
-              <span><strong>{copy("Sketch", "草图")}</strong><small>{visibleSketchWeight}%</small></span>
-              <span><small>{visibleInspirationWeight}%</small><strong>{copy("Inspiration", "灵感")}</strong></span>
-            </div>
-            <input
-              aria-label={copy("Balance sketch and inspiration", "调整草图与灵感图倾向")}
-              type="range"
-              min="5"
-              max="95"
-              step="5"
-              value={hasBothImages ? 100 - sketchWeight : hasSketch ? 5 : hasInspiration ? 95 : 20}
-              disabled={!hasBothImages}
-              onChange={(event) => setFurnitureSketchWeight(100 - Number(event.target.value))}
-            />
+      <input ref={sketchInputRef} className="furniture-file-input" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => onUpload("sketch", event)} />
+      <input ref={inspirationInputRef} className="furniture-file-input" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => onUpload("inspiration", event)} />
+
+      {stage === "input" && (
+        <section className="card card--pad furniture-intake" aria-labelledby="furniture-intake-title">
+          <header className="furniture-intake__head">
+            <h2 id="furniture-intake-title">{copy("Collect your inspiration", "收集你的灵感")}</h2>
+            <p>{copy("Upload either image or both. When both are present, choose which one should lead.", "手绘草图和灵感图可以二选一，也可以同时上传；两张都有时再决定更接近哪一张。")}</p>
+          </header>
+          <div className="furniture-source-grid">
+            <button type="button" className="furniture-upload furniture-upload--large" disabled={Boolean(uploading)} onClick={() => sketchInputRef.current?.click()}>
+              {furniture.sketchUrl ? <img src={furniture.sketchUrl} alt={furniture.sketchName ?? t("furn.sketch")} /> : <span className="furniture-upload__plus">+</span>}
+              <span><strong>{t("furn.sketch")}</strong><small>{copy("Defines form and structure", "决定造型与结构")}</small></span>
+              <em>{uploading === "sketch" ? copy("Uploading…", "上传中…") : furniture.sketchName ?? copy("Choose image", "选择图片")}</em>
+            </button>
+            <button type="button" className="furniture-upload furniture-upload--large" disabled={Boolean(uploading)} onClick={() => inspirationInputRef.current?.click()}>
+              {furniture.inspirationUrl ? <img src={furniture.inspirationUrl} alt={furniture.inspirationName ?? t("furn.inspiration")} /> : <span className="furniture-upload__plus">+</span>}
+              <span><strong>{t("furn.inspiration")}</strong><small>{copy("Defines style and material", "决定风格与材质")}</small></span>
+              <em>{uploading === "inspiration" ? copy("Uploading…", "上传中…") : furniture.inspirationName ?? copy("Choose image", "选择图片")}</em>
+            </button>
           </div>
+          {hasBothImages ? (
+            <div className="source-mix source-mix--intake">
+              <div className="source-mix__labels" aria-hidden="true">
+                <span><strong>{copy("Sketch", "草图")}</strong><small>{visibleSketchWeight}%</small></span>
+                <span><small>{visibleInspirationWeight}%</small><strong>{copy("Inspiration", "灵感")}</strong></span>
+              </div>
+              <input
+                aria-label={copy("Balance sketch and inspiration", "调整草图与灵感图倾向")}
+                aria-valuetext={copy(`Sketch ${visibleSketchWeight}%, inspiration ${visibleInspirationWeight}%`, `草图 ${visibleSketchWeight}%，灵感图 ${visibleInspirationWeight}%`)}
+                type="range"
+                min="5"
+                max="95"
+                step="5"
+                value={100 - sketchWeight}
+                onChange={(event) => setFurnitureSketchWeight(100 - Number(event.target.value))}
+              />
+            </div>
+          ) : (hasSketch || hasInspiration) ? (
+            <p className="source-single-note">{hasSketch ? copy("Sketch leads · 100%", "以草图为准 · 100%") : copy("Inspiration leads · 100%", "以灵感图为准 · 100%")}</p>
+          ) : null}
           <div className="input-panel__prompt">
             <label htmlFor="furniture-prompt" className="tag-group__name">{t("furn.prompt")}</label>
-            <textarea id="furniture-prompt" rows={4} value={furniture.prompt} onChange={(event) => setFurniturePrompt(event.target.value)} placeholder={copy("Describe the table, key features, and what must stay unchanged.", "描述桌子的用途、关键造型，以及哪些部分必须保留。")}/>
+            <textarea id="furniture-prompt" rows={5} value={furniture.prompt} onChange={(event) => setFurniturePrompt(event.target.value)} placeholder={copy("Describe the table, key features, dimensions, and what must stay unchanged.", "描述桌子的用途、关键造型、尺寸，以及哪些部分必须保留。")}/>
           </div>
-          <Button full onClick={onGenerate} disabled={!canGenerate || furniture.phase === "generating"}><Sparkle />{generated ? copy("Regenerate with changes", "按当前调整重新生成") : t("furn.generate")}</Button>
+          <Button full size="lg" onClick={() => onGenerate(false)} disabled={!canGenerate || furniture.phase === "generating"}><Sparkle />{t("furn.generate")}</Button>
           {furniture.agentError && <p className="furniture-error" role="alert">{furniture.agentError}</p>}
         </section>
+      )}
 
-        <section className="card render-panel" aria-label={t("furn.step2")}>
-          {generated ? (
-            <>
-              <img className="render-panel__image" src={generated.generated_image.url} alt={generated.response.design_summary} />
-              <div className="render-panel__summary"><strong>{generated.response.design_summary}</strong><span>{copy("Source weighting", "输入权重")} · {Math.round(generated.source_priority.sketch * 100)}% / {Math.round(generated.source_priority.inspiration * 100)}%</span></div>
-              <div className="render-panel__swatches">{spec?.materials.slice(0, 3).map((material) => <span className="swatch" key={`${material.part}-${material.material}`}><i className="swatch__dot swatch__dot--wood" aria-hidden="true" />{material.material}</span>)}</div>
-            </>
-          ) : (
-            <div className="render-panel__empty"><Sparkle size={32} /><p>{t("furn.emptyTitle")}</p><span>{copy("Your ZooWork Agent render will appear here.", "ZooWork Agent 生成的家具效果图会显示在这里。")}</span><div className="render-panel__placeholder"><FurnitureRender material={furniture.material} legs={furniture.legs} /></div></div>
-          )}
-        </section>
+      {stage === "render" && (
+        <div className="furniture-grid furniture-grid--render">
+          <aside className="card card--pad input-summary-panel" aria-labelledby="input-summary-title">
+            <header>
+              <h2 id="input-summary-title" className="input-panel__title">{copy("Your input", "你的输入")}</h2>
+              <button type="button" className="text-action" onClick={() => navigate("/furniture")}>{copy("Edit", "修改")}</button>
+            </header>
+            <div className="input-summary-panel__body">
+              <div className="input-summary__sources">
+                {(furniture.sketchName || furniture.sketchUrl) && (
+                  <figure>{furniture.sketchUrl ? <img src={furniture.sketchUrl} alt="" /> : <span>{copy("Ready", "已上传")}</span>}<figcaption>{copy("Sketch", "草图")} · {furniture.sketchName}</figcaption></figure>
+                )}
+                {(furniture.inspirationName || furniture.inspirationUrl) && (
+                  <figure>{furniture.inspirationUrl ? <img src={furniture.inspirationUrl} alt="" /> : <span>{copy("Ready", "已上传")}</span>}<figcaption>{copy("Inspiration", "灵感")} · {furniture.inspirationName}</figcaption></figure>
+                )}
+              </div>
+              {(hasSketch || hasInspiration || (generated && generated.source_priority.sketch + generated.source_priority.inspiration > 0)) && (
+                <div className="input-summary__weight">
+                  <span>{copy("Sketch", "草图")} {Math.round((generated?.source_priority.sketch ?? (hasSketch ? 1 : 0)) * 100)}%</span>
+                  <i aria-hidden="true"><b style={{ width: `${Math.round((generated?.source_priority.sketch ?? (hasSketch ? 1 : 0)) * 100)}%` }} /></i>
+                  <span>{copy("Inspiration", "灵感")} {Math.round((generated?.source_priority.inspiration ?? (hasInspiration ? 1 : 0)) * 100)}%</span>
+                </div>
+              )}
+              <div className="input-summary__brief">
+                <strong>{copy("Original brief", "原始描述")}</strong>
+                <p>{furniture.prompt || copy("No written description", "未填写文字描述")}</p>
+              </div>
+              {furniture.agentError && <p className="furniture-error" role="alert">{furniture.agentError}</p>}
+            </div>
+            <div className="input-summary-panel__footer">
+              <p>{copy("Happy with the result? Continue to concept drawings.", "确认效果后，进入概念三视图与规格。")}</p>
+              <Button full size="lg" disabled={!generated || furniture.phase === "generating" || generated.response.status === "failed"} onClick={onConfirm}>{t("furn.thisIsIt")}</Button>
+            </div>
+          </aside>
 
-        <aside className="card card--pad refine-panel" aria-label={t("furn.refine")}>
-          <h2 className="input-panel__title">{t("furn.refine")}</h2>
-          <p className="refine-panel__hint">{copy("Auto follows the sketch and description. Choosing a value locks only that item.", "“自动”会跟随草图与描述；选择具体值后，只锁定这一项。")}</p>
-          <ul className="refine-list">
-            <li><label htmlFor="furniture-type">{copy("Table type", "桌子类型")}</label><select id="furniture-type" value={furniture.tableType} onChange={(event) => setFurnitureTableType(event.target.value as FurnitureTableType)}>{TABLE_TYPES.map((option) => <option value={option.value} key={option.value}>{lang === "zh" ? option.zh : option.en}</option>)}</select></li>
-            <li><label htmlFor="furniture-size">{copy("Dimensions", "整体尺寸")}</label><select id="furniture-size" value={isLocked("dimensions_mm") ? furniture.size : ""} onChange={(event) => event.target.value ? setFurnitureOption("size", event.target.value) : unlockFurnitureControl("dimensions_mm")}><option value="">{autoLabel}</option>{SIZE_PRESETS.map((option) => <option value={option.label} key={option.label}>{option.label}</option>)}</select></li>
-            <li><label htmlFor="furniture-material">{copy("Primary material", "主材")}</label><select id="furniture-material" value={isLocked("primary_material") ? furniture.material : ""} onChange={(event) => event.target.value ? setFurnitureOption("material", event.target.value) : unlockFurnitureControl("primary_material")}><option value="">{autoLabel}</option>{MATERIALS.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
-            <li><label htmlFor="furniture-secondary">{copy("Secondary material", "辅材")}</label><select id="furniture-secondary" value={isLocked("secondary_material") ? furniture.secondaryMaterial : ""} onChange={(event) => event.target.value ? setFurnitureAppearance("secondaryMaterial", event.target.value) : unlockFurnitureControl("secondary_material")}><option value="">{autoLabel}</option>{SECONDARY_MATERIALS.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
-            <li><label htmlFor="furniture-shape">{copy("Top shape", "桌面形状")}</label><select id="furniture-shape" value={isLocked("top_shape") ? furniture.topShape : ""} onChange={(event) => event.target.value ? setFurnitureAppearance("topShape", event.target.value) : unlockFurnitureControl("top_shape")}><option value="">{autoLabel}</option>{TOP_SHAPES.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
-            <li><label htmlFor="furniture-edge">{copy("Edge profile", "边缘造型")}</label><select id="furniture-edge" value={isLocked("edge_profile") ? furniture.edgeProfile : ""} onChange={(event) => event.target.value ? setFurnitureAppearance("edgeProfile", event.target.value) : unlockFurnitureControl("edge_profile")}><option value="">{autoLabel}</option>{EDGE_PROFILES.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
-            <li><label htmlFor="furniture-base">{copy("Base / legs", "桌腿 / 底座")}</label><select id="furniture-base" value={isLocked("base_style") ? furniture.legs : ""} onChange={(event) => event.target.value ? setFurnitureOption("legs", event.target.value) : unlockFurnitureControl("base_style")}><option value="">{autoLabel}</option>{BASE_STYLES.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
-            <li><label htmlFor="furniture-finish">{copy("Finish", "表面处理")}</label><select id="furniture-finish" value={isLocked("finish") ? furniture.finish : ""} onChange={(event) => event.target.value ? setFurnitureAppearance("finish", event.target.value) : unlockFurnitureControl("finish")}><option value="">{autoLabel}</option>{FINISHES.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
-            <li><label htmlFor="furniture-storage">{copy("Storage", "抽屉 / 收纳")}</label><select id="furniture-storage" value={isLocked("storage") ? furniture.shelves : ""} onChange={(event) => event.target.value ? setFurnitureOption("shelves", event.target.value) : unlockFurnitureControl("storage")}><option value="">{autoLabel}</option>{STORAGE_OPTIONS.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
-            <li><label htmlFor="furniture-hardware">{copy("Hardware", "拉手 / 五金")}</label><select id="furniture-hardware" value={isLocked("component_notes") ? furniture.handles : ""} onChange={(event) => event.target.value ? setFurnitureOption("handles", event.target.value) : unlockFurnitureControl("component_notes")}><option value="">{autoLabel}</option>{HARDWARE_OPTIONS.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
-          </ul>
-          <Button full size="lg" disabled={!generated || generated.response.status === "failed"} onClick={() => { confirmFurniture(); saveDesign({ project: "My Home", title: `${lang === "zh" ? tableLabel?.zh : tableLabel?.en} · ${furniture.material}`, kind: "Furniture", detail: furniture.size }); }}>{t("furn.thisIsIt")}</Button>
-          {generated?.response.warnings.map((warning) => <p className="furniture-warning" key={warning}>{warning}</p>)}
-        </aside>
-      </div>
+          <section className="card render-panel render-panel--stage" aria-label={t("furn.step2")}>
+            {generated ? (
+              <>
+                <div className="render-panel__media"><img className="render-panel__image" src={generated.generated_image.url} alt={generated.response.design_summary} /></div>
+                <div className="render-panel__meta">
+                  <div className="render-panel__swatches">{uniqueMaterials.map((material) => <span className="swatch" key={`${material.material}-${material.finish}`}><i className="swatch__dot" style={{ background: MATERIAL_COLORS[material.material] ?? "#806044" }} aria-hidden="true" />{material.material}</span>)}</div>
+                  <details className="render-panel__details">
+                    <summary>{copy("Design details", "设计说明")}</summary>
+                    <p>{generated.response.design_summary}</p>
+                    {generated.response.warnings.length > 0 && <ul>{generated.response.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>}
+                  </details>
+                </div>
+              </>
+            ) : (
+              <div className="render-panel__loading">
+                <span className="render-panel__loading-mark"><Sparkle size={30} /></span>
+                <strong>{furniture.phase === "error" ? copy("The render could not be completed", "效果图未能完成") : copy("Preparing your furniture render", "正在准备家具效果图")}</strong>
+                <p>{furniture.phase === "error" ? copy("Return to your input or try again after checking the message on the left.", "请根据左侧提示返回修改输入，或重新尝试。") : copy("Your result will appear here without moving the page.", "生成完成后会在当前位置显示，不会让页面跳动。")}</p>
+              </div>
+            )}
+          </section>
 
-      {furniture.confirmed && drawingProps && spec && generated && (
-        <section className="drawings" ref={drawingsRef} aria-label={t("furn.drawings")}>
+          <aside className="card card--pad refine-panel refine-panel--stage" aria-labelledby="refine-title">
+            <header>
+              <h2 id="refine-title" className="input-panel__title">{copy("Refine this piece", "调整这件家具")}</h2>
+              <p className="refine-panel__hint">{copy("Change only what matters, then generate again.", "只调整重要的部分，然后重新生成。")}</p>
+            </header>
+            <div className="refine-panel__body">
+              <fieldset className="material-picker">
+                <legend>{copy("Color / material", "颜色 / 材质")}</legend>
+                <div>{MATERIALS.map((material) => (
+                  <button type="button" key={material} className="material-choice" aria-pressed={isLocked("primary_material") && furniture.material === material} onClick={() => setFurnitureOption("material", material)}>
+                    <i style={{ background: MATERIAL_COLORS[material] }} aria-hidden="true" /><span>{tTag(material)}</span>
+                  </button>
+                ))}</div>
+                {isLocked("primary_material") && <button type="button" className="text-action" onClick={() => unlockFurnitureControl("primary_material")}>{copy("Use input material", "恢复跟随输入")}</button>}
+              </fieldset>
+
+              <div className="refine-reference">
+                <span className="refine-label">{copy("Reference image", "补充参考图")}</span>
+                <button type="button" className="refine-reference__button" disabled={Boolean(uploading)} onClick={() => inspirationInputRef.current?.click()}>
+                  {furniture.inspirationUrl && <img src={furniture.inspirationUrl} alt="" />}
+                  <span><strong>{furniture.inspirationName ? copy("Replace inspiration", "替换灵感图") : copy("Add inspiration", "添加灵感图")}</strong><small>{uploading === "inspiration" ? copy("Uploading…", "上传中…") : copy("JPG, PNG or WebP", "JPG、PNG 或 WebP")}</small></span>
+                </button>
+              </div>
+
+              <div className="refine-request">
+                <label className="refine-label" htmlFor="furniture-refinement">{copy("What should change?", "还想怎么调整？")}</label>
+                <textarea id="furniture-refinement" rows={5} value={furniture.refinementPrompt ?? ""} onChange={(event) => setFurnitureRefinementPrompt(event.target.value)} placeholder={copy("For example: keep both drawers, make the legs slimmer, and use a lighter wood.", "例如：保留两个抽屉、桌腿更细、木色再浅一点。")}/>
+              </div>
+
+              <details className="advanced-controls">
+                <summary>{copy("Advanced adjustments", "高级调整")}</summary>
+                <ul className="refine-list refine-list--advanced">
+                  <li><label htmlFor="furniture-type">{copy("Table type", "桌子类型")}</label><select id="furniture-type" value={furniture.tableType} onChange={(event) => setFurnitureTableType(event.target.value as FurnitureTableType)}>{TABLE_TYPES.map((option) => <option value={option.value} key={option.value}>{lang === "zh" ? option.zh : option.en}</option>)}</select></li>
+                  <li><label htmlFor="furniture-size">{copy("Dimensions", "整体尺寸")}</label><select id="furniture-size" value={isLocked("dimensions_mm") ? furniture.size : ""} onChange={(event) => event.target.value ? setFurnitureOption("size", event.target.value) : unlockFurnitureControl("dimensions_mm")}><option value="">{autoLabel}</option>{SIZE_PRESETS.map((option) => <option value={option.label} key={option.label}>{option.label}</option>)}</select></li>
+                  <li><label htmlFor="furniture-secondary">{copy("Secondary material", "辅材")}</label><select id="furniture-secondary" value={isLocked("secondary_material") ? furniture.secondaryMaterial : ""} onChange={(event) => event.target.value ? setFurnitureAppearance("secondaryMaterial", event.target.value) : unlockFurnitureControl("secondary_material")}><option value="">{autoLabel}</option>{SECONDARY_MATERIALS.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
+                  <li><label htmlFor="furniture-shape">{copy("Top shape", "桌面形状")}</label><select id="furniture-shape" value={isLocked("top_shape") ? furniture.topShape : ""} onChange={(event) => event.target.value ? setFurnitureAppearance("topShape", event.target.value) : unlockFurnitureControl("top_shape")}><option value="">{autoLabel}</option>{TOP_SHAPES.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
+                  <li><label htmlFor="furniture-edge">{copy("Edge profile", "边缘造型")}</label><select id="furniture-edge" value={isLocked("edge_profile") ? furniture.edgeProfile : ""} onChange={(event) => event.target.value ? setFurnitureAppearance("edgeProfile", event.target.value) : unlockFurnitureControl("edge_profile")}><option value="">{autoLabel}</option>{EDGE_PROFILES.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
+                  <li><label htmlFor="furniture-base">{copy("Base / legs", "桌腿 / 底座")}</label><select id="furniture-base" value={isLocked("base_style") ? furniture.legs : ""} onChange={(event) => event.target.value ? setFurnitureOption("legs", event.target.value) : unlockFurnitureControl("base_style")}><option value="">{autoLabel}</option>{BASE_STYLES.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
+                  <li><label htmlFor="furniture-finish">{copy("Finish", "表面处理")}</label><select id="furniture-finish" value={isLocked("finish") ? furniture.finish : ""} onChange={(event) => event.target.value ? setFurnitureAppearance("finish", event.target.value) : unlockFurnitureControl("finish")}><option value="">{autoLabel}</option>{FINISHES.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
+                  <li><label htmlFor="furniture-storage">{copy("Storage", "抽屉 / 收纳")}</label><select id="furniture-storage" value={isLocked("storage") ? furniture.shelves : ""} onChange={(event) => event.target.value ? setFurnitureOption("shelves", event.target.value) : unlockFurnitureControl("storage")}><option value="">{autoLabel}</option>{STORAGE_OPTIONS.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
+                  <li><label htmlFor="furniture-hardware">{copy("Hardware", "拉手 / 五金")}</label><select id="furniture-hardware" value={isLocked("component_notes") ? furniture.handles : ""} onChange={(event) => event.target.value ? setFurnitureOption("handles", event.target.value) : unlockFurnitureControl("component_notes")}><option value="">{autoLabel}</option>{HARDWARE_OPTIONS.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
+                </ul>
+              </details>
+            </div>
+            <Button full size="lg" disabled={!generated || Boolean(uploading) || furniture.phase === "generating"} onClick={() => onGenerate(true)}><Sparkle />{copy("Generate again", "重新生成")}</Button>
+          </aside>
+        </div>
+      )}
+
+      {stage === "drawings" && generated && spec && drawingProps && (
+        <section className="furniture-drawings-stage" aria-label={t("furn.drawings")}>
+          <div className="drawings-stage__toolbar"><button type="button" className="text-action" onClick={() => navigate("/furniture/render")}>← {copy("Back to render", "返回调整效果图")}</button></div>
           <div className="drawings__grid">
             <div className="card card--pad drawings__views">
               <h2>{copy("Concept Orthographic Views", "概念级三视图")}</h2>
@@ -282,11 +413,11 @@ export function FurniturePage() {
                 <li><strong>{copy("Table type", "桌子类型")}</strong><span>{lang === "zh" ? tableLabel?.zh : tableLabel?.en}</span></li>
                 <li><strong>{t("furn.spec.dims")}</strong><span>{spec.dimensions_mm.width} × {spec.dimensions_mm.depth} × {spec.dimensions_mm.height} mm</span></li>
                 <li><strong>{t("furn.spec.materials")}</strong><span>{spec.materials.map((item) => `${item.part}: ${item.material}`).join(" · ")}</span></li>
-                <li><strong>{t("furn.spec.finish")}</strong><span>{furniture.finish}</span></li>
+                <li><strong>{t("furn.spec.finish")}</strong><span>{[...new Set(spec.materials.map((item) => item.finish))].join(" · ")}</span></li>
                 <li><strong>{t("furn.spec.components")}</strong><span>{spec.components.map((item) => `${item.name} × ${item.quantity}`).join(" · ")}</span></li>
               </ul>
               <Button full onClick={() => window.print()}>{copy("Print / Save Views", "打印 / 保存三视图")}</Button>
-              <Button full variant="secondary" onClick={async () => { try { await navigator.clipboard.writeText(`${generated.response.design_summary}\n${furniture.size}`); flash(copy("Specification copied.", "规格已复制。")); } catch { flash(copy("Clipboard is unavailable.", "暂时无法使用剪贴板。")); } }}>{copy("Copy Specification", "复制规格")}</Button>
+              <Button full variant="secondary" onClick={async () => { try { await navigator.clipboard.writeText(`${generated.response.design_summary}\n${spec.dimensions_mm.width} × ${spec.dimensions_mm.depth} × ${spec.dimensions_mm.height} mm`); flash(copy("Specification copied.", "规格已复制。")); } catch { flash(copy("Clipboard is unavailable.", "暂时无法使用剪贴板。")); } }}>{copy("Copy Specification", "复制规格")}</Button>
               {feedback && <p className="drawings__note" role="status">{feedback}</p>}
               <p className="drawings__note">{copy("Concept only—not fabrication-ready. A furniture engineer or fabricator must verify structure, joints, tolerances, and final dimensions before production.", "当前为概念级图纸，不可直接下单生产。结构、节点、公差和最终尺寸需由家具工程师或制造商复核。")}</p>
             </aside>

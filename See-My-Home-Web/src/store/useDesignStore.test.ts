@@ -122,4 +122,16 @@ describe("useDesignStore", () => {
     useDesignStore.getState().setFurnitureSketchWeight(100);
     expect(useDesignStore.getState().furniture.sketchWeight).toBe(95);
   });
+
+  test("editing furniture text clears a prior drawing confirmation", () => {
+    useDesignStore.getState().confirmFurniture();
+    useDesignStore.getState().setFurnitureRefinementPrompt("Make the legs slimmer.");
+
+    expect(useDesignStore.getState().furniture.refinementPrompt).toBe("Make the legs slimmer.");
+    expect(useDesignStore.getState().furniture.confirmed).toBe(false);
+
+    useDesignStore.getState().confirmFurniture();
+    useDesignStore.getState().setFurniturePrompt("A lighter oak desk.");
+    expect(useDesignStore.getState().furniture.confirmed).toBe(false);
+  });
 });

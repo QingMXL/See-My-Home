@@ -35,7 +35,7 @@ function RouteView() {
           <Route path="/layout/result" element={<LayoutResultPage />} />
           <Route path="/style" element={<StyleFlowPage />} />
           <Route path="/style/result" element={<StyleResultPage />} />
-          <Route path="/furniture" element={<FurniturePage />} />
+          <Route path="/furniture/*" element={<FurniturePage />} />
           <Route path="/designs" element={<MyDesignsPage />} />
           <Route path="/explore" element={<ComingSoonPage titleKey="coming.explore" />} />
           <Route path="/pricing" element={<ComingSoonPage titleKey="coming.pricing" />} />

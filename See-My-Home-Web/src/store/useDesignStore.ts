@@ -64,6 +64,7 @@ interface FurnitureFlowState {
   sketchWeight: number;
   tableType: FurnitureTableType;
   prompt: string;
+  refinementPrompt: string;
   material: string;
   secondaryMaterial: string;
   size: string;
@@ -113,6 +114,7 @@ interface DesignStore {
   setStyleAgentError: (message: string | null) => void;
 
   setFurniturePrompt: (prompt: string) => void;
+  setFurnitureRefinementPrompt: (prompt: string) => void;
   setFurnitureSource: (kind: "sketch" | "inspiration", name: string | null, url: string | null) => void;
   setFurnitureUploadedAsset: (kind: "sketch" | "inspiration", asset: UploadedFurnitureAsset | null) => void;
   setFurnitureSketchWeight: (weight: number) => void;
@@ -169,6 +171,7 @@ const initialFurniture: FurnitureFlowState = {
   sketchWeight: 80,
   tableType: "dining_table",
   prompt: "",
+  refinementPrompt: "",
   material: "Walnut",
   secondaryMaterial: "Blackened Steel",
   size: "1800 × 900 × 750 mm",
@@ -335,7 +338,9 @@ export const useDesignStore = create<DesignStore>()(
   setStyleAgentError: (agentError) =>
     set((s) => ({ style: { ...s.style, agentError } })),
 
-  setFurniturePrompt: (prompt) => set((s) => ({ furniture: { ...s.furniture, prompt } })),
+  setFurniturePrompt: (prompt) => set((s) => ({ furniture: { ...s.furniture, prompt, confirmed: false } })),
+  setFurnitureRefinementPrompt: (refinementPrompt) =>
+    set((s) => ({ furniture: { ...s.furniture, refinementPrompt, confirmed: false } })),
   setFurnitureSource: (kind, name, url) =>
     set((s) => ({
       furniture: {
@@ -398,7 +403,7 @@ export const useDesignStore = create<DesignStore>()(
   setFurniturePhase: (phase, stepIndex) =>
     set((s) => ({ furniture: { ...s.furniture, phase, stepIndex: stepIndex ?? s.furniture.stepIndex } })),
   setFurnitureAgentRun: (agentRun) =>
-    set((s) => ({ furniture: { ...s.furniture, agentRun, agentError: null } })),
+    set((s) => ({ furniture: { ...s.furniture, agentRun, agentError: null, confirmed: false } })),
   setFurnitureAgentError: (agentError) =>
     set((s) => ({ furniture: { ...s.furniture, agentError } })),
   confirmFurniture: () => set((s) => ({ furniture: { ...s.furniture, confirmed: true } })),
@@ -443,6 +448,7 @@ export const useDesignStore = create<DesignStore>()(
           sketchWeight: s.furniture.sketchWeight ?? initialFurniture.sketchWeight,
           tableType: s.furniture.tableType,
           prompt: s.furniture.prompt,
+          refinementPrompt: s.furniture.refinementPrompt ?? "",
           material: s.furniture.material,
           secondaryMaterial: s.furniture.secondaryMaterial,
           size: s.furniture.size,
@@ -453,6 +459,7 @@ export const useDesignStore = create<DesignStore>()(
           edgeProfile: s.furniture.edgeProfile,
           finish: s.furniture.finish,
           lockedControls: s.furniture.lockedControls ?? [],
+          confirmed: s.furniture.confirmed,
           phase: s.furniture.phase === "done" ? "done" : "idle",
           agentRun: s.furniture.agentRun,
           agentError: null,
