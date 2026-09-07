@@ -1,4 +1,4 @@
-import { useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { Download, X } from "lucide-react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Breadcrumbs, Stepper } from "../../components/layout/Breadcrumbs";
@@ -18,6 +18,14 @@ import {
   type FurnitureTableType,
   type FurnitureTopShape,
 } from "../../lib/homeFurnitureApi";
+import {
+  createAnnotatedOrthographicSheet,
+  localizeComponentLine,
+  localizeFinishLine,
+  localizeFurnitureNarrative,
+  localizeFurnitureTerm,
+  localizeMaterialLine,
+} from "../../lib/furniturePresentation";
 import { useDesignStore } from "../../store/useDesignStore";
 import "../layout-flow/layout-flow.css";
 import "./furniture.css";
@@ -102,6 +110,8 @@ export function FurniturePage() {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [generatingOrthographic, setGeneratingOrthographic] = useState(false);
   const [orthographicStep, setOrthographicStep] = useState(0);
+  const [orthographicError, setOrthographicError] = useState<string | null>(null);
+  const [annotatedOrthographic, setAnnotatedOrthographic] = useState<{ url: string; blob: Blob } | null>(null);
 
   const copy = (en: string, zh: string) => (lang === "zh" ? zh : en);
   const autoLabel = copy("Auto · follow inputs", "自动 · 跟随输入");
@@ -123,6 +133,31 @@ export function FurniturePage() {
     { title: t("furn.step2"), hint: copy("Render & refine", "渲染与调整") },
     { title: t("furn.step3"), hint: copy("Views & specification", "三视图与规格") },
   ];
+  const localizedSummary = generated ? localizeFurnitureNarrative(generated.response.design_summary, lang, {
+    en: "A furniture concept generated from your confirmed inputs and adjustments.",
+    zh: "已根据你确认的输入和调整生成家具概念方案。",
+  }) : "";
+
+  useEffect(() => {
+    if (!orthographic || !spec) return;
+    let active = true;
+    let objectUrl: string | null = null;
+    void createAnnotatedOrthographicSheet({
+      imageUrl: orthographic.orthographic_image.url,
+      dimensions: spec.dimensions_mm,
+      language: lang,
+    }).then((blob) => {
+      if (!active) return;
+      objectUrl = URL.createObjectURL(blob);
+      setAnnotatedOrthographic({ url: objectUrl, blob });
+    }).catch(() => {
+      if (active) setAnnotatedOrthographic(null);
+    });
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [lang, orthographic, spec]);
 
   const makeInput = (description: string): FurnitureGenerateInput => ({
     project_id: furniture.projectId ?? `furniture_${crypto.randomUUID()}`,
@@ -193,6 +228,8 @@ export function FurniturePage() {
       ? refinement ? `${previousDescription}\n\n${copy("Requested revision:", "本次调整：")} ${refinement}` : previousDescription
       : originalDescription;
     const input = makeInput(description);
+    setOrthographicError(null);
+    setAnnotatedOrthographic(null);
     setFurnitureAgentError(null);
     setFurniturePhase("generating", 0);
     navigate("/furniture/render");
@@ -216,7 +253,9 @@ export function FurniturePage() {
 
   const onConfirm = async () => {
     if (!generated || !spec) return;
-    setFurnitureAgentError(null);
+    setOrthographicError(null);
+    setAnnotatedOrthographic(null);
+    setFurnitureOrthographicRun(null);
     setGeneratingOrthographic(true);
     setOrthographicStep(0);
     const stepOne = window.setTimeout(() => setOrthographicStep(1), 1200);
@@ -233,13 +272,14 @@ export function FurniturePage() {
       confirmFurniture();
       saveDesign({
         project: "My Home",
-        title: `${lang === "zh" ? tableLabel?.zh : tableLabel?.en} · ${spec.materials[0]?.material ?? furniture.material}`,
+        title: `${lang === "zh" ? tableLabel?.zh : tableLabel?.en} · ${localizeFurnitureTerm(spec.materials[0]?.material ?? furniture.material, lang, copy("Custom material", "定制材质"))}`,
         kind: "Furniture",
         detail: `${spec.dimensions_mm.width} × ${spec.dimensions_mm.depth} × ${spec.dimensions_mm.height} mm`,
       });
       navigate("/furniture/drawings");
     } catch (error) {
-      setFurnitureAgentError(error instanceof Error ? error.message : copy("Concept view generation failed.", "概念三视图生成失败。"));
+      console.error("[furniture-orthographic]", error);
+      setOrthographicError(copy("The concept views could not be completed. Please try again.", "概念三视图未能完成，请重试。"));
     } finally {
       window.clearTimeout(stepOne);
       window.clearTimeout(stepTwo);
@@ -248,15 +288,17 @@ export function FurniturePage() {
   };
 
   const downloadOrthographic = async () => {
-    if (!orthographic) return;
+    if (!orthographic || !spec) return;
     try {
-      const response = await fetch(orthographic.orthographic_image.url);
-      if (!response.ok) throw new Error(`Download failed (${response.status})`);
-      const blobUrl = URL.createObjectURL(await response.blob());
+      const blob = annotatedOrthographic?.blob ?? await createAnnotatedOrthographicSheet({
+        imageUrl: orthographic.orthographic_image.url,
+        dimensions: spec.dimensions_mm,
+        language: lang,
+      });
+      const blobUrl = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = blobUrl;
-      const extension = orthographic.orthographic_image.mime_type === "image/webp" ? "webp" : orthographic.orthographic_image.mime_type === "image/jpeg" ? "jpg" : "png";
-      link.download = `${generated?.table_type ?? "table"}-orthographic-views.${extension}`;
+      link.download = `${generated?.table_type ?? "table"}-orthographic-views.png`;
       link.click();
       window.setTimeout(() => URL.revokeObjectURL(blobUrl), 0);
       flash(copy("Concept views downloaded.", "概念三视图已下载。"));
@@ -373,23 +415,31 @@ export function FurniturePage() {
                 <strong>{copy("Original brief", "原始描述")}</strong>
                 <p>{furniture.prompt || copy("No written description", "未填写文字描述")}</p>
               </div>
-              {furniture.agentError && <p className="furniture-error" role="alert">{furniture.agentError}</p>}
             </div>
           </aside>
 
           <section className="card render-panel render-panel--stage" aria-label={t("furn.step2")}>
             {generated ? (
               <>
-                <div className="render-panel__media"><img className="render-panel__image" src={generated.generated_image.url} alt={generated.response.design_summary} /></div>
+                <div className="render-panel__media"><img className="render-panel__image" src={generated.generated_image.url} alt={localizedSummary} /></div>
                 <div className="render-panel__meta">
                   <div className="render-panel__decision">
-                    <div className="render-panel__swatches">{uniqueMaterials.map((material) => <span className="swatch" key={`${material.material}-${material.finish}`}><i className="swatch__dot" style={{ background: MATERIAL_COLORS[material.material] ?? "#806044" }} aria-hidden="true" />{material.material}</span>)}</div>
+                    <div className="render-panel__swatches">{uniqueMaterials.map((material) => <span className="swatch" key={`${material.material}-${material.finish}`}><i className="swatch__dot" style={{ background: MATERIAL_COLORS[material.material] ?? "#806044" }} aria-hidden="true" />{localizeFurnitureTerm(material.material, lang, copy("Custom material", "定制材质"))}</span>)}</div>
                     <Button disabled={furniture.phase === "generating" || generatingOrthographic || generated.response.status === "failed"} onClick={() => void onConfirm()}>{t("furn.thisIsIt")}</Button>
                   </div>
+                  {orthographicError && (
+                    <div className="render-panel__orthographic-error" role="alert">
+                      <span>{orthographicError}</span>
+                      <button type="button" onClick={() => void onConfirm()}>{copy("Try again", "重新生成")}</button>
+                    </div>
+                  )}
                   <details className="render-panel__details">
                     <summary>{copy("Design details", "设计说明")}</summary>
-                    <p>{generated.response.design_summary}</p>
-                    {generated.response.warnings.length > 0 && <ul>{generated.response.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>}
+                    <p>{localizedSummary}</p>
+                    {generated.response.warnings.length > 0 && <ul>{generated.response.warnings.map((warning, index) => <li key={`${warning}-${index}`}>{localizeFurnitureNarrative(warning, lang, {
+                      en: "Please review this concept before confirming it.",
+                      zh: "确认前请检查这项概念提示。",
+                    })}</li>)}</ul>}
                   </details>
                 </div>
               </>
@@ -450,21 +500,22 @@ export function FurniturePage() {
             <div className="card card--pad drawings__views">
               <h2>{copy("Concept Orthographic Views", "概念级三视图")}</h2>
               <div className="orthographic-sheet-frame">
-                <img src={orthographic.orthographic_image.url} alt={copy("One orthographic sheet showing the confirmed table from the front, side, and top", "与已确认效果图一致的桌子正视、侧视和顶视三视图合成图")} />
+                <img src={annotatedOrthographic?.url ?? orthographic.orthographic_image.url} alt={copy("One dimensioned black-and-white orthographic sheet showing the confirmed table from the front, side, and top", "与已确认效果图一致、带尺寸的黑白正视、侧视和顶视三视图合成图")} />
+                {!annotatedOrthographic && <span className="orthographic-sheet-frame__status">{copy("Applying exact dimensions…", "正在标注精确尺寸…")}</span>}
               </div>
-              <p className="drawings__note">{copy("Generated from the confirmed render as one front / side / top concept sheet.", "基于已确认效果图生成的一张正视 / 侧视 / 顶视概念图。")}</p>
+              <p className="drawings__note">{copy("Generated from the confirmed render; exact overall dimensions are applied from the confirmed specification.", "基于已确认效果图生成，并按确认规格标注准确的整体尺寸。")}</p>
             </div>
             <aside className="card card--pad spec">
               <h2>{t("furn.spec")}</h2>
               <ul className="spec__list">
                 <li><strong>{copy("Table type", "桌子类型")}</strong><span>{lang === "zh" ? tableLabel?.zh : tableLabel?.en}</span></li>
                 <li><strong>{t("furn.spec.dims")}</strong><span>{spec.dimensions_mm.width} × {spec.dimensions_mm.depth} × {spec.dimensions_mm.height} mm</span></li>
-                <li><strong>{t("furn.spec.materials")}</strong><span>{spec.materials.map((item) => `${item.part}: ${item.material}`).join(" · ")}</span></li>
-                <li><strong>{t("furn.spec.finish")}</strong><span>{[...new Set(spec.materials.map((item) => item.finish))].join(" · ")}</span></li>
-                <li><strong>{t("furn.spec.components")}</strong><span>{spec.components.map((item) => `${item.name} × ${item.quantity}`).join(" · ")}</span></li>
+                <li><strong>{t("furn.spec.materials")}</strong><span>{localizeMaterialLine(spec.materials, lang)}</span></li>
+                <li><strong>{t("furn.spec.finish")}</strong><span>{localizeFinishLine(spec.materials, lang)}</span></li>
+                <li><strong>{t("furn.spec.components")}</strong><span>{localizeComponentLine(spec.components, lang)}</span></li>
               </ul>
               <Button full onClick={() => void downloadOrthographic()}><Download size={16} />{copy("Download views", "下载三视图")}</Button>
-              <Button full variant="secondary" onClick={async () => { try { await navigator.clipboard.writeText(`${generated.response.design_summary}\n${spec.dimensions_mm.width} × ${spec.dimensions_mm.depth} × ${spec.dimensions_mm.height} mm`); flash(copy("Specification copied.", "规格已复制。")); } catch { flash(copy("Clipboard is unavailable.", "暂时无法使用剪贴板。")); } }}>{copy("Copy Specification", "复制规格")}</Button>
+              <Button full variant="secondary" onClick={async () => { try { await navigator.clipboard.writeText(`${localizedSummary}\n${spec.dimensions_mm.width} × ${spec.dimensions_mm.depth} × ${spec.dimensions_mm.height} mm\n${localizeMaterialLine(spec.materials, lang)}`); flash(copy("Specification copied.", "规格已复制。")); } catch { flash(copy("Clipboard is unavailable.", "暂时无法使用剪贴板。")); } }}>{copy("Copy Specification", "复制规格")}</Button>
               {feedback && <p className="drawings__note" role="status">{feedback}</p>}
               <p className="drawings__note">{copy("Concept only—not fabrication-ready. A furniture engineer or fabricator must verify structure, joints, tolerances, and final dimensions before production.", "当前为概念级图纸，不可直接下单生产。结构、节点、公差和最终尺寸需由家具工程师或制造商复核。")}</p>
             </aside>

@@ -127,7 +127,7 @@ interface DesignStore {
   unlockFurnitureControl: (control: FurnitureControlKey) => void;
   setFurniturePhase: (phase: GenerationPhase, stepIndex?: number) => void;
   setFurnitureAgentRun: (run: FurnitureGenerationResult) => void;
-  setFurnitureOrthographicRun: (run: FurnitureOrthographicResult) => void;
+  setFurnitureOrthographicRun: (run: FurnitureOrthographicResult | null) => void;
   setFurnitureAgentError: (message: string | null) => void;
   confirmFurniture: () => void;
 
@@ -430,7 +430,7 @@ export const useDesignStore = create<DesignStore>()(
   setFurnitureAgentRun: (agentRun) =>
     set((s) => ({ furniture: { ...s.furniture, agentRun, orthographicRun: null, agentError: null, confirmed: false } })),
   setFurnitureOrthographicRun: (orthographicRun) =>
-    set((s) => ({ furniture: { ...s.furniture, orthographicRun, agentError: null } })),
+    set((s) => ({ furniture: { ...s.furniture, orthographicRun, confirmed: orthographicRun ? s.furniture.confirmed : false } })),
   setFurnitureAgentError: (agentError) =>
     set((s) => ({ furniture: { ...s.furniture, agentError } })),
   confirmFurniture: () => set((s) => ({ furniture: { ...s.furniture, confirmed: true } })),

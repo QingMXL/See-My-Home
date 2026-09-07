@@ -115,3 +115,30 @@ test('starts a furniture turn and completes it through durable polling', async (
     assert.equal(completed.result.artifacts[0]?.artifactId, 'art_async_001');
   }
 });
+
+test('builds a strict black-and-white orthographic request with deterministic annotation space', async () => {
+  let postedContent = '';
+  const fakeClient = {
+    async postEvents(_agentId: string, _sessionId: string, events: { content?: string }[]) {
+      postedContent = events[0]?.content ?? '';
+      return { events: [{ id: 'event_ortho', seq: 20, type: 'user.message', accepted: true }] };
+    },
+  } as unknown as ZooworkClient;
+  const runtime = new HomeFurnitureRuntime(fakeClient, 'agent_private_001');
+  const orthographicRequest: FurnitureTurnRequest = {
+    ...request,
+    output_mode: 'orthographic_sheet',
+    render_asset_ref: 'https://example.com/confirmed.png',
+    confirmed_design_spec: response.design_spec,
+    description: response.design_summary,
+    source_priority: { sketch: 0, inspiration: 0 },
+    locked_controls: [],
+  };
+
+  await runtime.startFurnitureTurn({ agentId: 'agent_private_001', sessionId: 'session_ortho' }, orthographicRequest);
+
+  assert.match(postedContent, /pure white background with crisp solid-black technical outlines/i);
+  assert.match(postedContent, /width 1800 mm, depth 900 mm, and height 750 mm/i);
+  assert.match(postedContent, /separate annotation band/i);
+  assert.match(postedContent, /Write design_summary, questions, warnings.*Simplified Chinese/i);
+});

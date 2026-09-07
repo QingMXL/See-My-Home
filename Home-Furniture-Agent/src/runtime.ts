@@ -169,20 +169,26 @@ export class HomeFurnitureRuntime {
       request.inspiration_asset_ref ? `Inspect inspiration_asset_ref exactly once with image: ${request.inspiration_asset_ref}` : '',
       request.render_asset_ref ? `Inspect render_asset_ref exactly once with image: ${request.render_asset_ref}` : '',
     ].filter(Boolean).join(' ');
+    const orthographicDimensions = request.confirmed_design_spec?.dimensions_mm;
+    const orthographicInventory = request.confirmed_design_spec?.components
+      .map((component) => `${component.quantity} × ${component.role}: ${component.name}`)
+      .join('; ');
     const outputRequirement = orthographic
       ? [
           'Use table-concept-renderer in orthographic-sheet mode. The confirmed design specification is immutable.',
           sources,
           'Treat render_asset_ref as the sole visual authority. Do not inspect any image URL more than once.',
-          'Generate one landscape raster image containing exactly three clean line-art panels from left to right: front elevation, side elevation, and top plan.',
-          'The three panels must depict the same confirmed furniture shown in render_asset_ref, including the same silhouette, top, drawers, shelves, supports, hardware, proportions, and component placement.',
-          'Use a warm-white background with crisp dark monochrome technical lines. No perspective view, room scene, material rendering, shadows, decorative props, extra panels, title block, written labels, dimension numbers, logos, or watermark.',
+          'Generate one landscape raster image containing exactly three equal-width clean line-art panels from left to right: front elevation, side elevation, and top plan. Keep a clear white margin around each panel so the application can add a separate annotation band after generation.',
+          `The confirmed overall dimensions are width ${orthographicDimensions?.width} mm, depth ${orthographicDimensions?.depth} mm, and height ${orthographicDimensions?.height} mm. Preserve their recognizable ratios across front, side, and top views; the application will typeset these exact values after generation.`,
+          `Required component inventory: ${orthographicInventory || 'use confirmed_design_spec exactly'}. Every listed component count and placement must match render_asset_ref in every view where that component is visible. Do not redesign, stylize, simplify, merge, open, close, add, or remove components.`,
+          'Use a pure white background with crisp solid-black technical outlines. No beige or grey background, perspective view, room scene, material rendering, tonal fill, shading, shadows, decorative props, extra panels, title block, written labels, dimension numbers, logos, or watermark.',
           `Call image_generate exactly once with action="generate", render_asset_ref as the supported source image input, quality="high", and filename="${filename}". Use only arguments exposed by the current tool schema; never invent model, provider, numeric image-weight, or control-strength fields.`,
           'After generation starts, call sessions_yield exactly once and end the waiting run.',
           `In the attachment continuation, call media_materialize exactly once for the returned artifactId with path="/workspace/artifacts/${request.project_id}/${filename}". Inspect the materialized image exactly once.`,
           'Publish only when all three views are present, mutually consistent, and recognizably match the confirmed render and component specification. Otherwise return failed with qa.publishable=false.',
           'Echo request.confirmed_design_spec exactly and without changing any value in response.design_spec. Set absent sketch and inspiration QA fields to true.',
           'Otherwise call artifact_publish exactly once and return status=completed with its artifact id.',
+          `Write design_summary, questions, warnings, and other user-facing prose in ${request.locale === 'zh-CN' ? 'Simplified Chinese' : 'English'}. Do not expose internal QA reasoning as user guidance.`,
           'Return one compact JSON object matching response_schema without Markdown fences. This is concept-level only, not fabrication-ready engineering.',
         ]
       : [
@@ -202,6 +208,7 @@ export class HomeFurnitureRuntime {
           'If the raster is missing, corrupt, not recognizably the requested table, or materially contradicts the validated major components, do not publish it and return failed with qa.publishable=false.',
           'Otherwise call artifact_publish exactly once and return status=completed with its artifact id.',
           'Treat absent sketch or inspiration QA as satisfied when that source was not provided.',
+          `Write every human-readable response field, including design_summary, questions, warnings, drawing_notes, material part/material/finish names, and component names, in ${request.locale === 'zh-CN' ? 'Simplified Chinese' : 'English'}. Keep schema keys, ids, enums, and numeric values unchanged.`,
           'Return one compact JSON object matching response_schema without Markdown fences. This is concept-level only, not fabrication-ready engineering.',
         ];
     return [{

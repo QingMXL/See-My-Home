@@ -162,4 +162,12 @@ describe("useDesignStore", () => {
     useDesignStore.getState().setFurniturePrompt("A lighter oak desk.");
     expect(useDesignStore.getState().furniture.confirmed).toBe(false);
   });
+
+  test("starting a new orthographic attempt invalidates the previous confirmation", () => {
+    useDesignStore.getState().confirmFurniture();
+    useDesignStore.getState().setFurnitureOrthographicRun(null);
+
+    expect(useDesignStore.getState().furniture.orthographicRun).toBeNull();
+    expect(useDesignStore.getState().furniture.confirmed).toBe(false);
+  });
 });
