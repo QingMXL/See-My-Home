@@ -13,6 +13,17 @@ export type TableType =
 
 export type TopShape = 'rectangular' | 'round' | 'oval' | 'square' | 'freeform';
 
+export type FurnitureControlKey =
+  | 'dimensions_mm'
+  | 'primary_material'
+  | 'secondary_material'
+  | 'top_shape'
+  | 'edge_profile'
+  | 'base_style'
+  | 'finish'
+  | 'storage'
+  | 'component_notes';
+
 export interface FurnitureDimensions {
   width: number;
   depth: number;
@@ -44,6 +55,8 @@ export interface FurnitureTurnRequest {
     sketch: number;
     inspiration: number;
   };
+  /** Only these controls were explicitly selected by the user and are hard constraints. */
+  locked_controls: FurnitureControlKey[];
   design_controls: FurnitureDesignControls;
 }
 

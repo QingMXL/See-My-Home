@@ -11,6 +11,7 @@ import {
   refineFurniture,
   uploadFurnitureImage,
   type FurnitureGenerateInput,
+  type FurnitureControlKey,
   type FurnitureSourceKind,
   type FurnitureTableType,
   type FurnitureTopShape,
@@ -47,6 +48,7 @@ const TOP_SHAPES: FurnitureTopShape[] = ["rectangular", "round", "oval", "square
 const EDGE_PROFILES = ["Soft Radius", "Square Edge", "Bullnose", "Beveled Edge", "Live Edge"];
 const FINISHES = ["Matte Clear Oil", "Satin Lacquer", "Natural Soap", "High Gloss", "Textured Powder Coat"];
 const STORAGE_OPTIONS = ["No Storage", "One Drawer", "Two Drawers", "Open Shelf", "Cable Management"];
+const HARDWARE_OPTIONS = ["No Hardware", "Round Knob", "Bar Pull", "Integrated Pull"];
 
 function sizeDimensions(size: string) {
   return SIZE_PRESETS.find((preset) => preset.label === size)?.dimensions ?? SIZE_PRESETS[0].dimensions;
@@ -63,6 +65,7 @@ export function FurniturePage() {
     setFurnitureTableType,
     setFurnitureOption,
     setFurnitureAppearance,
+    unlockFurnitureControl,
     setFurniturePhase,
     setFurnitureAgentRun,
     setFurnitureAgentError,
@@ -80,8 +83,11 @@ export function FurniturePage() {
   const sketchWeight = furniture.sketchWeight ?? 80;
   const visibleSketchWeight = hasBothImages ? sketchWeight : hasSketch ? 100 : hasInspiration ? 0 : sketchWeight;
   const visibleInspirationWeight = hasBothImages ? 100 - sketchWeight : hasInspiration ? 100 : hasSketch ? 0 : 100 - sketchWeight;
+  const lockedControls = furniture.lockedControls ?? [];
+  const isLocked = (control: FurnitureControlKey) => lockedControls.includes(control);
 
   const copy = (en: string, zh: string) => (lang === "zh" ? zh : en);
+  const autoLabel = copy("Auto · follow inputs", "自动 · 跟随输入");
   const steps = [
     { title: t("furn.step1"), hint: t("furn.step1hint") },
     { title: t("furn.step2"), hint: t("furn.step2hint") },
@@ -95,6 +101,7 @@ export function FurniturePage() {
     locale: lang === "zh" ? "zh-CN" : "en-US",
     table_type: furniture.tableType,
     description: furniture.prompt.trim(),
+    locked_controls: lockedControls,
     dimensions_mm: { ...sizeDimensions(furniture.size) },
     primary_material: furniture.material,
     secondary_material: furniture.secondaryMaterial,
@@ -239,16 +246,18 @@ export function FurniturePage() {
 
         <aside className="card card--pad refine-panel" aria-label={t("furn.refine")}>
           <h2 className="input-panel__title">{t("furn.refine")}</h2>
+          <p className="refine-panel__hint">{copy("Auto follows the sketch and description. Choosing a value locks only that item.", "“自动”会跟随草图与描述；选择具体值后，只锁定这一项。")}</p>
           <ul className="refine-list">
             <li><label htmlFor="furniture-type">{copy("Table type", "桌子类型")}</label><select id="furniture-type" value={furniture.tableType} onChange={(event) => setFurnitureTableType(event.target.value as FurnitureTableType)}>{TABLE_TYPES.map((option) => <option value={option.value} key={option.value}>{lang === "zh" ? option.zh : option.en}</option>)}</select></li>
-            <li><label htmlFor="furniture-size">{copy("Dimensions", "整体尺寸")}</label><select id="furniture-size" value={furniture.size} onChange={(event) => setFurnitureOption("size", event.target.value)}>{SIZE_PRESETS.map((option) => <option value={option.label} key={option.label}>{option.label}</option>)}</select></li>
-            <li><label htmlFor="furniture-material">{copy("Primary material", "主材")}</label><select id="furniture-material" value={furniture.material} onChange={(event) => setFurnitureOption("material", event.target.value)}>{MATERIALS.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
-            <li><label htmlFor="furniture-secondary">{copy("Secondary material", "辅材")}</label><select id="furniture-secondary" value={furniture.secondaryMaterial} onChange={(event) => setFurnitureAppearance("secondaryMaterial", event.target.value)}>{SECONDARY_MATERIALS.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
-            <li><label htmlFor="furniture-shape">{copy("Top shape", "桌面形状")}</label><select id="furniture-shape" value={furniture.topShape} onChange={(event) => setFurnitureAppearance("topShape", event.target.value)}>{TOP_SHAPES.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
-            <li><label htmlFor="furniture-edge">{copy("Edge profile", "边缘造型")}</label><select id="furniture-edge" value={furniture.edgeProfile} onChange={(event) => setFurnitureAppearance("edgeProfile", event.target.value)}>{EDGE_PROFILES.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
-            <li><label htmlFor="furniture-base">{copy("Base / legs", "桌腿 / 底座")}</label><select id="furniture-base" value={furniture.legs} onChange={(event) => setFurnitureOption("legs", event.target.value)}>{BASE_STYLES.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
-            <li><label htmlFor="furniture-finish">{copy("Finish", "表面处理")}</label><select id="furniture-finish" value={furniture.finish} onChange={(event) => setFurnitureAppearance("finish", event.target.value)}>{FINISHES.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
-            <li><label htmlFor="furniture-storage">{copy("Feature", "功能部件")}</label><select id="furniture-storage" value={furniture.shelves} onChange={(event) => setFurnitureOption("shelves", event.target.value)}>{STORAGE_OPTIONS.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
+            <li><label htmlFor="furniture-size">{copy("Dimensions", "整体尺寸")}</label><select id="furniture-size" value={isLocked("dimensions_mm") ? furniture.size : ""} onChange={(event) => event.target.value ? setFurnitureOption("size", event.target.value) : unlockFurnitureControl("dimensions_mm")}><option value="">{autoLabel}</option>{SIZE_PRESETS.map((option) => <option value={option.label} key={option.label}>{option.label}</option>)}</select></li>
+            <li><label htmlFor="furniture-material">{copy("Primary material", "主材")}</label><select id="furniture-material" value={isLocked("primary_material") ? furniture.material : ""} onChange={(event) => event.target.value ? setFurnitureOption("material", event.target.value) : unlockFurnitureControl("primary_material")}><option value="">{autoLabel}</option>{MATERIALS.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
+            <li><label htmlFor="furniture-secondary">{copy("Secondary material", "辅材")}</label><select id="furniture-secondary" value={isLocked("secondary_material") ? furniture.secondaryMaterial : ""} onChange={(event) => event.target.value ? setFurnitureAppearance("secondaryMaterial", event.target.value) : unlockFurnitureControl("secondary_material")}><option value="">{autoLabel}</option>{SECONDARY_MATERIALS.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
+            <li><label htmlFor="furniture-shape">{copy("Top shape", "桌面形状")}</label><select id="furniture-shape" value={isLocked("top_shape") ? furniture.topShape : ""} onChange={(event) => event.target.value ? setFurnitureAppearance("topShape", event.target.value) : unlockFurnitureControl("top_shape")}><option value="">{autoLabel}</option>{TOP_SHAPES.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
+            <li><label htmlFor="furniture-edge">{copy("Edge profile", "边缘造型")}</label><select id="furniture-edge" value={isLocked("edge_profile") ? furniture.edgeProfile : ""} onChange={(event) => event.target.value ? setFurnitureAppearance("edgeProfile", event.target.value) : unlockFurnitureControl("edge_profile")}><option value="">{autoLabel}</option>{EDGE_PROFILES.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
+            <li><label htmlFor="furniture-base">{copy("Base / legs", "桌腿 / 底座")}</label><select id="furniture-base" value={isLocked("base_style") ? furniture.legs : ""} onChange={(event) => event.target.value ? setFurnitureOption("legs", event.target.value) : unlockFurnitureControl("base_style")}><option value="">{autoLabel}</option>{BASE_STYLES.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
+            <li><label htmlFor="furniture-finish">{copy("Finish", "表面处理")}</label><select id="furniture-finish" value={isLocked("finish") ? furniture.finish : ""} onChange={(event) => event.target.value ? setFurnitureAppearance("finish", event.target.value) : unlockFurnitureControl("finish")}><option value="">{autoLabel}</option>{FINISHES.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
+            <li><label htmlFor="furniture-storage">{copy("Storage", "抽屉 / 收纳")}</label><select id="furniture-storage" value={isLocked("storage") ? furniture.shelves : ""} onChange={(event) => event.target.value ? setFurnitureOption("shelves", event.target.value) : unlockFurnitureControl("storage")}><option value="">{autoLabel}</option>{STORAGE_OPTIONS.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
+            <li><label htmlFor="furniture-hardware">{copy("Hardware", "拉手 / 五金")}</label><select id="furniture-hardware" value={isLocked("component_notes") ? furniture.handles : ""} onChange={(event) => event.target.value ? setFurnitureOption("handles", event.target.value) : unlockFurnitureControl("component_notes")}><option value="">{autoLabel}</option>{HARDWARE_OPTIONS.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
           </ul>
           <Button full size="lg" disabled={!generated || generated.response.status === "failed"} onClick={() => { confirmFurniture(); saveDesign({ project: "My Home", title: `${lang === "zh" ? tableLabel?.zh : tableLabel?.en} · ${furniture.material}`, kind: "Furniture", detail: furniture.size }); }}>{t("furn.thisIsIt")}</Button>
           {generated?.response.warnings.map((warning) => <p className="furniture-warning" key={warning}>{warning}</p>)}

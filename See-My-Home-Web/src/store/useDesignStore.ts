@@ -6,6 +6,7 @@ import type { LayoutGenerationResult, LayoutImageAnalysisResult, UploadedLayoutA
 import type { StyleGenerationResult, UploadedStyleAsset } from "../lib/homeStyleApi";
 import type {
   FurnitureGenerationResult,
+  FurnitureControlKey,
   FurnitureTableType,
   FurnitureTopShape,
   UploadedFurnitureAsset,
@@ -72,6 +73,7 @@ interface FurnitureFlowState {
   topShape: FurnitureTopShape;
   edgeProfile: string;
   finish: string;
+  lockedControls: FurnitureControlKey[];
   phase: GenerationPhase;
   stepIndex: number;
   confirmed: boolean;
@@ -117,6 +119,7 @@ interface DesignStore {
   setFurnitureTableType: (tableType: FurnitureTableType) => void;
   setFurnitureOption: (key: "material" | "size" | "legs" | "handles" | "shelves", value: string) => void;
   setFurnitureAppearance: (key: "secondaryMaterial" | "topShape" | "edgeProfile" | "finish", value: string) => void;
+  unlockFurnitureControl: (control: FurnitureControlKey) => void;
   setFurniturePhase: (phase: GenerationPhase, stepIndex?: number) => void;
   setFurnitureAgentRun: (run: FurnitureGenerationResult) => void;
   setFurnitureAgentError: (message: string | null) => void;
@@ -165,7 +168,7 @@ const initialFurniture: FurnitureFlowState = {
   inspirationAsset: null,
   sketchWeight: 80,
   tableType: "dining_table",
-  prompt: "一张轮廓简洁的实木餐桌，保留手绘草图中的桌面比例和腿部位置。",
+  prompt: "",
   material: "Walnut",
   secondaryMaterial: "Blackened Steel",
   size: "1800 × 900 × 750 mm",
@@ -175,6 +178,7 @@ const initialFurniture: FurnitureFlowState = {
   topShape: "rectangular",
   edgeProfile: "Soft Radius",
   finish: "Matte Clear Oil",
+  lockedControls: [],
   phase: "idle",
   stepIndex: 0,
   confirmed: false,
@@ -361,9 +365,36 @@ export const useDesignStore = create<DesignStore>()(
   setFurnitureTableType: (tableType) =>
     set((s) => ({ furniture: { ...s.furniture, tableType, confirmed: false } })),
   setFurnitureOption: (key, value) =>
-    set((s) => ({ furniture: { ...s.furniture, [key]: value, confirmed: false } })),
+    set((s) => {
+      const controlByKey = {
+        material: "primary_material",
+        size: "dimensions_mm",
+        legs: "base_style",
+        handles: "component_notes",
+        shelves: "storage",
+      } as const;
+      const control = controlByKey[key];
+      return { furniture: { ...s.furniture, [key]: value, lockedControls: [...new Set([...(s.furniture.lockedControls ?? []), control])], confirmed: false } };
+    }),
   setFurnitureAppearance: (key, value) =>
-    set((s) => ({ furniture: { ...s.furniture, [key]: value, confirmed: false } })),
+    set((s) => {
+      const controlByKey = {
+        secondaryMaterial: "secondary_material",
+        topShape: "top_shape",
+        edgeProfile: "edge_profile",
+        finish: "finish",
+      } as const;
+      const control = controlByKey[key];
+      return { furniture: { ...s.furniture, [key]: value, lockedControls: [...new Set([...(s.furniture.lockedControls ?? []), control])], confirmed: false } };
+    }),
+  unlockFurnitureControl: (control) =>
+    set((s) => ({
+      furniture: {
+        ...s.furniture,
+        lockedControls: (s.furniture.lockedControls ?? []).filter((candidate) => candidate !== control),
+        confirmed: false,
+      },
+    })),
   setFurniturePhase: (phase, stepIndex) =>
     set((s) => ({ furniture: { ...s.furniture, phase, stepIndex: stepIndex ?? s.furniture.stepIndex } })),
   setFurnitureAgentRun: (agentRun) =>
@@ -421,6 +452,7 @@ export const useDesignStore = create<DesignStore>()(
           topShape: s.furniture.topShape,
           edgeProfile: s.furniture.edgeProfile,
           finish: s.furniture.finish,
+          lockedControls: s.furniture.lockedControls ?? [],
           phase: s.furniture.phase === "done" ? "done" : "idle",
           agentRun: s.furniture.agentRun,
           agentError: null,

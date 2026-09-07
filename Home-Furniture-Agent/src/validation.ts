@@ -85,9 +85,11 @@ export function parseFurnitureAgentResponse(raw: string): FurnitureAgentResponse
 export function assertResponseMatchesRequest(response: FurnitureAgentResponse, request: FurnitureTurnRequest): void {
   if (response.request_id !== request.request_id) throw new Error('Furniture response request_id does not match request');
   if (response.table_type !== request.table_type) throw new Error('Furniture response table_type does not match request');
-  const expected = request.design_controls.dimensions_mm;
-  const actual = response.design_spec.dimensions_mm;
-  if (actual.width !== expected.width || actual.depth !== expected.depth || actual.height !== expected.height) {
-    throw new Error('Furniture response dimensions do not match the requested canonical dimensions');
+  if (request.locked_controls.includes('dimensions_mm')) {
+    const expected = request.design_controls.dimensions_mm;
+    const actual = response.design_spec.dimensions_mm;
+    if (actual.width !== expected.width || actual.depth !== expected.depth || actual.height !== expected.height) {
+      throw new Error('Furniture response dimensions do not match the requested canonical dimensions');
+    }
   }
 }

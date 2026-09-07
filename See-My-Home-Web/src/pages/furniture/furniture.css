@@ -320,6 +320,13 @@
   gap: var(--space-4);
 }
 
+.refine-panel__hint {
+  margin: -0.35rem 0 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-xs);
+  line-height: 1.55;
+}
+
 .refine-list {
   list-style: none;
   margin: 0;

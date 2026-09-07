@@ -6,6 +6,7 @@ const input: FurnitureGenerateInput = {
   locale: "zh-CN",
   table_type: "dining_table",
   description: "一张简洁的实木餐桌。",
+  locked_controls: ["dimensions_mm"],
   dimensions_mm: { width: 1800, depth: 900, height: 750 },
   primary_material: "White Oak",
   secondary_material: "Blackened Steel",

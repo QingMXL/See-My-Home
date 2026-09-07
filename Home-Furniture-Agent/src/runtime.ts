@@ -180,7 +180,7 @@ export class HomeFurnitureRuntime {
               : request.source_priority.sketch > request.source_priority.inspiration ? 'sketch' : 'inspiration'
             : request.sketch_asset_ref ? 'sketch' : request.inspiration_asset_ref ? 'inspiration' : 'text',
           priority: request.source_priority,
-          rule: 'Move the design closer to the higher-weight image and retain proportionally fewer cues from the lower-weight image. Equal weights require a balanced synthesis. Exact dimensions are hard constraints. Numeric priority is design-decision guidance, not an image-tool parameter.',
+          rule: 'Move the design closer to the higher-weight image and retain proportionally fewer cues from the lower-weight image. Equal weights require a balanced synthesis. Only fields named in request.locked_controls are hard UI constraints; all other design_controls are fallbacks and must yield to clear sketch or text evidence. Numeric priority is design-decision guidance, not an image-tool parameter.',
         },
         contracts: { request_schema: REQUEST_SCHEMA, response_schema: RESPONSE_SCHEMA },
         request,
@@ -188,9 +188,13 @@ export class HomeFurnitureRuntime {
           'Use table-design-spec, then table-concept-renderer.',
           sources,
           'Do not call any image URL more than once for inspection.',
-          'Use design_controls.dimensions_mm unchanged in the response and in the generation prompt.',
+          'Treat only request.locked_controls as hard UI constraints. Unlocked design_controls are fallback suggestions; do not report a conflict merely because clear sketch or text evidence differs from an unlocked fallback.',
+          'When dimensions_mm is locked, use it unchanged. Otherwise infer coherent dimensions from explicit text first, then the visual sources, and only then the fallback dimensions.',
           'Resolve a dimensionally coherent concept specification before generating.',
-          `Call image_generate exactly once with action="generate", a supported source image input when available, a clean three-quarter product-render prompt, quality="high", and filename="${filename}". Use only arguments exposed by the current tool schema; never invent provider, model, numeric image-weight, or control-strength fields.`,
+          request.sketch_asset_ref
+            ? 'The sketch controls topology, component count and placement, proportions, and camera viewpoint according to source_priority. Match its viewing angle, elevation, visible faces, and framing; do not force a generic three-quarter view. Explicitly preserve every visible drawer, shelf, support, and handle unless a locked control overrides it.'
+            : 'With no sketch, use a clean readable three-quarter product view unless the written brief clearly requests another viewpoint.',
+          `Call image_generate exactly once with action="generate", a supported source image input when available, a clean isolated product-render prompt, quality="high", and filename="${filename}". Use only arguments exposed by the current tool schema; never invent provider, model, numeric image-weight, or control-strength fields.`,
           'Do not ask the image model for orthographic drawings, dimensions, text, labels, logos, or a drawing sheet.',
           'After generation starts, call sessions_yield exactly once and end the waiting run.',
           `In the attachment continuation, call media_materialize exactly once for the returned artifactId with path="/workspace/artifacts/${request.project_id}/${filename}". Inspect the materialized image exactly once.`,

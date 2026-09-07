@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { loadEnvFile } from 'node:process';
 import { createZooworkClient, ZooworkError } from '@zoowork-ai/sdk';
 import type {
+  FurnitureControlKey,
   FurnitureDesignControls,
   FurnitureTurnRequest,
   SupportedLocale,
@@ -160,6 +161,10 @@ function sourceUrl(asset: UploadedAsset): string {
 
 const tableTypes = new Set<TableType>(['dining_table', 'coffee_table', 'console_table', 'side_table', 'desk', 'bedside_table', 'nesting_tables', 'bar_table', 'other_table']);
 const topShapes = new Set<TopShape>(['rectangular', 'round', 'oval', 'square', 'freeform']);
+const furnitureControlKeys = new Set<FurnitureControlKey>([
+  'dimensions_mm', 'primary_material', 'secondary_material', 'top_shape', 'edge_profile',
+  'base_style', 'finish', 'storage', 'component_notes',
+]);
 
 function dimension(value: unknown, field: string, min: number, max: number): number {
   if (typeof value !== 'number' || !Number.isInteger(value) || value < min || value > max) throw new Error(`${field} is invalid`);
@@ -187,6 +192,19 @@ function controls(input: Record<string, unknown>): FurnitureDesignControls {
     storage: optionalString(input.storage, 'storage', 240),
     ...(optionalString(input.component_notes, 'component_notes', 1000) ? { component_notes: optionalString(input.component_notes, 'component_notes', 1000) } : {}),
   };
+}
+
+function lockedControls(value: unknown): FurnitureControlKey[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) throw new Error('locked_controls must be an array');
+  const controls = value.map((candidate) => {
+    if (typeof candidate !== 'string' || !furnitureControlKeys.has(candidate as FurnitureControlKey)) {
+      throw new Error('locked_controls contains an unsupported control');
+    }
+    return candidate as FurnitureControlKey;
+  });
+  if (new Set(controls).size !== controls.length) throw new Error('locked_controls must not contain duplicates');
+  return controls;
 }
 
 function selectedLocale(value: unknown): SupportedLocale {
@@ -247,6 +265,7 @@ async function runGeneration(input: Record<string, unknown>) {
     ...(inspiration ? { inspiration_asset_ref: sourceUrl(inspiration) } : {}),
     ...(description ? { description } : {}),
     source_priority: sourcePriority(input, Boolean(sketch), Boolean(inspiration)),
+    locked_controls: lockedControls(input.locked_controls),
     design_controls: controls(input),
   };
   const result = await runtime.runFurnitureTurn(conversation, request);

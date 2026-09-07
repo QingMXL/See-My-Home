@@ -19,6 +19,7 @@ const validRequest: FurnitureTurnRequest = {
   inspiration_asset_ref: 'https://example.com/inspiration.jpg',
   description: 'A calm solid-wood dining table.',
   source_priority: { sketch: 0.8, inspiration: 0.2 },
+  locked_controls: ['dimensions_mm'],
   design_controls: {
     dimensions_mm: { width: 1800, depth: 900, height: 750 },
     primary_material: 'White oak',
@@ -100,6 +101,15 @@ test('enforces the same canonical dimensions in request and response', () => {
     ...validResponse,
     design_spec: { ...validResponse.design_spec, dimensions_mm: { width: 1600, depth: 900, height: 750 } },
   }, validRequest), /dimensions/);
+  assert.doesNotThrow(() => assertResponseMatchesRequest({
+    ...validResponse,
+    design_spec: { ...validResponse.design_spec, dimensions_mm: { width: 1500, depth: 600, height: 1000 } },
+  }, { ...validRequest, locked_controls: [] }));
+});
+
+test('rejects unknown or duplicate locked controls', () => {
+  assert.throws(() => assertFurnitureTurnRequest({ ...validRequest, locked_controls: ['unknown'] }), ContractValidationError);
+  assert.throws(() => assertFurnitureTurnRequest({ ...validRequest, locked_controls: ['storage', 'storage'] }), ContractValidationError);
 });
 
 test('extracts a JSON response without trusting Markdown framing', () => {

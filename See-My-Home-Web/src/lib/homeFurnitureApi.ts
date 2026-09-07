@@ -12,6 +12,16 @@ export type FurnitureTableType =
   | "bar_table"
   | "other_table";
 export type FurnitureTopShape = "rectangular" | "round" | "oval" | "square" | "freeform";
+export type FurnitureControlKey =
+  | "dimensions_mm"
+  | "primary_material"
+  | "secondary_material"
+  | "top_shape"
+  | "edge_profile"
+  | "base_style"
+  | "finish"
+  | "storage"
+  | "component_notes";
 
 export interface FurnitureDimensions {
   width: number;
@@ -81,6 +91,7 @@ export interface FurnitureGenerateInput {
   locale: "en-US" | "zh-CN";
   table_type: FurnitureTableType;
   description: string;
+  locked_controls: FurnitureControlKey[];
   dimensions_mm: FurnitureDimensions;
   primary_material: string;
   secondary_material: string;

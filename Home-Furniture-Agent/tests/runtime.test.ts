@@ -12,6 +12,7 @@ const request: FurnitureTurnRequest = {
   table_type: 'dining_table',
   description: '一张简洁的实木餐桌。',
   source_priority: { sketch: 0, inspiration: 0 },
+  locked_controls: ['dimensions_mm'],
   design_controls: {
     dimensions_mm: { width: 1800, depth: 900, height: 750 },
     primary_material: 'White Oak',

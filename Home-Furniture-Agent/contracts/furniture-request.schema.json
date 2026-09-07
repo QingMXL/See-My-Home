@@ -3,7 +3,7 @@
   "$id": "https://see-my-home.example/contracts/home-furniture-v1-request.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["contract_version", "request_id", "project_id", "locale", "table_type", "source_priority", "design_controls"],
+  "required": ["contract_version", "request_id", "project_id", "locale", "table_type", "source_priority", "locked_controls", "design_controls"],
   "properties": {
     "contract_version": { "const": "home-furniture-v1" },
     "request_id": { "type": "string", "minLength": 1, "maxLength": 160 },
@@ -20,6 +20,13 @@
       "properties": {
         "sketch": { "type": "number", "minimum": 0, "maximum": 1 },
         "inspiration": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "locked_controls": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": ["dimensions_mm", "primary_material", "secondary_material", "top_shape", "edge_profile", "base_style", "finish", "storage", "component_notes"]
       }
     },
     "design_controls": {

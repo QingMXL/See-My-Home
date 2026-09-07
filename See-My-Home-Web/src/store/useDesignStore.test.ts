@@ -101,13 +101,18 @@ describe("useDesignStore", () => {
   });
 
   test("setFurnitureOption clears prior confirmation", () => {
+    useDesignStore.getState().unlockFurnitureControl("primary_material");
     useDesignStore.getState().confirmFurniture();
     expect(useDesignStore.getState().furniture.confirmed).toBe(true);
 
     useDesignStore.getState().setFurnitureOption("material", "White Oak");
 
     expect(useDesignStore.getState().furniture.material).toBe("White Oak");
+    expect(useDesignStore.getState().furniture.lockedControls).toContain("primary_material");
     expect(useDesignStore.getState().furniture.confirmed).toBe(false);
+
+    useDesignStore.getState().unlockFurnitureControl("primary_material");
+    expect(useDesignStore.getState().furniture.lockedControls).not.toContain("primary_material");
   });
 
   test("normalizes the adjustable sketch weight to safe five-point steps", () => {

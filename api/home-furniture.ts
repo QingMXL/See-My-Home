@@ -3,6 +3,7 @@ import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { ZooworkError } from '@zoowork-ai/sdk';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type {
+  FurnitureControlKey,
   FurnitureDesignControls,
   FurnitureTurnRequest,
   TableType,
@@ -31,6 +32,10 @@ const tableTypes = new Set<TableType>([
   'bedside_table', 'nesting_tables', 'bar_table', 'other_table',
 ]);
 const topShapes = new Set<TopShape>(['rectangular', 'round', 'oval', 'square', 'freeform']);
+const furnitureControlKeys = new Set<FurnitureControlKey>([
+  'dimensions_mm', 'primary_material', 'secondary_material', 'top_shape', 'edge_profile',
+  'base_style', 'finish', 'storage', 'component_notes',
+]);
 
 function runtime(): HomeFurnitureRuntime {
   const agentId = process.env.ZOOWORK_FURNITURE_AGENT_ID?.trim();
@@ -77,6 +82,7 @@ interface FurnitureApiInput extends Record<string, unknown> {
   storage?: unknown;
   component_notes?: unknown;
   source_priority?: unknown;
+  locked_controls?: unknown;
 }
 
 interface FurnitureJob {
@@ -164,6 +170,19 @@ function parseControls(input: FurnitureApiInput): FurnitureDesignControls {
   };
 }
 
+function parseLockedControls(value: unknown): FurnitureControlKey[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) throw new Error('locked_controls must be an array');
+  const controls = value.map((candidate) => {
+    if (typeof candidate !== 'string' || !furnitureControlKeys.has(candidate as FurnitureControlKey)) {
+      throw new Error('locked_controls contains an unsupported control');
+    }
+    return candidate as FurnitureControlKey;
+  });
+  if (new Set(controls).size !== controls.length) throw new Error('locked_controls must not contain duplicates');
+  return controls;
+}
+
 function sourcePriority(
   input: FurnitureApiInput,
   hasSketch: boolean,
@@ -238,6 +257,7 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
     ...(inspirationRef ? { inspiration_asset_ref: inspirationRef } : {}),
     ...(description ? { description } : {}),
     source_priority: sourcePriority(input, Boolean(sketchRef), Boolean(inspirationRef)),
+    locked_controls: parseLockedControls(input.locked_controls),
     design_controls: parseControls(input),
   };
 
@@ -304,6 +324,7 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
       table_type: tableType,
       description,
       source_priority: turn.source_priority,
+      locked_controls: turn.locked_controls,
       ...turn.design_controls,
     },
   });
