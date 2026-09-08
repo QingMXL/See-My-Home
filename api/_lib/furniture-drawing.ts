@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import opentype from 'opentype.js';
 import sharp, { type OverlayOptions } from 'sharp';
 import type { FurnitureDesignSpec, OrthographicView } from '../../Home-Furniture-Agent/src/contracts.js';
 
@@ -35,14 +37,37 @@ function escapeXml(value: string): string {
     .replaceAll("'", '&apos;');
 }
 
-function textLabel(
+const LABEL_SIZES = {
+  'view-title': 62,
+  'dimension-text': 68,
+  'detail-dimension-text': 56,
+  'unit-text': 52,
+} as const;
+
+const ENGINEERING_FONT_URL = new URL(
+  '../../Home-Furniture-Agent/skills/table-concept-renderer/references/fonts/LiberationSans-Regular.ttf',
+  import.meta.url,
+);
+const engineeringFontBuffer = readFileSync(ENGINEERING_FONT_URL);
+const engineeringFont = opentype.parse(
+  engineeringFontBuffer.buffer.slice(
+    engineeringFontBuffer.byteOffset,
+    engineeringFontBuffer.byteOffset + engineeringFontBuffer.byteLength,
+  ),
+);
+
+function vectorLabel(
   value: string,
   x: number,
   y: number,
-  className: 'view-title' | 'dimension-text' | 'unit-text',
+  className: keyof typeof LABEL_SIZES,
   anchor: 'start' | 'middle' | 'end' = 'start',
 ): string {
-  return `<text x="${x}" y="${y}" class="${className}" text-anchor="${anchor}">${escapeXml(value)}</text>`;
+  const size = LABEL_SIZES[className];
+  const width = engineeringFont.getAdvanceWidth(value, size, { kerning: true });
+  const anchorOffset = anchor === 'middle' ? width / 2 : anchor === 'end' ? width : 0;
+  const path = engineeringFont.getPath(value, x - anchorOffset, y, size, { kerning: true });
+  return `<path class="${className}" data-label="${escapeXml(value)}" data-font-size="${size}" aria-label="${escapeXml(value)}" d="${path.toPathData(2)}"/>`;
 }
 
 export function orthographicTargetRatios(spec: FurnitureDesignSpec): [number, number, number] {
@@ -114,28 +139,28 @@ function targetFrames(spec: FurnitureDesignSpec): OrthographicViewFrame[] {
 function horizontalDimension(frame: OrthographicViewFrame, label: string): string {
   const x1 = frame.left;
   const x2 = frame.left + frame.width;
-  const y = Math.max(110, frame.top - 92);
+  const y = Math.max(130, frame.top - 112);
   const middle = (x1 + x2) / 2;
-  const arrow = 18;
+  const arrow = 24;
   return [
     `<path d="M ${x1} ${frame.top - 12} V ${y - 18} M ${x2} ${frame.top - 12} V ${y - 18}" class="extension-line"/>`,
     `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" class="dimension-line"/>`,
     `<path d="M ${x1} ${y} l ${arrow} -9 v 18 z M ${x2} ${y} l -${arrow} -9 v 18 z" class="arrowhead"/>`,
-    textLabel(label, middle, y - 20, 'dimension-text', 'middle'),
+    vectorLabel(label, middle, y - 28, 'dimension-text', 'middle'),
   ].join('');
 }
 
 function verticalDimension(frame: OrthographicViewFrame, label: string): string {
   const y1 = frame.top;
   const y2 = frame.top + frame.height;
-  const x = frame.left - 92;
+  const x = frame.left - 112;
   const middle = (y1 + y2) / 2;
-  const arrow = 18;
+  const arrow = 24;
   return [
     `<path d="M ${frame.left - 12} ${y1} H ${x + 18} M ${frame.left - 12} ${y2} H ${x + 18}" class="extension-line"/>`,
     `<line x1="${x}" y1="${y1}" x2="${x}" y2="${y2}" class="dimension-line"/>`,
     `<path d="M ${x} ${y1} l -9 ${arrow} h 18 z M ${x} ${y2} l -9 -${arrow} h 18 z" class="arrowhead"/>`,
-    textLabel(label, x - 24, middle + 14, 'dimension-text', 'end'),
+    vectorLabel(label, x - 32, middle + 22, 'dimension-text', 'end'),
   ].join('');
 }
 
@@ -150,7 +175,7 @@ function topThicknessDimension(frame: OrthographicViewFrame, spec: FurnitureDesi
     `<path d="M ${frame.left + frame.width + 12} ${y1} H ${x - 18} M ${frame.left + frame.width + 12} ${y2} H ${x - 18}" class="extension-line"/>`,
     `<line x1="${x}" y1="${y1}" x2="${x}" y2="${y2}" class="dimension-line"/>`,
     `<path d="M ${x} ${y1} l -7 14 h 14 z M ${x} ${y2} l -7 -14 h 14 z" class="arrowhead"/>`,
-    textLabel(`${thickness} mm`, x + 22, (y1 + y2) / 2 + 13, 'dimension-text'),
+    vectorLabel(`${thickness} mm`, x + 28, (y1 + y2) / 2 + 18, 'detail-dimension-text'),
   ].join('');
 }
 
@@ -163,9 +188,9 @@ export function buildDimensionAnnotationSvg(input: {
   if (!front || !side || !top) throw new Error('Three orthographic frames are required');
   const { width, depth, height } = spec.dimensions_mm;
   const titles = [
-    textLabel('FRONT ELEVATION', front.left + front.width / 2, front.top + front.height + 72, 'view-title', 'middle'),
-    textLabel('SIDE ELEVATION', side.left + side.width / 2, side.top + side.height + 72, 'view-title', 'middle'),
-    textLabel('TOP VIEW', top.left + top.width / 2, top.top + top.height + 72, 'view-title', 'middle'),
+    vectorLabel('FRONT ELEVATION', front.left + front.width / 2, front.top + front.height + 72, 'view-title', 'middle'),
+    vectorLabel('SIDE ELEVATION', side.left + side.width / 2, side.top + side.height + 72, 'view-title', 'middle'),
+    vectorLabel('TOP VIEW', top.left + top.width / 2, top.top + top.height + 72, 'view-title', 'middle'),
   ].join('');
   const dimensions = [
     horizontalDimension(front, `${width} mm`),
@@ -180,18 +205,15 @@ export function buildDimensionAnnotationSvg(input: {
   return `
   <svg xmlns="http://www.w3.org/2000/svg" width="${ORTHOGRAPHIC_SHEET_WIDTH}" height="${ORTHOGRAPHIC_SHEET_HEIGHT}" viewBox="0 0 ${ORTHOGRAPHIC_SHEET_WIDTH} ${ORTHOGRAPHIC_SHEET_HEIGHT}">
     <style>
-      text { font-family: Arial, Helvetica, sans-serif; fill: #111; }
-      .view-title { font-size: 42px; font-weight: 500; letter-spacing: 1.5px; }
-      .dimension-text { font-size: 40px; font-weight: 400; }
-      .unit-text { font-size: 34px; font-weight: 400; }
-      .dimension-line, .extension-line { fill: none; stroke: #111; stroke-width: 3; stroke-linecap: square; }
-      .extension-line { stroke-width: 2; }
+      .view-title, .dimension-text, .detail-dimension-text, .unit-text { fill: #111; stroke: none; }
+      .dimension-line, .extension-line { fill: none; stroke: #111; stroke-width: 5; stroke-linecap: square; }
+      .extension-line { stroke-width: 3; }
       .arrowhead { fill: #111; stroke: none; }
     </style>
     <!-- FRONT ELEVATION SIDE ELEVATION TOP VIEW ${width} mm ${depth} mm ${height} mm ${spec.top.thickness_mm} mm -->
     <rect x="22" y="22" width="${ORTHOGRAPHIC_SHEET_WIDTH - 44}" height="${ORTHOGRAPHIC_SHEET_HEIGHT - 44}" fill="none" stroke="#111" stroke-width="2"/>
     ${titles}${dimensions}
-    ${textLabel('Unit: mm', ORTHOGRAPHIC_SHEET_WIDTH - 100, ORTHOGRAPHIC_SHEET_HEIGHT - 70, 'unit-text', 'end')}
+    ${vectorLabel('UNIT: mm', ORTHOGRAPHIC_SHEET_WIDTH - 100, ORTHOGRAPHIC_SHEET_HEIGHT - 70, 'unit-text', 'end')}
   </svg>`;
 }
 

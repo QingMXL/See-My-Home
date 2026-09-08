@@ -37,13 +37,15 @@ function viewSource(width: number, height: number, inset: number): Buffer {
   `);
 }
 
-test('builds engineering labels and dimensions with a real sans-serif font stack', () => {
+test('builds engineering labels and dimensions as font-independent vector paths', () => {
   const svg = buildDimensionAnnotationSvg({ frames, spec });
-  for (const expected of ['FRONT ELEVATION', 'SIDE ELEVATION', 'TOP VIEW', '1500 mm', '600 mm', '1000 mm', '36 mm', 'Unit: mm']) {
-    assert.match(svg, new RegExp(expected));
+  for (const expected of ['FRONT ELEVATION', 'SIDE ELEVATION', 'TOP VIEW', '1500 mm', '600 mm', '1000 mm', '36 mm', 'UNIT: mm']) {
+    assert.match(svg, new RegExp(`data-label="${expected}"`));
   }
-  assert.match(svg, /<text\b/);
-  assert.match(svg, /font-family: Arial, Helvetica, sans-serif/);
+  assert.doesNotMatch(svg, /<text\b/);
+  assert.doesNotMatch(svg, /font-family/);
+  assert.match(svg, /class="dimension-text"[^>]*data-font-size="68"[^>]*d="M/);
+  assert.match(svg, /class="view-title"[^>]*data-font-size="62"[^>]*d="M/);
   assert.match(svg, /class="extension-line"/);
 });
 
