@@ -40,6 +40,7 @@ describe("Home Furniture generation API", () => {
         status: "processing",
         job_token: "signed-furniture-job",
         poll_after_ms: 500,
+        progress: "rendering",
       }), { status: 202, headers: { "content-type": "application/json" } }))
       .mockResolvedValueOnce(new Response(JSON.stringify(finalResult), {
         status: 200,
@@ -47,11 +48,13 @@ describe("Home Furniture generation API", () => {
       }));
     vi.stubGlobal("fetch", fetchMock);
 
-    const resultPromise = generateFurniture(input);
+    const onProgress = vi.fn();
+    const resultPromise = generateFurniture(input, onProgress);
     await vi.advanceTimersByTimeAsync(500);
     const result = await resultPromise;
 
     expect(result).toEqual(finalResult);
+    expect(onProgress).toHaveBeenCalledWith("rendering");
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toMatchObject({
       project_id: "furniture_test_001",

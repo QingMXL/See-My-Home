@@ -45,6 +45,7 @@ export const FURNITURE_GENERATION_STEPS: GenerationStep[] = [
   { labelKey: "gen.furn.reading", weight: 1 },
   { labelKey: "gen.furn.interpreting", weight: 1.2 },
   { labelKey: "gen.furn.rendering", weight: 1.6 },
+  { labelKey: "gen.furn.publishing", weight: 1 },
 ];
 
 export const FURNITURE_ORTHOGRAPHIC_STEPS: GenerationStep[] = [

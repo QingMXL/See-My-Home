@@ -26,6 +26,7 @@ import {
   refineFurniture,
   uploadFurnitureImage,
   type FurnitureControlKey,
+  type FurnitureGenerationProgress,
   type FurnitureGenerateInput,
   type FurnitureSourceKind,
   type FurnitureTableType,
@@ -81,6 +82,13 @@ const FINISHES = ["Matte Clear Oil", "Matte Black Stain", "Satin Lacquer", "Natu
 const STORAGE_OPTIONS = ["No Storage", "One Drawer", "Two Drawers", "Open Shelf", "Cable Management"];
 const HARDWARE_OPTIONS = ["No Hardware", "Round Knob", "Bar Pull", "Integrated Pull"];
 
+const FURNITURE_PROGRESS_STEP: Record<FurnitureGenerationProgress, number> = {
+  analyzing: 0,
+  interpreting: 1,
+  rendering: 2,
+  publishing: 3,
+};
+
 type FurnitureStage = "input" | "render" | "drawings";
 
 function sizeDimensions(size: string) {
@@ -135,6 +143,7 @@ export function FurniturePage() {
   const [orthographicStep, setOrthographicStep] = useState(0);
   const [orthographicError, setOrthographicError] = useState<string | null>(null);
   const [showDemoPreview, setShowDemoPreview] = useState(false);
+  const [generationStartedAt, setGenerationStartedAt] = useState<number | null>(null);
 
   const copy = (en: string, zh: string) => (lang === "zh" ? zh : en);
   const autoLabel = copy("Auto · follow inputs", "自动 · 跟随输入");
@@ -301,9 +310,11 @@ export function FurniturePage() {
     setFurnitureAgentError(null);
     if (!isRefinement) setFurnitureAgentRun(null);
     setFurniturePhase("generating", 0);
+    setGenerationStartedAt(Date.now());
     navigate("/furniture/render");
-    const stepOne = useDemoGeneration ? undefined : window.setTimeout(() => setFurniturePhase("generating", 1), 1200);
-    const stepTwo = useDemoGeneration ? undefined : window.setTimeout(() => setFurniturePhase("generating", 2), 3200);
+    const onProgress = (progress: FurnitureGenerationProgress) => {
+      setFurniturePhase("generating", FURNITURE_PROGRESS_STEP[progress]);
+    };
     try {
       const result = useDemoGeneration
         ? await runGeneration(
@@ -311,8 +322,8 @@ export function FurniturePage() {
             (stepIndex) => setFurniturePhase("generating", stepIndex),
           ).then(() => createDemoFurnitureResult(input))
         : isRefinement && furniture.agentRun?.request_context
-          ? await refineFurniture(furniture.agentRun.request_context, input.locale, input, input.description)
-          : await generateFurniture(input);
+          ? await refineFurniture(furniture.agentRun.request_context, input.locale, input, input.description, onProgress)
+          : await generateFurniture(input, onProgress);
       setFurnitureAgentRun(result);
       setFurnitureRefinementPrompt("");
       setFurniturePhase("done");
@@ -320,8 +331,7 @@ export function FurniturePage() {
       setFurnitureAgentError(error instanceof Error ? error.message : copy("Furniture generation failed.", "家具生成失败。"));
       setFurniturePhase("error");
     } finally {
-      if (stepOne) window.clearTimeout(stepOne);
-      if (stepTwo) window.clearTimeout(stepTwo);
+      setGenerationStartedAt(null);
     }
   };
 
@@ -623,7 +633,7 @@ export function FurniturePage() {
         </section>
       )}
 
-      {furniture.phase === "generating" && <GeneratingOverlay title={copy("Designing your table", "正在设计你的桌子")} steps={FURNITURE_GENERATION_STEPS} activeIndex={furniture.stepIndex} />}
+      {furniture.phase === "generating" && <GeneratingOverlay title={copy("Designing your table", "正在设计你的桌子")} steps={FURNITURE_GENERATION_STEPS} activeIndex={furniture.stepIndex} startedAt={generationStartedAt ?? undefined} />}
       {generatingOrthographic && <GeneratingOverlay title={copy("Creating the concept views", "正在生成概念三视图")} steps={FURNITURE_ORTHOGRAPHIC_STEPS} activeIndex={orthographicStep} />}
     </main>
   );

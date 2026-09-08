@@ -36,7 +36,7 @@ export interface UploadedFurnitureAsset {
   file_name: string;
   mime_type: "image/jpeg" | "image/png" | "image/webp";
   size_bytes: number;
-  sha256: string;
+  sha256?: string;
   storage: "application_backend" | "vercel_blob";
   image_processing_status: "uploaded";
   source_url?: string;
@@ -108,7 +108,10 @@ interface FurnitureGenerationPending {
   status: "processing";
   job_token: string;
   poll_after_ms: number;
+  progress?: FurnitureGenerationProgress;
 }
+
+export type FurnitureGenerationProgress = "analyzing" | "interpreting" | "rendering" | "publishing";
 
 export interface FurnitureGenerationResult {
   session_id: string;
@@ -184,8 +187,6 @@ export async function uploadFurnitureImage(
       contentType: file.type || "application/octet-stream",
       multipart: file.size > 4 * 1024 * 1024,
     });
-    const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
-    const sha256 = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
     return {
       project_id: projectId,
       asset_id: blob.url,
@@ -194,7 +195,6 @@ export async function uploadFurnitureImage(
       file_name: file.name,
       mime_type: file.type as UploadedFurnitureAsset["mime_type"],
       size_bytes: file.size,
-      sha256,
       storage: "vercel_blob",
       image_processing_status: "uploaded",
     };
@@ -222,11 +222,15 @@ export async function deleteFurnitureImage(asset: UploadedFurnitureAsset): Promi
   await readResponse<{ deleted: true }>(response);
 }
 
-export async function generateFurniture(input: FurnitureGenerateInput): Promise<FurnitureGenerationResult> {
+export async function generateFurniture(
+  input: FurnitureGenerateInput,
+  onProgress?: (progress: FurnitureGenerationProgress) => void,
+): Promise<FurnitureGenerationResult> {
   return runFurnitureGeneration(
     "/api/home-furniture/events/agent.generate",
     input,
     input.locale === "zh-CN" ? "Home Furniture Agent 处理超时，请重试。" : "The Home Furniture Agent timed out. Please try again.",
+    onProgress,
   );
 }
 
@@ -235,11 +239,13 @@ export async function refineFurniture(
   locale: "en-US" | "zh-CN",
   controls: Partial<FurnitureGenerateInput>,
   description: string,
+  onProgress?: (progress: FurnitureGenerationProgress) => void,
 ): Promise<FurnitureGenerationResult> {
   return runFurnitureGeneration(
     "/api/home-furniture/events/agent.refine",
     { base_input: baseInput, locale, controls, description },
     locale === "zh-CN" ? "Home Furniture Agent 调整超时，请重试。" : "The Home Furniture Agent refinement timed out. Please try again.",
+    onProgress,
   );
 }
 
@@ -261,6 +267,7 @@ async function runFurnitureGeneration<TResult extends object = FurnitureGenerati
   endpoint: string,
   input: object,
   timeoutMessage: string,
+  onProgress?: (progress: FurnitureGenerationProgress) => void,
 ): Promise<TResult> {
   const deadline = Date.now() + 900_000;
   let jobToken: string | undefined;
@@ -276,6 +283,7 @@ async function runFurnitureGeneration<TResult extends object = FurnitureGenerati
         throw new Error("The Home Furniture Agent returned an invalid processing ticket.");
       }
       jobToken = result.job_token;
+      onProgress?.(result.progress ?? "analyzing");
       const delayMs = Math.min(10_000, Math.max(500, result.poll_after_ms || 3_000));
       await new Promise((resolveDelay) => window.setTimeout(resolveDelay, delayMs));
       continue;

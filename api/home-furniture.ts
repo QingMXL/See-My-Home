@@ -30,7 +30,6 @@ import {
   sendJson,
   temporaryBlobReadUrl,
 } from './_lib/common.js';
-import { createDimensionedOrthographicPng } from './_lib/furniture-drawing.js';
 import { assertFurnitureAgentResponse } from '../Home-Furniture-Agent/src/validation.js';
 
 export const config = { maxDuration: 300 };
@@ -328,6 +327,7 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
         expiresAt: Date.now() + 30 * 60 * 1000,
       }),
       poll_after_ms: 3_000,
+      progress: 'analyzing',
     });
     return;
   }
@@ -339,6 +339,7 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
       status: 'processing',
       job_token: signJob(job),
       poll_after_ms: 3_000,
+      progress: polled.progress,
     });
     return;
   }
@@ -590,6 +591,7 @@ async function orthographic(request: VercelRequest, response: VercelResponse): P
     if (!upstream.ok) throw new Error(`ZooWork ${view} orthographic artifact download failed (${upstream.status})`);
     return [view, Buffer.from(await upstream.arrayBuffer())] as const;
   }))) as Record<OrthographicView, Buffer>;
+  const { createDimensionedOrthographicPng } = await import('./_lib/furniture-drawing.js');
   const dimensionedPng = await createDimensionedOrthographicPng({
     sources: viewBuffers,
     spec: baseResponse.design_spec,

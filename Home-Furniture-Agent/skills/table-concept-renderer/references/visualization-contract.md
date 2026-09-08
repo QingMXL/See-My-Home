@@ -6,6 +6,8 @@ The request has two mutually exclusive modes.
 
 Generate one isolated product view on a quiet neutral studio background. When a sketch is present, preserve its camera viewpoint: viewing angle, elevation, visible faces, and framing should remain recognizably aligned with the sketch according to its source weight. Use a three-quarter view only when there is no sketch or the sketch itself uses that view. The complete table must be visible, with no room staging that hides its silhouette.
 
+Inspect each supplied source once before generation. After the concept raster is returned, materialize and publish it without a second `image` inspection; this avoids repeating visual analysis while preserving the source-led generation prompt. Keep strict post-generation inspection for orthographic geometry only.
+
 When both visual references exist, the output should be recognizably closer to the image with the higher `source_priority` value. Express this balance through the natural-language design prompt and validated specification only; do not invent numeric image-weight or control-strength arguments that the current image tool schema does not expose.
 
 ## Preserve

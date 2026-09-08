@@ -215,6 +215,7 @@ export const MESSAGES = {
   "gen.furn.reading": { en: "Reading your sketch and references", zh: "读取草图与参考图" },
   "gen.furn.interpreting": { en: "Interpreting materials and proportions", zh: "解析材质与比例" },
   "gen.furn.rendering": { en: "Generating the furniture render", zh: "生成家具效果图" },
+  "gen.furn.publishing": { en: "Preparing your finished image", zh: "整理并发布效果图" },
   "gen.furn.viewsReading": { en: "Reading the confirmed furniture render", zh: "读取已确认效果图" },
   "gen.furn.viewsDrawing": { en: "Drawing standard orthographic views", zh: "生成标准三视图" },
   "gen.furn.viewsDimensioning": { en: "Adding dimensions and annotations", zh: "添加尺寸与标注" },

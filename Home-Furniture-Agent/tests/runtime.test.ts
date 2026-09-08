@@ -85,18 +85,15 @@ test('starts a furniture turn and completes it through durable polling', async (
         { seq: 14, eventType: 'run.finished', payload: { status: 'succeeded' }, runId: 'run_async' },
       ] satisfies SessionEvent[];
     },
-    async listArtifacts() {
+    async getArtifact() {
       return {
-        artifacts: [{
-          artifact_id: 'art_async_001',
-          file_name: 'furniture_async_001_req_async_001_table.png',
-          source_path: '/workspace/artifacts/furniture_async_001/furniture_async_001_req_async_001_table.png',
-          content_type: 'image/png',
-          size: 1024,
-          status: 'ready',
-          run_id: 'run_async',
-        }],
-        has_more: false,
+        artifact_id: 'art_async_001',
+        file_name: 'furniture_async_001_req_async_001_table.png',
+        source_path: '/workspace/artifacts/furniture_async_001/furniture_async_001_req_async_001_table.png',
+        content_type: 'image/png',
+        size: 1024,
+        status: 'ready',
+        run_id: 'run_async',
       };
     },
   } as unknown as ZooworkClient;
@@ -108,12 +105,73 @@ test('starts a furniture turn and completes it through durable polling', async (
   const completed = await runtime.pollFurnitureTurn(conversation, request, started.postedSeq);
 
   assert.deepEqual(started, { postedSeq: 10 });
-  assert.deepEqual(pending, { status: 'processing', postedSeq: 10 });
+  assert.deepEqual(pending, { status: 'processing', postedSeq: 10, progress: 'analyzing' });
   assert.equal(completed.status, 'completed');
   if (completed.status === 'completed') {
     assert.equal(completed.result.response.request_id, request.request_id);
     assert.equal(completed.result.artifacts[0]?.artifactId, 'art_async_001');
   }
+});
+
+test('reports durable concept-render progress from ZooWork tool events', async () => {
+  let reads = 0;
+  const fakeClient = {
+    async listAllEvents() {
+      reads += 1;
+      const events: SessionEvent[] = [
+        { seq: 11, eventType: 'run.started', payload: {}, runId: 'run_progress' },
+        {
+          seq: 12,
+          eventType: 'agent.assistant',
+          payload: { message: { role: 'assistant', content: [{ type: 'text', text: 'Resolving the specification.' }] } },
+          runId: 'run_progress',
+        },
+      ];
+      if (reads >= 2) events.push({
+        seq: 13,
+        eventType: 'agent.tool',
+        payload: { phase: 'start', toolName: 'image_generate', toolCallId: 'tool_generate' },
+        runId: 'run_progress',
+      });
+      if (reads >= 3) events.push({
+        seq: 14,
+        eventType: 'agent.tool',
+        payload: { phase: 'start', toolName: 'media_materialize', toolCallId: 'tool_materialize' },
+        runId: 'run_progress',
+      });
+      return events;
+    },
+  } as unknown as ZooworkClient;
+  const runtime = new HomeFurnitureRuntime(fakeClient, 'agent_private_001');
+  const conversation = { agentId: 'agent_private_001', sessionId: 'session_progress' };
+
+  assert.equal((await runtime.pollFurnitureTurn(conversation, request, 10)).status, 'processing');
+  assert.deepEqual(await runtime.pollFurnitureTurn(conversation, request, 10), {
+    status: 'processing', postedSeq: 10, progress: 'rendering',
+  });
+  assert.deepEqual(await runtime.pollFurnitureTurn(conversation, request, 10), {
+    status: 'processing', postedSeq: 10, progress: 'publishing',
+  });
+});
+
+test('builds a compact sketch-led concept request without post-generation reinspection', async () => {
+  let postedContent = '';
+  const fakeClient = {
+    async postEvents(_agentId: string, _sessionId: string, events: { content?: string }[]) {
+      postedContent = events[0]?.content ?? '';
+      return { events: [{ id: 'event_concept', seq: 20, type: 'user.message', accepted: true }] };
+    },
+  } as unknown as ZooworkClient;
+  const runtime = new HomeFurnitureRuntime(fakeClient, 'agent_private_001');
+  await runtime.startFurnitureTurn(
+    { agentId: 'agent_private_001', sessionId: 'session_concept' },
+    { ...request, sketch_asset_ref: 'https://example.com/sketch.png', source_priority: { sketch: 1, inspiration: 0 } },
+  );
+
+  const posted = JSON.parse(postedContent) as { output_requirement: string };
+  assert.match(posted.output_requirement, /Preserve the sketch viewpoint, topology, proportions, component count, and placement/i);
+  assert.match(posted.output_requirement, /quality="high"/i);
+  assert.match(posted.output_requirement, /Do not call image to inspect the generated concept render a second time/i);
 });
 
 test('builds a strict single-view black-and-white orthographic request', async () => {

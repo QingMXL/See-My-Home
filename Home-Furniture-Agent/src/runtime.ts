@@ -56,8 +56,10 @@ export interface FurnitureTurnStart {
   postedSeq: number;
 }
 
+export type FurnitureTurnProgress = 'analyzing' | 'interpreting' | 'rendering' | 'publishing';
+
 export type FurnitureTurnPoll =
-  | { status: 'processing'; postedSeq: number }
+  | { status: 'processing'; postedSeq: number; progress: FurnitureTurnProgress }
   | { status: 'completed'; result: FurnitureTurnResult };
 
 export function orthographicProjectionQaPassed(
@@ -97,7 +99,8 @@ export class HomeFurnitureRuntime {
 
   async ensureRunning(): Promise<void> {
     const agent = await this.client.getAgent(this.agentId);
-    if (agent.status?.desired_state !== 'running') await this.client.startAgent(this.agentId);
+    if (agent.status?.desired_state === 'running') return;
+    await this.client.startAgent(this.agentId);
     await this.client.waitUntilRunning(this.agentId, { timeoutMs: 60_000 });
   }
 
@@ -132,9 +135,9 @@ export class HomeFurnitureRuntime {
     assertFurnitureTurnRequest(request);
     if (conversation.agentId !== this.agentId) throw new Error('conversation belongs to a different Agent');
     if (!Number.isSafeInteger(postedSeq) || postedSeq < 0) throw new Error('postedSeq is invalid');
-    const raw = await this.readDurableTurn(conversation.sessionId, postedSeq);
-    if (!raw) return { status: 'processing', postedSeq };
-    return { status: 'completed', result: await this.resultFromRaw(conversation.sessionId, request, raw) };
+    const durable = await this.readDurableTurn(conversation.sessionId, postedSeq);
+    if (!durable.result) return { status: 'processing', postedSeq, progress: durable.progress };
+    return { status: 'completed', result: await this.resultFromRaw(conversation.sessionId, request, durable.result) };
   }
 
   private async resultFromRaw(
@@ -220,24 +223,14 @@ export class HomeFurnitureRuntime {
           'Return one compact JSON object matching response_schema without Markdown fences. This is concept-level only, not fabrication-ready engineering.',
         ]
       : [
-          'Use table-design-spec, then table-concept-renderer in concept-render mode.',
+          'Use table-design-spec and table-concept-renderer in concept-render mode. Execute directly and avoid narrating intermediate work.',
           sources,
-          'Do not call any image URL more than once for inspection.',
-          'Treat only request.locked_controls as hard UI constraints. Unlocked design_controls are fallback suggestions; do not report a conflict merely because clear sketch or text evidence differs from an unlocked fallback.',
-          'When dimensions_mm is locked, use it unchanged. Otherwise infer coherent dimensions from explicit text first, then the visual sources, and only then the fallback dimensions.',
-          'Resolve a dimensionally coherent concept specification before generating.',
-          request.sketch_asset_ref
-            ? 'The sketch controls topology, component count and placement, proportions, and camera viewpoint according to source_priority. Match its viewing angle, elevation, visible faces, and framing; do not force a generic three-quarter view. Explicitly preserve every visible drawer, shelf, support, and handle unless a locked control overrides it.'
-            : 'With no sketch, use a clean readable three-quarter product view unless the written brief clearly requests another viewpoint.',
-          `Call image_generate exactly once with action="generate", a supported source image input when available, a clean isolated product-render prompt, quality="high", and filename="${filename}". Use only arguments exposed by the current tool schema; never invent provider, model, numeric image-weight, or control-strength fields.`,
-          'Do not ask the image model for orthographic drawings, dimensions, text, labels, logos, or a drawing sheet.',
+          'Inspect each provided source image exactly once before generation. Resolve one coherent specification using the authority and locked-control rules already supplied in this request.',
+          request.sketch_asset_ref ? 'Preserve the sketch viewpoint, topology, proportions, component count, and placement according to source_priority.' : 'Use a clean readable three-quarter product view unless the written brief requests another viewpoint.',
+          `Call image_generate exactly once with action="generate", the provided visual source input when available, a clean isolated product-render prompt, quality="high", and filename="${filename}".`,
           'After generation starts, call sessions_yield exactly once and end the waiting run.',
-          `In the attachment continuation, call media_materialize exactly once for the returned artifactId with path="/workspace/artifacts/${request.project_id}/${filename}". Inspect the materialized image exactly once.`,
-          'If the raster is missing, corrupt, not recognizably the requested table, or materially contradicts the validated major components, do not publish it and return failed with qa.publishable=false.',
-          'Otherwise call artifact_publish exactly once and return status=completed with its artifact id.',
-          'Treat absent sketch or inspiration QA as satisfied when that source was not provided.',
-          `Write every human-readable response field, including design_summary, questions, warnings, drawing_notes, material part/material/finish names, and component names, in ${request.locale === 'zh-CN' ? 'Simplified Chinese' : 'English'}. Keep schema keys, ids, enums, and numeric values unchanged.`,
-          'Return one compact JSON object matching response_schema without Markdown fences. This is concept-level only, not fabrication-ready engineering.',
+          `In the attachment continuation, call media_materialize exactly once for the returned artifactId with path="/workspace/artifacts/${request.project_id}/${filename}", then publish it exactly once. Do not call image to inspect the generated concept render a second time.`,
+          `Return one compact response_schema JSON object without Markdown fences. Use ${request.locale === 'zh-CN' ? 'Simplified Chinese' : 'English'} for human-readable fields, and never claim fabrication readiness.`,
         ];
     return [{
       type: 'user.message',
@@ -361,7 +354,10 @@ export class HomeFurnitureRuntime {
     return posted.seq;
   }
 
-  private async readDurableTurn(sessionId: string, postedSeq: number): Promise<RawTurnResult | null> {
+  private async readDurableTurn(
+    sessionId: string,
+    postedSeq: number,
+  ): Promise<{ result: RawTurnResult | null; progress: FurnitureTurnProgress }> {
     const events = await this.client.listAllEvents(this.agentId, sessionId, {
       types: ['run.started', 'run.finished', 'agent.assistant', 'agent.tool'],
     });
@@ -369,12 +365,16 @@ export class HomeFurnitureRuntime {
     const toolsBySeq = new Map<number, AgentToolTrace>();
     let runId: string | undefined;
     let outcome: RawTurnResult['outcome'] | undefined;
+    let progress: FurnitureTurnProgress = 'analyzing';
 
     for (const event of [...events].sort((left, right) => left.seq - right.seq)) {
       if (event.seq <= postedSeq) continue;
       if (event.eventType === 'run.started') runId = event.runId;
       const text = assistantText(event);
-      if (text) assistantBySeq.set(event.seq, text);
+      if (text) {
+        assistantBySeq.set(event.seq, text);
+        if (progress === 'analyzing') progress = 'interpreting';
+      }
       const call = toolCall(event);
       if (call) {
         toolsBySeq.set(event.seq, {
@@ -384,6 +384,8 @@ export class HomeFurnitureRuntime {
           ...(call.isError !== undefined ? { isError: call.isError } : {}),
           ...(call.resultPreview ? { resultPreview: call.resultPreview } : {}),
         });
+        if (call.toolName === 'image_generate') progress = 'rendering';
+        if (call.toolName === 'media_materialize' || call.toolName === 'artifact_publish') progress = 'publishing';
       }
       if (!isRunFinished(event)) continue;
       const candidate = runOutcome(event);
@@ -395,14 +397,14 @@ export class HomeFurnitureRuntime {
       }
     }
 
-    if (!outcome) return null;
+    if (!outcome) return { result: null, progress };
     const result: RawTurnResult = {
       text: [...assistantBySeq.entries()].sort(([a], [b]) => a - b).map(([, text]) => text).join(''),
       outcome,
       toolCalls: [...toolsBySeq.entries()].sort(([a], [b]) => a - b).map(([, call]) => call),
     };
     if (runId !== undefined) result.runId = runId;
-    return result;
+    return { result, progress };
   }
 
   private hasJson(messages: Map<number, string>): boolean {
@@ -431,6 +433,25 @@ export class HomeFurnitureRuntime {
         return typeof id === 'string' ? [id] : [];
       } catch { return []; }
     }));
+    if (publishedIds.size > 0) {
+      for (let attempt = 0; attempt < 12; attempt += 1) {
+        const matches = (await Promise.all([...publishedIds].map((artifactId) => (
+          this.client.getArtifact(this.agentId, artifactId)
+        )))).map((artifact) => ({
+          artifactId: artifact.artifact_id,
+          fileName: artifact.file_name ?? null,
+          contentType: artifact.content_type ?? null,
+          size: artifact.size ?? null,
+          status: artifact.status ?? null,
+          runId: artifact.run_id ?? null,
+        }));
+        if (matches.some((artifact) => artifact.status === 'ready')) return matches;
+        if (attempt < 11) await new Promise((resolve) => setTimeout(resolve, 750));
+      }
+      return [];
+    }
+
+    // Compatibility fallback for older runs whose artifact_publish preview omitted the id.
     for (let attempt = 0; attempt < 12; attempt += 1) {
       const page = await this.client.listArtifacts(this.agentId, { sessionId, limit: 100 });
       const matches = page.artifacts.filter((artifact) => (

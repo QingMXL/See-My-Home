@@ -164,6 +164,17 @@
   margin-bottom: var(--space-5);
 }
 
+.generating__title--timed {
+  margin-bottom: var(--space-2);
+}
+
+.generating__elapsed {
+  margin: 0 0 var(--space-5);
+  color: var(--color-ink-soft);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm);
+}
+
 .generating__steps {
   display: grid;
   gap: 0.65rem;
