@@ -264,4 +264,42 @@ describe("useDesignStore", () => {
     expect(persisted.furniture.prompt).toBe("");
     expect(persisted.furniture.refinementPrompt).toBe("");
   });
+
+  test("does not persist a bundled demo as a custom furniture result", () => {
+    useDesignStore.getState().setFurnitureUploadedAsset("sketch", DEMO_FURNITURE_SKETCH_ASSET);
+    useDesignStore.getState().setFurnitureAgentRun(createDemoFurnitureResult(demoInput));
+
+    const partialize = useDesignStore.persist.getOptions().partialize;
+    const persisted = partialize?.(useDesignStore.getState()) as ReturnType<typeof useDesignStore.getState>;
+
+    expect(persisted.furniture).toMatchObject({
+      projectId: null,
+      confirmed: false,
+      phase: "idle",
+      agentRun: null,
+      orthographicRun: null,
+    });
+  });
+
+  test("migrates a previously persisted bundled demo out of the custom workflow", async () => {
+    const migrate = useDesignStore.persist.getOptions().migrate;
+    const demoResult = createDemoFurnitureResult(demoInput);
+    const migrated = await migrate?.({
+      furniture: {
+        ...useDesignStore.getState().furniture,
+        projectId: demoResult.project_id,
+        phase: "done",
+        confirmed: true,
+        agentRun: demoResult,
+      },
+    }, 3) as ReturnType<typeof useDesignStore.getState>;
+
+    expect(migrated.furniture).toMatchObject({
+      projectId: null,
+      phase: "idle",
+      confirmed: false,
+      agentRun: null,
+      orthographicRun: null,
+    });
+  });
 });

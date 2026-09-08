@@ -449,64 +449,68 @@ export const useDesignStore = create<DesignStore>()(
       name: "see-my-home",
       // Keep completed Agent results addressable across a page refresh. Blob URLs,
       // in-flight upload adapters, and transient Agent errors are session-only.
-      partialize: (s): Pick<DesignStore, "saved" | "layout" | "style" | "furniture"> => ({
-        saved: s.saved,
-        layout: {
-          ...initialLayout,
-          fileName: s.layout.fileName,
-          rooms: s.layout.rooms,
-          excludedRooms: s.layout.excludedRooms ?? [],
-          lifestyleTags: s.layout.lifestyleTags,
-          specialConsiderations: s.layout.specialConsiderations,
-          phase: s.layout.phase === "done" ? "done" : "idle",
-          agentRun: s.layout.agentRun,
-          agentError: null,
-        },
-        style: {
-          ...initialStyle,
-          photoName: s.style.photoName,
-          roomType: s.style.roomType,
-          templateId: s.style.templateId,
-          phase: s.style.phase === "done" ? "done" : "idle",
-          agentRun: s.style.agentRun,
-          renderHistory: s.style.renderHistory,
-          refinements: s.style.refinements,
-          agentError: null,
-        },
-        furniture: {
-          ...initialFurniture,
-          projectId: s.furniture.projectId,
-          // Uploads are session-scoped. Persisting only their names creates a
-          // misleading "uploaded" source after the actual asset is gone.
-          sketchName: null,
-          inspirationName: null,
-          sketchWeight: s.furniture.sketchWeight ?? initialFurniture.sketchWeight,
-          tableType: s.furniture.tableType,
-          // Intake and refinement copy are session drafts. Reloading the intake
-          // should start from the localized example instead of restoring old text.
-          material: s.furniture.material,
-          secondaryMaterial: s.furniture.secondaryMaterial,
-          size: s.furniture.size,
-          legs: s.furniture.legs,
-          handles: s.furniture.handles,
-          shelves: s.furniture.shelves,
-          topShape: s.furniture.topShape,
-          edgeProfile: s.furniture.edgeProfile,
-          finish: s.furniture.finish,
-          lockedControls: s.furniture.lockedControls ?? [],
-          confirmed: s.furniture.confirmed,
-          phase: s.furniture.phase === "done" ? "done" : "idle",
-          agentRun: s.furniture.agentRun,
-          orthographicRun: s.furniture.orthographicRun ?? null,
-          agentError: null,
-        },
-      }),
-      version: 3,
+      partialize: (s): Pick<DesignStore, "saved" | "layout" | "style" | "furniture"> => {
+        const demoFurniture = s.furniture.agentRun?.generated_image.provider_model === "Pre-rendered demo";
+        return {
+          saved: s.saved,
+          layout: {
+            ...initialLayout,
+            fileName: s.layout.fileName,
+            rooms: s.layout.rooms,
+            excludedRooms: s.layout.excludedRooms ?? [],
+            lifestyleTags: s.layout.lifestyleTags,
+            specialConsiderations: s.layout.specialConsiderations,
+            phase: s.layout.phase === "done" ? "done" : "idle",
+            agentRun: s.layout.agentRun,
+            agentError: null,
+          },
+          style: {
+            ...initialStyle,
+            photoName: s.style.photoName,
+            roomType: s.style.roomType,
+            templateId: s.style.templateId,
+            phase: s.style.phase === "done" ? "done" : "idle",
+            agentRun: s.style.agentRun,
+            renderHistory: s.style.renderHistory,
+            refinements: s.style.refinements,
+            agentError: null,
+          },
+          furniture: {
+            ...initialFurniture,
+            projectId: demoFurniture ? null : s.furniture.projectId,
+            // Uploads are session-scoped. Persisting only their names creates a
+            // misleading "uploaded" source after the actual asset is gone.
+            sketchName: null,
+            inspirationName: null,
+            sketchWeight: s.furniture.sketchWeight ?? initialFurniture.sketchWeight,
+            tableType: s.furniture.tableType,
+            // Intake and refinement copy are session drafts. Reloading the intake
+            // should start from the localized example instead of restoring old text.
+            material: s.furniture.material,
+            secondaryMaterial: s.furniture.secondaryMaterial,
+            size: s.furniture.size,
+            legs: s.furniture.legs,
+            handles: s.furniture.handles,
+            shelves: s.furniture.shelves,
+            topShape: s.furniture.topShape,
+            edgeProfile: s.furniture.edgeProfile,
+            finish: s.furniture.finish,
+            lockedControls: s.furniture.lockedControls ?? [],
+            confirmed: demoFurniture ? false : s.furniture.confirmed,
+            phase: !demoFurniture && s.furniture.phase === "done" ? "done" : "idle",
+            agentRun: demoFurniture ? null : s.furniture.agentRun,
+            orthographicRun: demoFurniture ? null : s.furniture.orthographicRun ?? null,
+            agentError: null,
+          },
+        };
+      },
+      version: 4,
       migrate: (persistedState, version) => {
         const state = persistedState as Partial<Pick<DesignStore, "saved" | "layout" | "style" | "furniture">>;
         if (!state.furniture) {
           return state as Pick<DesignStore, "saved" | "layout" | "style" | "furniture">;
         }
+        const demoFurniture = state.furniture.agentRun?.generated_image.provider_model === "Pre-rendered demo";
         return {
           ...state,
           furniture: {
@@ -518,6 +522,14 @@ export const useDesignStore = create<DesignStore>()(
               inspirationName: null,
               inspirationUrl: null,
               inspirationAsset: null,
+            } : {}),
+            ...(version < 4 && demoFurniture ? {
+              projectId: null,
+              confirmed: false,
+              phase: "idle" as const,
+              stepIndex: 0,
+              agentRun: null,
+              orthographicRun: null,
             } : {}),
             prompt: "",
             refinementPrompt: "",
