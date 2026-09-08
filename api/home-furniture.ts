@@ -30,7 +30,6 @@ import {
   sendJson,
   temporaryBlobReadUrl,
 } from './_lib/common.js';
-import { createDimensionedOrthographicPng } from './_lib/furniture-drawing.js';
 import { assertFurnitureAgentResponse } from '../Home-Furniture-Agent/src/validation.js';
 
 export const config = { maxDuration: 300 };
@@ -45,10 +44,17 @@ const furnitureControlKeys = new Set<FurnitureControlKey>([
   'base_style', 'finish', 'storage', 'component_notes',
 ]);
 
+let cachedRuntime: HomeFurnitureRuntime | undefined;
+let cachedRuntimeAgentId: string | undefined;
+
 function runtime(): HomeFurnitureRuntime {
   const agentId = process.env.ZOOWORK_FURNITURE_AGENT_ID?.trim();
   if (!agentId) throw new Error('ZOOWORK_FURNITURE_AGENT_ID is not configured on Vercel');
-  return HomeFurnitureRuntime.fromEnvironment({ agentId, turnTimeoutMs: 760_000 });
+  if (!cachedRuntime || cachedRuntimeAgentId !== agentId) {
+    cachedRuntime = HomeFurnitureRuntime.fromEnvironment({ agentId, turnTimeoutMs: 760_000 });
+    cachedRuntimeAgentId = agentId;
+  }
+  return cachedRuntime;
 }
 
 async function uploadToken(request: VercelRequest, response: VercelResponse): Promise<void> {
@@ -293,8 +299,14 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
     throw new Error('job_token does not match this request');
   }
 
-  const sketchRef = sketchBlobUrl ? await temporaryBlobReadUrl(sketchBlobUrl) : undefined;
-  const inspirationRef = inspirationBlobUrl ? await temporaryBlobReadUrl(inspirationBlobUrl) : undefined;
+  // ZooWork only needs signed source URLs when a turn is posted. Durable polls
+  // validate the same request shape but never fetch the source images again.
+  const sketchRef = sketchBlobUrl
+    ? job ? sketchBlobUrl : await temporaryBlobReadUrl(sketchBlobUrl)
+    : undefined;
+  const inspirationRef = inspirationBlobUrl
+    ? job ? inspirationBlobUrl : await temporaryBlobReadUrl(inspirationBlobUrl)
+    : undefined;
   const zoo = runtime();
   const requestId = job?.requestId ?? newId('req');
   const turn: FurnitureTurnRequest = {
@@ -451,7 +463,9 @@ async function orthographic(request: VercelRequest, response: VercelResponse): P
 
   const zoo = runtime();
   const requestId = job?.requestId ?? newId('ortho');
-  const renderAssetRef = await temporaryBlobReadUrl(renderBlobUrl);
+  // The confirmed render is fetched only when a view turn starts. Reusing the
+  // private canonical URL while polling avoids signing the same Blob repeatedly.
+  const renderAssetRef = job ? renderBlobUrl : await temporaryBlobReadUrl(renderBlobUrl);
 
   if (!job) {
     await zoo.ensureRunning();
@@ -520,6 +534,7 @@ async function orthographic(request: VercelRequest, response: VercelResponse): P
 
   const nextParts: OrthographicJobPart[] = [];
   let startedRetry = false;
+  let retryRenderAssetRef: string | undefined;
   for (const polledPart of polledParts) {
     if (polledPart.status === 'ready') {
       nextParts.push({ ...polledPart.part, artifactId: polledPart.artifactId });
@@ -541,12 +556,13 @@ async function orthographic(request: VercelRequest, response: VercelResponse): P
       agentStatus: polledPart.result.response.status,
     }));
     const retryRequestId = newId(`ortho_${polledPart.part.view}_retry`);
+    retryRenderAssetRef ??= await temporaryBlobReadUrl(renderBlobUrl);
     const retryTurn = orthographicTurn({
       requestId: retryRequestId,
       projectId,
       locale,
       tableType,
-      renderAssetRef,
+      renderAssetRef: retryRenderAssetRef,
       spec: baseResponse.design_spec,
       summary: baseResponse.design_summary,
       view: polledPart.part.view,
@@ -590,6 +606,9 @@ async function orthographic(request: VercelRequest, response: VercelResponse): P
     if (!upstream.ok) throw new Error(`ZooWork ${view} orthographic artifact download failed (${upstream.status})`);
     return [view, Buffer.from(await upstream.arrayBuffer())] as const;
   }))) as Record<OrthographicView, Buffer>;
+  // Sharp, OpenType and the engineering font are needed only for this final
+  // composition step, not for uploads, renders, refinements, or status polls.
+  const { createDimensionedOrthographicPng } = await import('./_lib/furniture-drawing.js');
   const dimensionedPng = await createDimensionedOrthographicPng({
     sources: viewBuffers,
     spec: baseResponse.design_spec,

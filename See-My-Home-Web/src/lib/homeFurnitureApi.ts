@@ -36,7 +36,7 @@ export interface UploadedFurnitureAsset {
   file_name: string;
   mime_type: "image/jpeg" | "image/png" | "image/webp";
   size_bytes: number;
-  sha256: string;
+  sha256?: string;
   storage: "application_backend" | "vercel_blob";
   image_processing_status: "uploaded";
   source_url?: string;
@@ -184,8 +184,6 @@ export async function uploadFurnitureImage(
       contentType: file.type || "application/octet-stream",
       multipart: file.size > 4 * 1024 * 1024,
     });
-    const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
-    const sha256 = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
     return {
       project_id: projectId,
       asset_id: blob.url,
@@ -194,7 +192,6 @@ export async function uploadFurnitureImage(
       file_name: file.name,
       mime_type: file.type as UploadedFurnitureAsset["mime_type"],
       size_bytes: file.size,
-      sha256,
       storage: "vercel_blob",
       image_processing_status: "uploaded",
     };

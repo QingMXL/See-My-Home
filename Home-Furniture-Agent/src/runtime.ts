@@ -97,7 +97,8 @@ export class HomeFurnitureRuntime {
 
   async ensureRunning(): Promise<void> {
     const agent = await this.client.getAgent(this.agentId);
-    if (agent.status?.desired_state !== 'running') await this.client.startAgent(this.agentId);
+    if (agent.status?.desired_state === 'running') return;
+    await this.client.startAgent(this.agentId);
     await this.client.waitUntilRunning(this.agentId, { timeoutMs: 60_000 });
   }
 
@@ -431,6 +432,27 @@ export class HomeFurnitureRuntime {
         return typeof id === 'string' ? [id] : [];
       } catch { return []; }
     }));
+
+    if (publishedIds.size > 0) {
+      for (let attempt = 0; attempt < 12; attempt += 1) {
+        const matches = (await Promise.all([...publishedIds].map((artifactId) => (
+          this.client.getArtifact(this.agentId, artifactId)
+        )))).map((artifact) => ({
+          artifactId: artifact.artifact_id,
+          fileName: artifact.file_name ?? null,
+          contentType: artifact.content_type ?? null,
+          size: artifact.size ?? null,
+          status: artifact.status ?? null,
+          runId: artifact.run_id ?? null,
+        }));
+        if (matches.some((artifact) => artifact.status === 'ready')) return matches;
+        if (attempt < 11) await new Promise((resolve) => setTimeout(resolve, 750));
+      }
+      return [];
+    }
+
+    // Older Agent responses may not expose artifact_publish's id in resultPreview.
+    // Keep the session-scoped list as a compatibility fallback for those turns.
     for (let attempt = 0; attempt < 12; attempt += 1) {
       const page = await this.client.listArtifacts(this.agentId, { sessionId, limit: 100 });
       const matches = page.artifacts.filter((artifact) => (
