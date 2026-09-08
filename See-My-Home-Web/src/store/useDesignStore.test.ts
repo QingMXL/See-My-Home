@@ -189,6 +189,19 @@ describe("useDesignStore", () => {
       inspirationName: null,
       inspirationUrl: null,
       inspirationAsset: null,
+      prompt: "",
+      refinementPrompt: "",
     });
+  });
+
+  test("does not persist furniture prompt drafts across a page reload", () => {
+    useDesignStore.getState().setFurniturePrompt("Do not keep this draft.");
+    useDesignStore.getState().setFurnitureRefinementPrompt("Nor this refinement.");
+
+    const partialize = useDesignStore.persist.getOptions().partialize;
+    const persisted = partialize?.(useDesignStore.getState()) as ReturnType<typeof useDesignStore.getState>;
+
+    expect(persisted.furniture.prompt).toBe("");
+    expect(persisted.furniture.refinementPrompt).toBe("");
   });
 });

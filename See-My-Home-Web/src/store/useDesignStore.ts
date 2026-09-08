@@ -476,8 +476,8 @@ export const useDesignStore = create<DesignStore>()(
           inspirationName: null,
           sketchWeight: s.furniture.sketchWeight ?? initialFurniture.sketchWeight,
           tableType: s.furniture.tableType,
-          prompt: s.furniture.prompt,
-          refinementPrompt: s.furniture.refinementPrompt ?? "",
+          // Intake and refinement copy are session drafts. Reloading the intake
+          // should start from the localized example instead of restoring old text.
           material: s.furniture.material,
           secondaryMaterial: s.furniture.secondaryMaterial,
           size: s.furniture.size,
@@ -495,22 +495,26 @@ export const useDesignStore = create<DesignStore>()(
           agentError: null,
         },
       }),
-      version: 2,
+      version: 3,
       migrate: (persistedState, version) => {
         const state = persistedState as Partial<Pick<DesignStore, "saved" | "layout" | "style" | "furniture">>;
-        if (version >= 2 || !state.furniture) {
+        if (!state.furniture) {
           return state as Pick<DesignStore, "saved" | "layout" | "style" | "furniture">;
         }
         return {
           ...state,
           furniture: {
             ...state.furniture,
-            sketchName: null,
-            sketchUrl: null,
-            sketchAsset: null,
-            inspirationName: null,
-            inspirationUrl: null,
-            inspirationAsset: null,
+            ...(version < 2 ? {
+              sketchName: null,
+              sketchUrl: null,
+              sketchAsset: null,
+              inspirationName: null,
+              inspirationUrl: null,
+              inspirationAsset: null,
+            } : {}),
+            prompt: "",
+            refinementPrompt: "",
           },
         } as Pick<DesignStore, "saved" | "layout" | "style" | "furniture">;
       },

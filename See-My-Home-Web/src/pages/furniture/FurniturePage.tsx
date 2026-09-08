@@ -137,6 +137,10 @@ export function FurniturePage() {
     en: "A furniture concept generated from your confirmed inputs and adjustments.",
     zh: "已根据你确认的输入和调整生成家具概念方案。",
   }) : "";
+  const promptExample = copy(
+    "Example: A 1800 × 900 × 750 mm dining table with curved legs, softly rounded edges, and solid walnut. Keep the top thin and the silhouette simple.",
+    "例如：一张 1800 × 900 × 750 mm 的餐桌，弧形桌腿、圆角边缘、胡桃木实木；桌面保持轻薄，整体轮廓简洁。",
+  );
 
   const makeInput = (description: string): FurnitureGenerateInput => ({
     project_id: furniture.projectId ?? `furniture_${crypto.randomUUID()}`,
@@ -357,7 +361,7 @@ export function FurniturePage() {
           </div>
           <div className="input-panel__prompt">
             <label htmlFor="furniture-prompt" className="tag-group__name">{t("furn.prompt")}</label>
-            <textarea id="furniture-prompt" rows={5} value={furniture.prompt} onChange={(event) => setFurniturePrompt(event.target.value)} placeholder={copy("Describe the table, key features, dimensions, and what must stay unchanged.", "描述桌子的用途、关键造型、尺寸，以及哪些部分必须保留。")}/>
+            <textarea id="furniture-prompt" rows={5} value={furniture.prompt} onChange={(event) => setFurniturePrompt(event.target.value)} placeholder={promptExample}/>
           </div>
           <Button full size="lg" onClick={() => onGenerate(false)} disabled={!canGenerate || furniture.phase === "generating"}><Sparkle />{t("furn.generate")}</Button>
           {furniture.agentError && <p className="furniture-error" role="alert">{furniture.agentError}</p>}
@@ -389,7 +393,7 @@ export function FurniturePage() {
               )}
               <div className="input-summary__brief">
                 <strong>{copy("Original brief", "原始描述")}</strong>
-                <p>{furniture.prompt || copy("No written description", "未填写文字描述")}</p>
+                <p>{generated?.request_context?.description || furniture.prompt || copy("No written description", "未填写文字描述")}</p>
               </div>
             </div>
           </aside>

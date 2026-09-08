@@ -269,13 +269,14 @@
 .furniture-grid--render {
   --furniture-stage-height: clamp(38rem, calc(100vh - 14.5rem), 48rem);
   display: grid;
-  grid-template-columns: minmax(14.5rem, 0.85fr) minmax(27rem, 2.15fr) minmax(18rem, 1fr);
+  grid-template-columns: minmax(14rem, 0.8fr) minmax(27rem, 2.25fr) minmax(16.5rem, 0.95fr);
   gap: var(--space-5);
   align-items: stretch;
 }
 
 .furniture-grid--render > .card {
   height: var(--furniture-stage-height);
+  min-width: 0;
   min-height: 0;
 }
 
@@ -284,6 +285,8 @@
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   gap: var(--space-4);
+  max-width: 100%;
+  min-width: 0;
   overflow: hidden;
 }
 
@@ -317,7 +320,10 @@
 
 .input-summary-panel__body,
 .refine-panel__body {
+  width: 100%;
+  min-width: 0;
   min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
@@ -557,7 +563,14 @@
 
 .refine-panel--stage > header {
   display: grid;
+  min-width: 0;
   gap: 0.35rem;
+}
+
+.refine-panel--stage > header > *,
+.refine-panel__hint {
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .refine-panel__body {
@@ -565,6 +578,16 @@
   align-content: start;
   gap: var(--space-5);
   padding-right: 0.2rem;
+}
+
+.material-picker,
+.refine-request,
+.advanced-controls,
+.refine-list,
+.refine-list li {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .material-picker {
@@ -577,7 +600,7 @@
 
 .material-picker > div {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(4.75rem, 1fr));
   gap: 0.45rem;
 }
 
@@ -653,12 +676,15 @@
 
 .refine-list select {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-md);
   padding: 0.6rem 0.7rem;
   color: var(--color-ink);
   background: var(--color-surface);
   font-size: var(--text-sm);
+  text-overflow: ellipsis;
 }
 
 /* Independent drawings stage. */

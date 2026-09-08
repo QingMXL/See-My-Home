@@ -37,13 +37,14 @@ function viewSource(width: number, height: number, inset: number): Buffer {
   `);
 }
 
-test('builds simple overall dimensions as vector paths without relying on server fonts', () => {
+test('builds engineering labels and dimensions with a real sans-serif font stack', () => {
   const svg = buildDimensionAnnotationSvg({ frames, spec });
-  for (const expected of ['FRONT', 'SIDE', 'TOP', 'W 1500 MM', 'D 600 MM', 'H 1000 MM']) {
+  for (const expected of ['FRONT ELEVATION', 'SIDE ELEVATION', 'TOP VIEW', '1500 mm', '600 mm', '1000 mm', '36 mm', 'Unit: mm']) {
     assert.match(svg, new RegExp(expected));
   }
-  assert.doesNotMatch(svg, /<text\b/);
-  assert.doesNotMatch(svg, /font-family|Arial|Helvetica/);
+  assert.match(svg, /<text\b/);
+  assert.match(svg, /font-family: Arial, Helvetica, sans-serif/);
+  assert.match(svg, /class="extension-line"/);
 });
 
 test('exports one black-and-white PNG composed from three independent views', async () => {
@@ -55,12 +56,12 @@ test('exports one black-and-white PNG composed from three independent views', as
   const output = await createDimensionedOrthographicPng({ sources, spec });
   assert.deepEqual([...output.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
   const metadata = await sharp(output).metadata();
-  assert.equal(metadata.width, 2400);
-  assert.equal(metadata.height, 1000);
+  assert.equal(metadata.width, 3840);
+  assert.equal(metadata.height, 2160);
   assert.ok(output.byteLength > 5_000);
 });
 
-test('keeps generated view aspect ratios instead of stretching them to confirmed ratios', async () => {
+test('normalizes the three panels to one shared confirmed-dimension scale', async () => {
   assert.deepEqual(orthographicTargetRatios(spec), [1.5, 0.6, 2.5]);
   const sources = {
     front: viewSource(1000, 400, 40),
@@ -68,8 +69,12 @@ test('keeps generated view aspect ratios instead of stretching them to confirmed
     top: viewSource(900, 300, 40),
   } satisfies Record<OrthographicView, Buffer>;
   const output = await createDimensionedOrthographicPng({ sources, spec });
-  const frontPanel = await sharp(output).extract({ left: 0, top: 90, width: 800, height: 680 }).greyscale().raw().toBuffer({ resolveWithObject: true });
+  const frontPanel = await sharp(output).extract({ left: 800, top: 250, width: 1100, height: 700 }).greyscale().raw().toBuffer({ resolveWithObject: true });
+  const sidePanel = await sharp(output).extract({ left: 2850, top: 250, width: 650, height: 700 }).greyscale().raw().toBuffer({ resolveWithObject: true });
+  const topPanel = await sharp(output).extract({ left: 800, top: 1250, width: 1100, height: 600 }).greyscale().raw().toBuffer({ resolveWithObject: true });
   assert.ok(frontPanel.data.some((value) => value < 128));
+  assert.ok(sidePanel.data.some((value) => value < 128));
+  assert.ok(topPanel.data.some((value) => value < 128));
 });
 
 test('rejects an almost empty generated view before publishing the sheet', async () => {

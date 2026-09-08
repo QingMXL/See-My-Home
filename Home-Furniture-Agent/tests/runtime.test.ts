@@ -138,7 +138,8 @@ test('builds a strict single-view black-and-white orthographic request', async (
 
   await runtime.startFurnitureTurn({ agentId: 'agent_private_001', sessionId: 'session_ortho' }, orthographicRequest);
 
-  assert.match(postedContent, /pure white background with crisp solid-black technical outlines/i);
+  assert.match(postedContent, /visible outer silhouette noticeably heavier than internal component edges/i);
+  assert.match(postedContent, /standard furniture shop-drawing sheet/i);
   assert.match(postedContent, /width 1800 mm, depth 900 mm, and height 750 mm/i);
   assert.match(postedContent, /single full-object front orthographic line view/i);
   assert.match(postedContent, /do not make a three-panel sheet/i);

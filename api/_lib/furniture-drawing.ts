@@ -1,14 +1,15 @@
 import sharp, { type OverlayOptions } from 'sharp';
 import type { FurnitureDesignSpec, OrthographicView } from '../../Home-Furniture-Agent/src/contracts.js';
 
-const SHEET_WIDTH = 2400;
-const SHEET_HEIGHT = 1000;
-const PANEL_WIDTH = SHEET_WIDTH / 3;
-const DRAWING_TOP = 105;
-const DRAWING_HEIGHT = 650;
-const MAX_VIEW_WIDTH = 620;
-const MAX_VIEW_HEIGHT = 570;
+export const ORTHOGRAPHIC_SHEET_WIDTH = 3840;
+export const ORTHOGRAPHIC_SHEET_HEIGHT = 2160;
+
 const VIEW_ORDER: OrthographicView[] = ['front', 'side', 'top'];
+const VIEW_AREAS = [
+  { left: 220, top: 280, width: 2300, height: 620 },
+  { left: 2740, top: 280, width: 880, height: 620 },
+  { left: 220, top: 1180, width: 2300, height: 720 },
+] as const;
 
 export type OrthographicImageSources = Record<OrthographicView, Buffer>;
 
@@ -25,50 +26,23 @@ interface PreparedView {
   height: number;
 }
 
-const GLYPHS: Record<string, string[]> = {
-  ' ': ['000', '000', '000', '000', '000', '000', '000'],
-  '0': ['111', '101', '101', '101', '101', '101', '111'],
-  '1': ['010', '110', '010', '010', '010', '010', '111'],
-  '2': ['111', '001', '001', '111', '100', '100', '111'],
-  '3': ['111', '001', '001', '111', '001', '001', '111'],
-  '4': ['101', '101', '101', '111', '001', '001', '001'],
-  '5': ['111', '100', '100', '111', '001', '001', '111'],
-  '6': ['111', '100', '100', '111', '101', '101', '111'],
-  '7': ['111', '001', '001', '010', '010', '010', '010'],
-  '8': ['111', '101', '101', '111', '101', '101', '111'],
-  '9': ['111', '101', '101', '111', '001', '001', '111'],
-  A: ['010', '101', '101', '111', '101', '101', '101'],
-  D: ['110', '101', '101', '101', '101', '101', '110'],
-  E: ['111', '100', '100', '110', '100', '100', '111'],
-  F: ['111', '100', '100', '110', '100', '100', '100'],
-  H: ['101', '101', '101', '111', '101', '101', '101'],
-  I: ['111', '010', '010', '010', '010', '010', '111'],
-  M: ['10001', '11011', '10101', '10101', '10001', '10001', '10001'],
-  N: ['1001', '1101', '1101', '1011', '1011', '1001', '1001'],
-  O: ['111', '101', '101', '101', '101', '101', '111'],
-  P: ['110', '101', '101', '110', '100', '100', '100'],
-  R: ['110', '101', '101', '110', '101', '101', '101'],
-  S: ['111', '100', '100', '111', '001', '001', '111'],
-  T: ['111', '010', '010', '010', '010', '010', '010'],
-  W: ['10001', '10001', '10001', '10101', '10101', '11011', '10001'],
-};
+function escapeXml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;');
+}
 
-function vectorLabel(text: string, x: number, y: number, cell: number, anchor: 'start' | 'middle' = 'start', rotate = 0): string {
-  const glyphs = [...text.toUpperCase()].map((character) => GLYPHS[character] ?? GLYPHS[' ']!);
-  const advances = glyphs.map((glyph) => (glyph[0]?.length ?? 3) + 1);
-  const totalCells = advances.reduce((sum, advance) => sum + advance, 0) - 1;
-  const offset = anchor === 'middle' ? -totalCells * cell / 2 : 0;
-  let cursor = offset;
-  const pixels: string[] = [];
-  glyphs.forEach((glyph, glyphIndex) => {
-    glyph.forEach((row, rowIndex) => {
-      [...row].forEach((pixel, columnIndex) => {
-        if (pixel === '1') pixels.push(`<rect x="${cursor + columnIndex * cell}" y="${rowIndex * cell}" width="${cell}" height="${cell}"/>`);
-      });
-    });
-    cursor += advances[glyphIndex]! * cell;
-  });
-  return `<g data-label="${text}" transform="translate(${x} ${y}) rotate(${rotate})" fill="#111">${pixels.join('')}</g>`;
+function textLabel(
+  value: string,
+  x: number,
+  y: number,
+  className: 'view-title' | 'dimension-text' | 'unit-text',
+  anchor: 'start' | 'middle' | 'end' = 'start',
+): string {
+  return `<text x="${x}" y="${y}" class="${className}" text-anchor="${anchor}">${escapeXml(value)}</text>`;
 }
 
 export function orthographicTargetRatios(spec: FurnitureDesignSpec): [number, number, number] {
@@ -79,10 +53,10 @@ export function orthographicTargetRatios(spec: FurnitureDesignSpec): [number, nu
 async function prepareView(source: Buffer, view: OrthographicView): Promise<PreparedView> {
   const monochrome = await sharp(source, { failOn: 'error' })
     .rotate()
-    .resize({ width: 1400, height: 1400, fit: 'inside', withoutEnlargement: true })
+    .resize({ width: 1800, height: 1800, fit: 'inside', withoutEnlargement: true })
     .flatten({ background: '#ffffff' })
     .greyscale()
-    .threshold(242)
+    .threshold(240)
     .png()
     .toBuffer();
   const trimmed = await sharp(monochrome)
@@ -102,43 +76,81 @@ async function prepareView(source: Buffer, view: OrthographicView): Promise<Prep
   return { data: trimmed.data, width: trimmed.info.width, height: trimmed.info.height };
 }
 
-function fittedFrame(view: PreparedView, index: number): OrthographicViewFrame {
-  const scale = Math.min(MAX_VIEW_WIDTH / view.width, MAX_VIEW_HEIGHT / view.height);
-  const width = Math.max(48, Math.round(view.width * scale));
-  const height = Math.max(48, Math.round(view.height * scale));
-  return {
-    left: Math.round(index * PANEL_WIDTH + (PANEL_WIDTH - width) / 2),
-    top: Math.round(DRAWING_TOP + (DRAWING_HEIGHT - height) / 2),
-    width,
-    height,
-  };
+function drawingScale(spec: FurnitureDesignSpec): number {
+  const { width, depth, height } = spec.dimensions_mm;
+  const candidates = [
+    VIEW_AREAS[0].width / width,
+    VIEW_AREAS[0].height / height,
+    VIEW_AREAS[1].width / depth,
+    VIEW_AREAS[1].height / height,
+    VIEW_AREAS[2].width / width,
+    VIEW_AREAS[2].height / depth,
+  ];
+  return Math.max(0.12, Math.min(...candidates));
+}
+
+function targetFrames(spec: FurnitureDesignSpec): OrthographicViewFrame[] {
+  const { width, depth, height } = spec.dimensions_mm;
+  const scale = drawingScale(spec);
+  const targetSizes = [
+    { width: Math.round(width * scale), height: Math.round(height * scale) },
+    { width: Math.round(depth * scale), height: Math.round(height * scale) },
+    { width: Math.round(width * scale), height: Math.round(depth * scale) },
+  ];
+
+  return targetSizes.map((size, index) => {
+    const area = VIEW_AREAS[index]!;
+    return {
+      left: Math.round(area.left + (area.width - size.width) / 2),
+      top: index === 2
+        ? Math.round(area.top + (area.height - size.height) / 2)
+        : area.top + area.height - size.height,
+      width: Math.max(64, size.width),
+      height: Math.max(64, size.height),
+    };
+  });
 }
 
 function horizontalDimension(frame: OrthographicViewFrame, label: string): string {
   const x1 = frame.left;
   const x2 = frame.left + frame.width;
-  const y = Math.min(SHEET_HEIGHT - 70, frame.top + frame.height + 48);
+  const y = Math.max(110, frame.top - 92);
   const middle = (x1 + x2) / 2;
-  const arrow = 10;
+  const arrow = 18;
   return [
-    `<path d="M ${x1} ${frame.top + frame.height + 7} V ${y - 9} M ${x2} ${frame.top + frame.height + 7} V ${y - 9}" class="dim"/>`,
-    `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" class="dim"/>`,
-    `<path d="M ${x1} ${y} l ${arrow} -6 M ${x1} ${y} l ${arrow} 6 M ${x2} ${y} l -${arrow} -6 M ${x2} ${y} l -${arrow} 6" class="dim"/>`,
-    vectorLabel(label, middle, y + 17, 3, 'middle'),
+    `<path d="M ${x1} ${frame.top - 12} V ${y - 18} M ${x2} ${frame.top - 12} V ${y - 18}" class="extension-line"/>`,
+    `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" class="dimension-line"/>`,
+    `<path d="M ${x1} ${y} l ${arrow} -9 v 18 z M ${x2} ${y} l -${arrow} -9 v 18 z" class="arrowhead"/>`,
+    textLabel(label, middle, y - 20, 'dimension-text', 'middle'),
   ].join('');
 }
 
-function verticalDimension(frame: OrthographicViewFrame, panelRight: number, label: string): string {
+function verticalDimension(frame: OrthographicViewFrame, label: string): string {
   const y1 = frame.top;
   const y2 = frame.top + frame.height;
-  const x = Math.min(panelRight - 28, frame.left + frame.width + 44);
+  const x = frame.left - 92;
   const middle = (y1 + y2) / 2;
-  const arrow = 10;
+  const arrow = 18;
   return [
-    `<path d="M ${frame.left + frame.width + 7} ${y1} H ${x - 9} M ${frame.left + frame.width + 7} ${y2} H ${x - 9}" class="dim"/>`,
-    `<line x1="${x}" y1="${y1}" x2="${x}" y2="${y2}" class="dim"/>`,
-    `<path d="M ${x} ${y1} l -6 ${arrow} M ${x} ${y1} l 6 ${arrow} M ${x} ${y2} l -6 -${arrow} M ${x} ${y2} l 6 -${arrow}" class="dim"/>`,
-    vectorLabel(label, x - 17, middle, 3, 'middle', -90),
+    `<path d="M ${frame.left - 12} ${y1} H ${x + 18} M ${frame.left - 12} ${y2} H ${x + 18}" class="extension-line"/>`,
+    `<line x1="${x}" y1="${y1}" x2="${x}" y2="${y2}" class="dimension-line"/>`,
+    `<path d="M ${x} ${y1} l -9 ${arrow} h 18 z M ${x} ${y2} l -9 -${arrow} h 18 z" class="arrowhead"/>`,
+    textLabel(label, x - 24, middle + 14, 'dimension-text', 'end'),
+  ].join('');
+}
+
+function topThicknessDimension(frame: OrthographicViewFrame, spec: FurnitureDesignSpec): string {
+  const thickness = Math.max(1, Math.round(spec.top.thickness_mm));
+  const overallHeight = Math.max(1, spec.dimensions_mm.height);
+  const drawnThickness = Math.max(18, Math.min(90, Math.round(frame.height * thickness / overallHeight)));
+  const x = frame.left + frame.width + 80;
+  const y1 = frame.top;
+  const y2 = frame.top + drawnThickness;
+  return [
+    `<path d="M ${frame.left + frame.width + 12} ${y1} H ${x - 18} M ${frame.left + frame.width + 12} ${y2} H ${x - 18}" class="extension-line"/>`,
+    `<line x1="${x}" y1="${y1}" x2="${x}" y2="${y2}" class="dimension-line"/>`,
+    `<path d="M ${x} ${y1} l -7 14 h 14 z M ${x} ${y2} l -7 -14 h 14 z" class="arrowhead"/>`,
+    textLabel(`${thickness} mm`, x + 22, (y1 + y2) / 2 + 13, 'dimension-text'),
   ].join('');
 }
 
@@ -147,22 +159,39 @@ export function buildDimensionAnnotationSvg(input: {
   spec: FurnitureDesignSpec;
 }): string {
   const { frames, spec } = input;
+  const [front, side, top] = frames;
+  if (!front || !side || !top) throw new Error('Three orthographic frames are required');
   const { width, depth, height } = spec.dimensions_mm;
-  const titles = ['FRONT', 'SIDE', 'TOP'];
-  const horizontal = [`W ${width} MM`, `D ${depth} MM`, `W ${width} MM`];
-  const vertical = [`H ${height} MM`, `H ${height} MM`, `D ${depth} MM`];
-  const labels = titles.map((title, index) => vectorLabel(title, index * PANEL_WIDTH + PANEL_WIDTH / 2, 42, 5, 'middle')).join('');
-  const dimensions = frames.map((frame, index) => [
-    horizontalDimension(frame, horizontal[index]!),
-    verticalDimension(frame, (index + 1) * PANEL_WIDTH, vertical[index]!),
-  ].join('')).join('');
+  const titles = [
+    textLabel('FRONT ELEVATION', front.left + front.width / 2, front.top + front.height + 72, 'view-title', 'middle'),
+    textLabel('SIDE ELEVATION', side.left + side.width / 2, side.top + side.height + 72, 'view-title', 'middle'),
+    textLabel('TOP VIEW', top.left + top.width / 2, top.top + top.height + 72, 'view-title', 'middle'),
+  ].join('');
+  const dimensions = [
+    horizontalDimension(front, `${width} mm`),
+    verticalDimension(front, `${height} mm`),
+    horizontalDimension(side, `${depth} mm`),
+    verticalDimension(side, `${height} mm`),
+    horizontalDimension(top, `${width} mm`),
+    verticalDimension(top, `${depth} mm`),
+    topThicknessDimension(side, spec),
+  ].join('');
+
   return `
-  <svg xmlns="http://www.w3.org/2000/svg" width="${SHEET_WIDTH}" height="${SHEET_HEIGHT}" viewBox="0 0 ${SHEET_WIDTH} ${SHEET_HEIGHT}">
-    <style>.dim { fill: none; stroke: #111; stroke-width: 3; stroke-linecap: square; }</style>
-    <!-- FRONT SIDE TOP W ${width} MM D ${depth} MM H ${height} MM -->
-    <line x1="${PANEL_WIDTH}" y1="28" x2="${PANEL_WIDTH}" y2="${SHEET_HEIGHT - 28}" stroke="#dedede" stroke-width="2"/>
-    <line x1="${PANEL_WIDTH * 2}" y1="28" x2="${PANEL_WIDTH * 2}" y2="${SHEET_HEIGHT - 28}" stroke="#dedede" stroke-width="2"/>
-    ${labels}${dimensions}
+  <svg xmlns="http://www.w3.org/2000/svg" width="${ORTHOGRAPHIC_SHEET_WIDTH}" height="${ORTHOGRAPHIC_SHEET_HEIGHT}" viewBox="0 0 ${ORTHOGRAPHIC_SHEET_WIDTH} ${ORTHOGRAPHIC_SHEET_HEIGHT}">
+    <style>
+      text { font-family: Arial, Helvetica, sans-serif; fill: #111; }
+      .view-title { font-size: 42px; font-weight: 500; letter-spacing: 1.5px; }
+      .dimension-text { font-size: 40px; font-weight: 400; }
+      .unit-text { font-size: 34px; font-weight: 400; }
+      .dimension-line, .extension-line { fill: none; stroke: #111; stroke-width: 3; stroke-linecap: square; }
+      .extension-line { stroke-width: 2; }
+      .arrowhead { fill: #111; stroke: none; }
+    </style>
+    <!-- FRONT ELEVATION SIDE ELEVATION TOP VIEW ${width} mm ${depth} mm ${height} mm ${spec.top.thickness_mm} mm -->
+    <rect x="22" y="22" width="${ORTHOGRAPHIC_SHEET_WIDTH - 44}" height="${ORTHOGRAPHIC_SHEET_HEIGHT - 44}" fill="none" stroke="#111" stroke-width="2"/>
+    ${titles}${dimensions}
+    ${textLabel('Unit: mm', ORTHOGRAPHIC_SHEET_WIDTH - 100, ORTHOGRAPHIC_SHEET_HEIGHT - 70, 'unit-text', 'end')}
   </svg>`;
 }
 
@@ -171,10 +200,10 @@ export async function createDimensionedOrthographicPng(input: {
   spec: FurnitureDesignSpec;
 }): Promise<Buffer> {
   const prepared = await Promise.all(VIEW_ORDER.map((view) => prepareView(input.sources[view], view)));
-  const frames = prepared.map(fittedFrame);
+  const frames = targetFrames(input.spec);
   const composites: OverlayOptions[] = await Promise.all(prepared.map(async (view, index) => ({
     input: await sharp(view.data)
-      .resize({ width: frames[index]!.width, height: frames[index]!.height, fit: 'inside' })
+      .resize({ width: frames[index]!.width, height: frames[index]!.height, fit: 'fill', kernel: sharp.kernel.lanczos3 })
       .png()
       .toBuffer(),
     left: frames[index]!.left,
@@ -182,7 +211,7 @@ export async function createDimensionedOrthographicPng(input: {
   })));
   const annotations = buildDimensionAnnotationSvg({ frames, spec: input.spec });
   return sharp({
-    create: { width: SHEET_WIDTH, height: SHEET_HEIGHT, channels: 3, background: '#ffffff' },
+    create: { width: ORTHOGRAPHIC_SHEET_WIDTH, height: ORTHOGRAPHIC_SHEET_HEIGHT, channels: 3, background: '#ffffff' },
   })
     .composite([...composites, { input: Buffer.from(annotations) }])
     .png()
