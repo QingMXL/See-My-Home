@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { SessionEvent, ZooworkClient } from '@zoowork-ai/sdk';
 import type { FurnitureAgentResponse, FurnitureTurnRequest } from '../src/contracts.js';
-import { HomeFurnitureRuntime } from '../src/runtime.js';
+import { HomeFurnitureRuntime, orthographicProjectionQaPassed } from '../src/runtime.js';
 
 const request: FurnitureTurnRequest = {
   contract_version: 'home-furniture-v1',
@@ -146,6 +146,65 @@ test('builds a strict single-view black-and-white orthographic request', async (
   assert.match(postedContent, /Write design_summary, questions, warnings.*Simplified Chinese/i);
 });
 
+test('builds a strict directly-overhead visible-surfaces-only top plan request', async () => {
+  let postedContent = '';
+  const fakeClient = {
+    async postEvents(_agentId: string, _sessionId: string, events: { content?: string }[]) {
+      postedContent = events[0]?.content ?? '';
+      return { events: [{ id: 'event_top', seq: 30, type: 'user.message', accepted: true }] };
+    },
+  } as unknown as ZooworkClient;
+  const runtime = new HomeFurnitureRuntime(fakeClient, 'agent_private_001');
+  const topRequest: FurnitureTurnRequest = {
+    ...request,
+    output_mode: 'orthographic_sheet',
+    orthographic_view: 'top',
+    render_asset_ref: 'https://example.com/confirmed.png',
+    confirmed_design_spec: response.design_spec,
+    description: response.design_summary,
+    source_priority: { sketch: 0, inspiration: 0 },
+    locked_controls: [],
+  };
+
+  await runtime.startFurnitureTurn({ agentId: 'agent_private_001', sessionId: 'session_top' }, topRequest);
+
+  assert.match(postedContent, /TOP PLAN IS STRICT/i);
+  assert.match(postedContent, /optical axis exactly perpendicular to the tabletop/i);
+  assert.match(postedContent, /tabletop plane parallel to the image plane/i);
+  assert.match(postedContent, /Do not draw legs, apron, base, stretcher, shelf, drawers.*through it/i);
+  assert.match(postedContent, /do not use dashed hidden lines/i);
+  assert.match(postedContent, /orthographic_projection_correct=true/i);
+  assert.match(postedContent, /orthographic_visible_surfaces_correct=true/i);
+});
+
+test('requires explicit projection and visible-surface QA for every orthographic artifact', () => {
+  const topRequest: FurnitureTurnRequest = {
+    ...request,
+    output_mode: 'orthographic_sheet',
+    orthographic_view: 'top',
+    render_asset_ref: 'https://example.com/confirmed.png',
+    confirmed_design_spec: response.design_spec,
+    source_priority: { sketch: 0, inspiration: 0 },
+  };
+  assert.equal(orthographicProjectionQaPassed(topRequest, response), false);
+  assert.equal(orthographicProjectionQaPassed(topRequest, {
+    ...response,
+    qa: {
+      ...response.qa,
+      orthographic_projection_correct: true,
+      orthographic_visible_surfaces_correct: false,
+    },
+  }), false);
+  assert.equal(orthographicProjectionQaPassed(topRequest, {
+    ...response,
+    qa: {
+      ...response.qa,
+      orthographic_projection_correct: true,
+      orthographic_visible_surfaces_correct: true,
+    },
+  }), true);
+});
+
 test('keeps a readable orthographic candidate when only its raster proportions drift slightly', async () => {
   const orthographicRequest: FurnitureTurnRequest = {
     ...request,
@@ -162,7 +221,13 @@ test('keeps a readable orthographic candidate when only its raster proportions d
     status: 'needs_confirmation',
     design_spec: response.design_spec,
     warnings: ['The raster proportions drift slightly; the application will preserve the image and add exact labels.'],
-    qa: { ...response.qa, dimensions_consistent: false, publishable: false },
+    qa: {
+      ...response.qa,
+      dimensions_consistent: false,
+      publishable: false,
+      orthographic_projection_correct: true,
+      orthographic_visible_surfaces_correct: true,
+    },
   };
   const fakeClient = {
     async listAllEvents() {

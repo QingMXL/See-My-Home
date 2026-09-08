@@ -18,6 +18,12 @@ The generated sheet follows the reference hierarchy: a large front elevation in 
 
 The three geometry panels use one scale derived from the confirmed dimensions. This keeps front/top widths, front/side heights, and side/top depths visually coordinated. The fixture intentionally used simple stand-in geometry to validate composition; production geometry continues to come from three independent ZooWork Agent image-generation turns based on the confirmed render.
 
+## Top-view projection hardening
+
+The latest production sheet at `/tmp/furniture-latest-orthographic.png` exposed a top-plan failure: lower supports and legs were shown through or outside an opaque tabletop even though the front and side elevations did not support that projection. The top-specific generation contract now requires a camera axis perpendicular to the tabletop, a tabletop plane parallel to the image plane, parallel projection without adjacent-face leakage, and visible surfaces only. Opaque upper surfaces must hide the apron, base, stretchers, shelves, drawers, and legs below them; dashed hidden structure is not allowed in this concept plan.
+
+Every orthographic response must now explicitly pass both projection correctness and visible-surface correctness. Missing or false flags prevent the generated artifact from entering the final compositor and trigger the existing targeted retry path. Minor raster ratio drift is accepted only after those two gates pass.
+
 ## UI and interaction checks
 
 - The English intake starts with an empty value and a localized example placeholder.
@@ -37,7 +43,7 @@ The three geometry panels use one scale derived from the confirmed dimensions. T
 ## Verification
 
 - Web tests: 56 passed.
-- Furniture Agent tests: 16 passed.
+- Furniture Agent tests: 18 passed.
 - API and all Agent TypeScript checks: passed.
 - Production web build: passed.
 - 4K raster composition was regenerated with the bundled-font path renderer and visually inspected against both the reference and the failed production artifact.

@@ -14,6 +14,7 @@ import type {
   AgentArtifact,
   AgentToolTrace,
   ConversationHandle,
+  FurnitureAgentResponse,
   FurnitureTurnRequest,
   FurnitureTurnResult,
 } from './contracts.js';
@@ -58,6 +59,15 @@ export interface FurnitureTurnStart {
 export type FurnitureTurnPoll =
   | { status: 'processing'; postedSeq: number }
   | { status: 'completed'; result: FurnitureTurnResult };
+
+export function orthographicProjectionQaPassed(
+  request: FurnitureTurnRequest,
+  response: FurnitureAgentResponse,
+): boolean {
+  return request.output_mode !== 'orthographic_sheet'
+    || (response.qa.orthographic_projection_correct === true
+      && response.qa.orthographic_visible_surfaces_correct === true);
+}
 
 export class HomeFurnitureRuntime {
   readonly agentId: string;
@@ -135,14 +145,17 @@ export class HomeFurnitureRuntime {
     if (raw.outcome !== 'succeeded') throw new Error(`ZooWork run ended with status ${raw.outcome}`);
     const response = parseFurnitureAgentResponse(raw.text);
     assertResponseMatchesRequest(response, request);
+    const projectionQaPassed = orthographicProjectionQaPassed(request, response);
     const passedQa = (!request.sketch_asset_ref || response.qa.sketch_geometry_preserved)
       && (!request.inspiration_asset_ref || response.qa.inspiration_language_applied)
       && response.qa.dimensions_consistent
       && response.qa.function_plausible
-      && response.qa.publishable;
+      && response.qa.publishable
+      && projectionQaPassed;
     const generatedOrthographicCandidate = request.output_mode === 'orthographic_sheet'
       && response.status !== 'failed'
       && response.qa.function_plausible
+      && projectionQaPassed
       && raw.toolCalls.some((call) => call.phase === 'end' && call.toolName === 'image_generate' && !call.isError);
     const artifacts = (response.status === 'completed' && passedQa) || generatedOrthographicCandidate
       ? await this.artifactsForTurn(sessionId, raw.runId, raw.toolCalls, request.request_id)
@@ -178,6 +191,13 @@ export class HomeFurnitureRuntime {
     const orthographicInventory = request.confirmed_design_spec?.components
       .map((component) => `${component.quantity} × ${component.role}: ${component.name}`)
       .join('; ');
+    const viewSpecificProjectionRequirement = view === 'top'
+      ? [
+          'TOP PLAN IS STRICT: this is not a bird\'s-eye, elevated, three-quarter, transparent, or cutaway view. Place the virtual camera centered directly above the table with its optical axis exactly perpendicular to the tabletop and the tabletop plane parallel to the image plane. Use parallel orthographic projection only: no vanishing point, convergence, foreshortening, visible front/side face, visible tabletop thickness, or underside.',
+          'Draw only surfaces genuinely visible from directly above. Treat every opaque tabletop or upper surface as an occluder. Do not draw legs, apron, base, stretcher, shelf, drawers, or other under-table structure through it; do not use dashed hidden lines. A lower component may appear only where the confirmed render proves it physically projects beyond the tabletop footprint and would truly be visible from directly above. Never invent such a projection.',
+          'Before publishing the top plan, compare it with the confirmed render and the front/side implications in confirmed_design_spec. Reject it if the top outline is skewed, if parallel axes converge, if hidden under-structure shows through the top, or if supports protrude beyond the top without explicit visual evidence.',
+        ].join(' ')
+      : 'Use a strict orthographic elevation: the viewing axis is perpendicular to the requested front or side plane, parallel edges do not converge, and no adjacent top or side face is visible.';
     const outputRequirement = orthographic
       ? [
           `Use table-concept-renderer in orthographic-sheet mode for the ${view} view. The confirmed design specification is immutable.`,
@@ -187,13 +207,15 @@ export class HomeFurnitureRuntime {
           `The confirmed overall dimensions are width ${orthographicDimensions?.width} mm, depth ${orthographicDimensions?.depth} mm, and height ${orthographicDimensions?.height} mm. Preserve the ${view === 'front' ? 'width-to-height' : view === 'side' ? 'depth-to-height' : 'width-to-depth'} proportion recognizably; the application will typeset the exact values after generation.`,
           `Required component inventory: ${orthographicInventory || 'use confirmed_design_spec exactly'}. Every listed component that is visible from the ${view} direction must match render_asset_ref in count, placement, silhouette, open-or-closed state, and major curved details. Do not redesign, stylize, simplify, merge, add, or remove components.`,
           `This raster is the ${view} geometry layer for a standard furniture shop-drawing sheet. Use true orthographic projection with no perspective convergence and keep the whole object comfortably inside the canvas.`,
+          viewSpecificProjectionRequirement,
           'Use a pure white background and clean, uniform black-and-white technical linework. Draw the product\'s visible outer silhouette noticeably heavier than internal component edges. Keep internal edges medium weight and reserve very thin strokes for any unavoidable construction detail. No beige or grey background, room scene, material rendering, tonal fill, shading, shadows, decorative props, extra views, border, title block, written labels, dimension numbers, logos, or watermark.',
           `Call image_generate exactly once with action="generate", render_asset_ref as the supported source image input, quality="high", and filename="${filename}". Use only arguments exposed by the current tool schema; never invent model, provider, numeric image-weight, or control-strength fields.`,
           'After generation starts, call sessions_yield exactly once and end the waiting run.',
           `In the attachment continuation, call media_materialize exactly once for the returned artifactId with path="/workspace/artifacts/${request.project_id}/${filename}". Inspect the materialized image exactly once.`,
-          `Publish only when the image contains one readable, complete ${view} orthographic view that recognizably matches the confirmed furniture and uses the required heavy-outline/thinner-detail hierarchy. Fail when it is missing, cropped, perspective-only, materially different, contains multiple views, loses visible major components, introduces shading or material texture, or renders all lines as faint construction strokes. Minor raster proportion drift may be reported as a warning because the application normalizes the final concept sheet to the confirmed overall dimensions.`,
+          `Publish only when the image contains one readable, complete ${view} orthographic view that recognizably matches the confirmed furniture and uses the required heavy-outline/thinner-detail hierarchy. Fail when it is missing, cropped, perspective-only, materially different, contains multiple views, loses visible major components, introduces shading or material texture, renders hidden surfaces as visible, or renders all lines as faint construction strokes. Minor raster proportion drift may be reported as a warning only after projection and visible-surface correctness pass.`,
           'Echo request.confirmed_design_spec exactly and without changing any value in response.design_spec. Set absent sketch and inspiration QA fields to true.',
-          `For a readable single ${view} geometry layer, call artifact_publish exactly once and return status=completed with its artifact id. Treat dimensions_consistent as confirmation that the returned structured specification is unchanged; use warnings for minor raster proportion drift.`,
+          `After inspecting the materialized image, set qa.orthographic_projection_correct=true only when it is a true ${view} orthographic projection with no perspective or adjacent-face leakage. Set qa.orthographic_visible_surfaces_correct=true only when the image contains only surfaces visible from the requested direction and obeys the top-surface occlusion rule. If either is false, do not call artifact_publish; return failed or needs_confirmation with qa.publishable=false.`,
+          `For a readable single ${view} geometry layer that passes both orthographic QA fields, call artifact_publish exactly once and return status=completed with its artifact id. Treat dimensions_consistent as confirmation that the returned structured specification is unchanged; use warnings for minor raster proportion drift.`,
           `Write design_summary, questions, warnings, and other user-facing prose in ${request.locale === 'zh-CN' ? 'Simplified Chinese' : 'English'}. Do not expose internal QA reasoning as user guidance.`,
           'Return one compact JSON object matching response_schema without Markdown fences. This is concept-level only, not fabrication-ready engineering.',
         ]

@@ -100,7 +100,9 @@
         "inspiration_language_applied": { "type": "boolean" },
         "dimensions_consistent": { "type": "boolean" },
         "function_plausible": { "type": "boolean" },
-        "publishable": { "type": "boolean" }
+        "publishable": { "type": "boolean" },
+        "orthographic_projection_correct": { "type": "boolean" },
+        "orthographic_visible_surfaces_correct": { "type": "boolean" }
       }
     }
   },

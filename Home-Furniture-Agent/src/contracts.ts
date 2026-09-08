@@ -116,6 +116,10 @@ export interface FurnitureAgentResponse {
     dimensions_consistent: boolean;
     function_plausible: boolean;
     publishable: boolean;
+    /** Required to be true before an orthographic geometry layer may be consumed. */
+    orthographic_projection_correct?: boolean;
+    /** Required to be true when only surfaces actually visible from the requested direction are drawn. */
+    orthographic_visible_surfaces_correct?: boolean;
   };
 }
 
