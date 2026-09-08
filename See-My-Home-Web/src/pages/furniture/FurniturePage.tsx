@@ -17,7 +17,7 @@ import {
   isDemoFurnitureAsset,
 } from "../../data/furnitureDemo";
 import { useI18n } from "../../i18n/LanguageContext";
-import { FURNITURE_GENERATION_STEPS, runGeneration } from "../../lib/agents";
+import { FURNITURE_GENERATION_STEPS, FURNITURE_ORTHOGRAPHIC_STEPS, runGeneration } from "../../lib/agents";
 import { downloadImage } from "../../lib/download";
 import {
   deleteFurnitureImage,
@@ -197,7 +197,7 @@ export function FurniturePage() {
       imageAssetAvailable(DEMO_FURNITURE_ORTHOGRAPHIC_URL),
     ]);
     if (assetsAvailable.some((available) => !available)) {
-      setFurnitureAgentError(copy("The built-in furniture example is unavailable.", "内置家具案例暂时无法读取。"));
+      setFurnitureAgentError(copy("The furniture example is unavailable.", "家具示例暂时无法读取。"));
       return;
     }
     setFurnitureAgentError(null);
@@ -325,7 +325,7 @@ export function FurniturePage() {
     try {
       const result = isDemoResult
         ? await runGeneration(
-            FURNITURE_GENERATION_STEPS,
+            FURNITURE_ORTHOGRAPHIC_STEPS,
             setOrthographicStep,
           ).then(() => createDemoFurnitureOrthographicResult(generated))
         : await generateFurnitureOrthographic({
@@ -396,10 +396,6 @@ export function FurniturePage() {
   }
 
   const currentStep = stage === "input" ? 0 : stage === "render" ? 1 : 2;
-  const uniqueMaterials = spec?.materials.filter((material, index, items) =>
-    items.findIndex((candidate) => candidate.material === material.material && candidate.finish === material.finish) === index,
-  ).slice(0, 3) ?? [];
-
   return (
     <main className="page flow-page furniture-flow" aria-busy={furniture.phase === "generating" || generatingOrthographic}>
       <Breadcrumbs crumbs={[{ label: t("crumb.home"), to: "/" }, { label: t("furn.crumb") }]} />
@@ -419,7 +415,7 @@ export function FurniturePage() {
           <header className="sample-preview__head">
             <div>
               <span className="sample-preview__eyebrow">{copy("Original sketch", "原始草图")}</span>
-              <h2 id="furniture-demo-preview-title">{copy("Review the built-in furniture example", "查看内置家具案例")}</h2>
+              <h2 id="furniture-demo-preview-title">{copy("Review the Furniture Example", "查看家具案例")}</h2>
               <p>{copy(
                 "Start with this unprocessed sketch, then walk through the render and orthographic steps yourself.",
                 "从这张未经处理的草图开始，然后亲自走完效果图和三视图流程。",
@@ -427,7 +423,7 @@ export function FurniturePage() {
             </div>
           </header>
           <div className="sample-preview__canvas">
-            <img src={DEMO_FURNITURE_SKETCH_URL} alt={copy("Sketch for the built-in furniture example", "内置家具案例草图")} />
+            <img src={DEMO_FURNITURE_SKETCH_URL} alt={copy("Sketch for the furniture example", "家具示例草图")} />
           </div>
           <div className="sample-preview__actions">
             <Button variant="secondary" onClick={() => setShowDemoPreview(false)}>{copy("Back", "返回")}</Button>
@@ -443,7 +439,7 @@ export function FurniturePage() {
               <h2 id="furniture-intake-title">{copy("Collect your inspiration", "收集你的灵感")}</h2>
               <p>{copy("Upload either image or both. When both are present, choose which one should lead.", "手绘草图和灵感图可以二选一，也可以同时上传；两张都有时再决定更接近哪一张。")}</p>
             </div>
-            <Button variant="secondary" onClick={() => void openDemoPreview()}>{copy("Try the built-in example", "试试内置案例")}</Button>
+            <Button variant="secondary" onClick={() => void openDemoPreview()}>{copy("View Furniture Example", "看看家具示例")}</Button>
           </header>
           <div className="furniture-source-grid">
             <div className="furniture-upload-shell">
@@ -524,28 +520,8 @@ export function FurniturePage() {
               <>
                 <div className="render-panel__media"><img className="render-panel__image" src={generated.generated_image.url} alt={localizedSummary} /></div>
                 <div className="render-panel__meta">
-                  <div className="render-panel__decision">
-                    <div className="render-panel__swatches">{uniqueMaterials.map((material) => <span className="swatch" key={`${material.material}-${material.finish}`}><i className="swatch__dot" style={{ background: MATERIAL_COLORS[material.material] ?? "#806044" }} aria-hidden="true" />{localizeFurnitureTerm(material.material, lang, copy("Custom material", "定制材质"))}</span>)}</div>
-                    <div className="render-panel__actions">
-                      <Button variant="secondary" disabled={furniture.phase === "generating"} onClick={() => void downloadRender()}><Download size={16} />{copy("Download render", "下载效果图")}</Button>
-                      <Button disabled={furniture.phase === "generating" || generatingOrthographic || generated.response.status === "failed"} onClick={() => void onConfirm()}>{t("furn.thisIsIt")}</Button>
-                    </div>
-                  </div>
+                  <div className="render-panel__download"><Button variant="secondary" disabled={furniture.phase === "generating"} onClick={() => void downloadRender()}><Download size={16} />{copy("Download render", "下载效果图")}</Button></div>
                   {feedback && <p className="render-panel__feedback" role="status">{feedback}</p>}
-                  {orthographicError && (
-                    <div className="render-panel__orthographic-error" role="alert">
-                      <span>{orthographicError}</span>
-                      <button type="button" onClick={() => void onConfirm()}>{copy("Try again", "重新生成")}</button>
-                    </div>
-                  )}
-                  <details className="render-panel__details">
-                    <summary>{copy("Design details", "设计说明")}</summary>
-                    <p>{localizedSummary}</p>
-                    {generated.response.warnings.length > 0 && <ul>{generated.response.warnings.map((warning, index) => <li key={`${warning}-${index}`}>{localizeFurnitureNarrative(warning, lang, {
-                      en: "Please review this concept before confirming it.",
-                      zh: "确认前请检查这项概念提示。",
-                    })}</li>)}</ul>}
-                  </details>
                 </div>
               </>
             ) : (
@@ -593,7 +569,16 @@ export function FurniturePage() {
                 </ul>
               </details>
             </div>
-            <Button full size="lg" disabled={!generated || Boolean(uploading) || furniture.phase === "generating"} onClick={() => onGenerate(true)}><Sparkle />{copy("Apply changes & regenerate", "应用调整并重新生成")}</Button>
+            <div className="refine-panel__actions">
+              <Button size="lg" disabled={!generated || Boolean(uploading) || furniture.phase === "generating"} onClick={() => onGenerate(true)}><Sparkle />{copy("Apply Changes", "应用调整")}</Button>
+              <Button className="btn--furniture-confirm" size="lg" disabled={!generated || furniture.phase === "generating" || generatingOrthographic || generated.response.status === "failed"} onClick={() => void onConfirm()}>{t("furn.thisIsIt")}</Button>
+            </div>
+            {orthographicError && (
+              <div className="render-panel__orthographic-error" role="alert">
+                <span>{orthographicError}</span>
+                <button type="button" onClick={() => void onConfirm()}>{copy("Try again", "重新生成")}</button>
+              </div>
+            )}
           </aside>
         </div>
       )}
@@ -628,7 +613,7 @@ export function FurniturePage() {
       )}
 
       {furniture.phase === "generating" && <GeneratingOverlay title={copy("Designing your table", "正在设计你的桌子")} steps={FURNITURE_GENERATION_STEPS} activeIndex={furniture.stepIndex} />}
-      {generatingOrthographic && <GeneratingOverlay title={copy("Creating the concept views", "正在生成概念三视图")} steps={FURNITURE_GENERATION_STEPS} activeIndex={orthographicStep} />}
+      {generatingOrthographic && <GeneratingOverlay title={copy("Creating the concept views", "正在生成概念三视图")} steps={FURNITURE_ORTHOGRAPHIC_STEPS} activeIndex={orthographicStep} />}
     </main>
   );
 }

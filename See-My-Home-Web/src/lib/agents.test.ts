@@ -6,6 +6,7 @@ import {
   DEMO_LAYOUT_GENERATION_STEPS,
   DEMO_LAYOUT_UPLOAD_DELAY_MS,
   generationDurationMs,
+  FURNITURE_ORTHOGRAPHIC_STEPS,
   LAYOUT_GENERATION_STEPS,
   runGeneration,
 } from "./agents";
@@ -102,7 +103,7 @@ describe("runGeneration", () => {
   });
 
   test("step labels resolve to messages in both languages", () => {
-    for (const step of LAYOUT_GENERATION_STEPS) {
+    for (const step of [...LAYOUT_GENERATION_STEPS, ...FURNITURE_ORTHOGRAPHIC_STEPS]) {
       expect(MESSAGES[step.labelKey].en).toBeTruthy();
       expect(MESSAGES[step.labelKey].zh).toBeTruthy();
     }

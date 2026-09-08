@@ -8,7 +8,7 @@ import type {
 
 export const DEMO_FURNITURE_PROJECT_ID = "demo_home_furniture";
 export const DEMO_FURNITURE_SKETCH_ASSET_ID = "demo-furniture-sketch";
-export const DEMO_FURNITURE_FILE_NAME = "Built-in Furniture Example";
+export const DEMO_FURNITURE_FILE_NAME = "Furniture Example";
 export const DEMO_FURNITURE_SKETCH_URL = "/demo/home-furniture/source-sketch.png";
 export const DEMO_FURNITURE_RENDER_URL = "/demo/home-furniture/concept-render.png";
 export const DEMO_FURNITURE_ORTHOGRAPHIC_URL = "/demo/home-furniture/orthographic-views.png";

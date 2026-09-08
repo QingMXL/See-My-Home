@@ -47,6 +47,12 @@ export const FURNITURE_GENERATION_STEPS: GenerationStep[] = [
   { labelKey: "gen.furn.rendering", weight: 1.6 },
 ];
 
+export const FURNITURE_ORTHOGRAPHIC_STEPS: GenerationStep[] = [
+  { labelKey: "gen.furn.viewsReading", weight: 1 },
+  { labelKey: "gen.furn.viewsDrawing", weight: 1.2 },
+  { labelKey: "gen.furn.viewsDimensioning", weight: 1.6 },
+];
+
 const STEP_BASE_MS = 900;
 
 export function generationDurationMs(steps: GenerationStep[]) {
