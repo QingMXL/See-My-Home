@@ -4,8 +4,21 @@ import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Breadcrumbs, Stepper } from "../../components/layout/Breadcrumbs";
 import { Button, Sparkle } from "../../components/ui/Button";
 import { GeneratingOverlay } from "../../components/ui/GeneratingOverlay";
+import {
+  createDemoFurnitureOrthographicResult,
+  createDemoFurnitureResult,
+  DEMO_FURNITURE_DESCRIPTION,
+  DEMO_FURNITURE_FILE_NAME,
+  DEMO_FURNITURE_ORTHOGRAPHIC_URL,
+  DEMO_FURNITURE_PROJECT_ID,
+  DEMO_FURNITURE_RENDER_URL,
+  DEMO_FURNITURE_SKETCH_ASSET,
+  DEMO_FURNITURE_SKETCH_URL,
+  isDemoFurnitureAsset,
+} from "../../data/furnitureDemo";
 import { useI18n } from "../../i18n/LanguageContext";
-import { FURNITURE_GENERATION_STEPS } from "../../lib/agents";
+import { FURNITURE_GENERATION_STEPS, runGeneration } from "../../lib/agents";
+import { downloadImage } from "../../lib/download";
 import {
   deleteFurnitureImage,
   generateFurniture,
@@ -58,12 +71,13 @@ const MATERIAL_COLORS: Record<string, string> = {
   Cherry: "#9a4d37",
   Travertine: "#d9cebd",
   "Matte Black": "#353330",
+  "Tempered glass": "#dce9e8",
 };
-const SECONDARY_MATERIALS = ["Blackened Steel", "Brushed Brass", "Solid Wood", "Natural Stone", "None"];
+const SECONDARY_MATERIALS = ["Blackened Steel", "Brushed Brass", "Tempered Glass", "Solid Wood", "Natural Stone", "None"];
 const BASE_STYLES = ["Four Tapered Legs", "Trestle Base", "Twin Pedestal", "Central Pedestal", "Plinth Base"];
 const TOP_SHAPES: FurnitureTopShape[] = ["rectangular", "round", "oval", "square", "freeform"];
 const EDGE_PROFILES = ["Soft Radius", "Square Edge", "Bullnose", "Beveled Edge", "Live Edge"];
-const FINISHES = ["Matte Clear Oil", "Satin Lacquer", "Natural Soap", "High Gloss", "Textured Powder Coat"];
+const FINISHES = ["Matte Clear Oil", "Matte Black Stain", "Satin Lacquer", "Natural Soap", "High Gloss", "Textured Powder Coat"];
 const STORAGE_OPTIONS = ["No Storage", "One Drawer", "Two Drawers", "Open Shelf", "Cable Management"];
 const HARDWARE_OPTIONS = ["No Hardware", "Round Knob", "Bar Pull", "Integrated Pull"];
 
@@ -77,6 +91,15 @@ function routeStage(pathname: string): FurnitureStage {
   if (pathname.endsWith("/drawings")) return "drawings";
   if (pathname.endsWith("/render")) return "render";
   return "input";
+}
+
+async function imageAssetAvailable(url: string) {
+  try {
+    const response = await fetch(url, { method: "HEAD", cache: "no-store" });
+    return response.ok && (response.headers.get("content-type") ?? "").startsWith("image/");
+  } catch {
+    return false;
+  }
 }
 
 export function FurniturePage() {
@@ -110,12 +133,14 @@ export function FurniturePage() {
   const [generatingOrthographic, setGeneratingOrthographic] = useState(false);
   const [orthographicStep, setOrthographicStep] = useState(0);
   const [orthographicError, setOrthographicError] = useState<string | null>(null);
+  const [showDemoPreview, setShowDemoPreview] = useState(false);
 
   const copy = (en: string, zh: string) => (lang === "zh" ? zh : en);
   const autoLabel = copy("Auto · follow inputs", "自动 · 跟随输入");
   const hasSketch = Boolean(furniture.sketchAsset);
   const hasInspiration = Boolean(furniture.inspirationAsset);
   const hasBothImages = hasSketch && hasInspiration;
+  const isDemoSketch = isDemoFurnitureAsset(furniture.sketchAsset) && !hasInspiration;
   const sketchWeight = furniture.sketchWeight ?? 80;
   const visibleSketchWeight = hasBothImages ? sketchWeight : hasSketch ? 100 : hasInspiration ? 0 : sketchWeight;
   const visibleInspirationWeight = hasBothImages ? 100 - sketchWeight : hasInspiration ? 100 : hasSketch ? 0 : 100 - sketchWeight;
@@ -124,8 +149,11 @@ export function FurniturePage() {
   const generated = furniture.agentRun;
   const orthographic = furniture.orthographicRun;
   const spec = generated?.response.design_spec;
+  const isDemoResult = generated?.project_id === DEMO_FURNITURE_PROJECT_ID;
   const summaryHasSketch = Boolean(generated?.request_context?.sketch_asset_id);
   const summaryHasInspiration = Boolean(generated?.request_context?.inspiration_asset_id);
+  const summarySketchUrl = furniture.sketchUrl ?? (isDemoResult ? DEMO_FURNITURE_SKETCH_URL : null);
+  const summarySketchName = furniture.sketchName ?? (isDemoResult ? DEMO_FURNITURE_FILE_NAME : null);
   const tableLabel = TABLE_TYPES.find((option) => option.value === furniture.tableType);
   const canGenerate = Boolean(furniture.sketchAsset || furniture.inspirationAsset || furniture.prompt.trim()) && !uploading;
   const steps = [
@@ -162,6 +190,47 @@ export function FurniturePage() {
     ...(hasBothImages ? { source_priority: { sketch: sketchWeight / 100, inspiration: (100 - sketchWeight) / 100 } } : {}),
   });
 
+  const openDemoPreview = async () => {
+    const assetsAvailable = await Promise.all([
+      imageAssetAvailable(DEMO_FURNITURE_SKETCH_URL),
+      imageAssetAvailable(DEMO_FURNITURE_RENDER_URL),
+      imageAssetAvailable(DEMO_FURNITURE_ORTHOGRAPHIC_URL),
+    ]);
+    if (assetsAvailable.some((available) => !available)) {
+      setFurnitureAgentError(copy("The built-in furniture example is unavailable.", "内置家具案例暂时无法读取。"));
+      return;
+    }
+    setFurnitureAgentError(null);
+    for (const url of [DEMO_FURNITURE_RENDER_URL, DEMO_FURNITURE_ORTHOGRAPHIC_URL]) {
+      const preload = new Image();
+      preload.src = url;
+    }
+    setShowDemoPreview(true);
+  };
+
+  const confirmDemoInput = () => {
+    if (furniture.sketchUrl?.startsWith("blob:")) URL.revokeObjectURL(furniture.sketchUrl);
+    if (furniture.inspirationUrl?.startsWith("blob:")) URL.revokeObjectURL(furniture.inspirationUrl);
+    removeFurnitureSource("inspiration");
+    setFurnitureSource("sketch", DEMO_FURNITURE_FILE_NAME, DEMO_FURNITURE_SKETCH_URL);
+    setFurnitureUploadedAsset("sketch", DEMO_FURNITURE_SKETCH_ASSET);
+    setFurniturePrompt(lang === "zh" ? DEMO_FURNITURE_DESCRIPTION.zh : DEMO_FURNITURE_DESCRIPTION.en);
+    setFurnitureRefinementPrompt("");
+    setFurnitureTableType("dining_table");
+    setFurnitureOption("size", "1800 × 900 × 750 mm");
+    setFurnitureOption("material", "Ash");
+    setFurnitureOption("legs", "Twin Pedestal");
+    setFurnitureOption("handles", "No Hardware");
+    setFurnitureOption("shelves", "Open Shelf");
+    setFurnitureAppearance("secondaryMaterial", "Tempered Glass");
+    setFurnitureAppearance("topShape", "freeform");
+    setFurnitureAppearance("edgeProfile", "Soft Radius");
+    setFurnitureAppearance("finish", "Matte Black Stain");
+    setFurniturePhase("idle", 0);
+    setFurnitureAgentError(null);
+    setShowDemoPreview(false);
+  };
+
   const onUpload = async (kind: FurnitureSourceKind, event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -173,7 +242,8 @@ export function FurniturePage() {
     setFurnitureAgentError(null);
     setUploading(kind);
     try {
-      const projectId = furniture.sketchAsset?.project_id ?? furniture.inspirationAsset?.project_id ?? furniture.projectId ?? undefined;
+      const existingAsset = [furniture.sketchAsset, furniture.inspirationAsset].find((asset) => asset && !isDemoFurnitureAsset(asset));
+      const projectId = existingAsset?.project_id ?? (isDemoSketch ? undefined : furniture.projectId ?? undefined);
       const asset = await uploadFurnitureImage(file, kind, lang === "zh" ? "zh-CN" : "en-US", projectId);
       setFurnitureUploadedAsset(kind, asset);
     } catch (error) {
@@ -188,7 +258,7 @@ export function FurniturePage() {
     const localUrl = kind === "sketch" ? furniture.sketchUrl : furniture.inspirationUrl;
     if (localUrl?.startsWith("blob:")) URL.revokeObjectURL(localUrl);
     removeFurnitureSource(kind);
-    if (asset) {
+    if (asset && !isDemoFurnitureAsset(asset)) {
       void deleteFurnitureImage(asset).catch((error) => {
         setFurnitureAgentError(error instanceof Error ? error.message : copy("Image removal failed.", "图片删除失败。"));
       });
@@ -211,16 +281,27 @@ export function FurniturePage() {
       ? refinement ? `${previousDescription}\n\n${copy("Requested revision:", "本次调整：")} ${refinement}` : previousDescription
       : originalDescription;
     const input = makeInput(description);
+    const useDemoGeneration = isDemoSketch || (
+      isRefinement
+      && isDemoResult
+      && !furniture.sketchAsset
+      && !furniture.inspirationAsset
+    );
     setOrthographicError(null);
     setFurnitureAgentError(null);
     setFurniturePhase("generating", 0);
     navigate("/furniture/render");
-    const stepOne = window.setTimeout(() => setFurniturePhase("generating", 1), 1200);
-    const stepTwo = window.setTimeout(() => setFurniturePhase("generating", 2), 3200);
+    const stepOne = useDemoGeneration ? undefined : window.setTimeout(() => setFurniturePhase("generating", 1), 1200);
+    const stepTwo = useDemoGeneration ? undefined : window.setTimeout(() => setFurniturePhase("generating", 2), 3200);
     try {
-      const result = isRefinement && furniture.agentRun?.request_context
-        ? await refineFurniture(furniture.agentRun.request_context, input.locale, input, input.description)
-        : await generateFurniture(input);
+      const result = useDemoGeneration
+        ? await runGeneration(
+            FURNITURE_GENERATION_STEPS,
+            (stepIndex) => setFurniturePhase("generating", stepIndex),
+          ).then(() => createDemoFurnitureResult(input))
+        : isRefinement && furniture.agentRun?.request_context
+          ? await refineFurniture(furniture.agentRun.request_context, input.locale, input, input.description)
+          : await generateFurniture(input);
       setFurnitureAgentRun(result);
       setFurnitureRefinementPrompt("");
       setFurniturePhase("done");
@@ -228,8 +309,8 @@ export function FurniturePage() {
       setFurnitureAgentError(error instanceof Error ? error.message : copy("Furniture generation failed.", "家具生成失败。"));
       setFurniturePhase("error");
     } finally {
-      window.clearTimeout(stepOne);
-      window.clearTimeout(stepTwo);
+      if (stepOne) window.clearTimeout(stepOne);
+      if (stepTwo) window.clearTimeout(stepTwo);
     }
   };
 
@@ -239,16 +320,21 @@ export function FurniturePage() {
     setFurnitureOrthographicRun(null);
     setGeneratingOrthographic(true);
     setOrthographicStep(0);
-    const stepOne = window.setTimeout(() => setOrthographicStep(1), 1200);
-    const stepTwo = window.setTimeout(() => setOrthographicStep(2), 3200);
+    const stepOne = isDemoResult ? undefined : window.setTimeout(() => setOrthographicStep(1), 1200);
+    const stepTwo = isDemoResult ? undefined : window.setTimeout(() => setOrthographicStep(2), 3200);
     try {
-      const result = await generateFurnitureOrthographic({
-        project_id: generated.project_id,
-        locale: lang === "zh" ? "zh-CN" : "en-US",
-        render_asset_id: generated.generated_image.asset_id,
-        render_image_url: generated.generated_image.url,
-        design_response: generated.response,
-      });
+      const result = isDemoResult
+        ? await runGeneration(
+            FURNITURE_GENERATION_STEPS,
+            setOrthographicStep,
+          ).then(() => createDemoFurnitureOrthographicResult(generated))
+        : await generateFurnitureOrthographic({
+            project_id: generated.project_id,
+            locale: lang === "zh" ? "zh-CN" : "en-US",
+            render_asset_id: generated.generated_image.asset_id,
+            render_image_url: generated.generated_image.url,
+            design_response: generated.response,
+          });
       setFurnitureOrthographicRun(result);
       confirmFurniture();
       saveDesign({
@@ -264,8 +350,8 @@ export function FurniturePage() {
         ? error.message
         : copy("The concept views could not be completed. Please try again.", "概念三视图未能完成，请重试。"));
     } finally {
-      window.clearTimeout(stepOne);
-      window.clearTimeout(stepTwo);
+      if (stepOne) window.clearTimeout(stepOne);
+      if (stepTwo) window.clearTimeout(stepTwo);
       setGeneratingOrthographic(false);
     }
   };
@@ -284,6 +370,16 @@ export function FurniturePage() {
       flash(copy("Concept views downloaded.", "概念三视图已下载。"));
     } catch {
       flash(copy("The image could not be downloaded. Please try again.", "图片下载失败，请重试。"));
+    }
+  };
+
+  const downloadRender = async () => {
+    if (!generated) return;
+    try {
+      await downloadImage(generated.generated_image.url, `${generated.table_type ?? "table"}-concept-render`);
+      flash(copy("Render downloaded.", "效果图已下载。"));
+    } catch {
+      flash(copy("The render could not be downloaded. Please try again.", "效果图下载失败，请重试。"));
     }
   };
 
@@ -318,11 +414,36 @@ export function FurniturePage() {
       <input ref={sketchInputRef} className="furniture-file-input" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => onUpload("sketch", event)} />
       <input ref={inspirationInputRef} className="furniture-file-input" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => onUpload("inspiration", event)} />
 
-      {stage === "input" && (
+      {stage === "input" && showDemoPreview && (
+        <section className="card sample-preview furniture-demo-preview" aria-labelledby="furniture-demo-preview-title">
+          <header className="sample-preview__head">
+            <div>
+              <span className="sample-preview__eyebrow">{copy("Original sketch", "原始草图")}</span>
+              <h2 id="furniture-demo-preview-title">{copy("Review the built-in furniture example", "查看内置家具案例")}</h2>
+              <p>{copy(
+                "Start with this unprocessed sketch, then walk through the render and orthographic steps yourself.",
+                "从这张未经处理的草图开始，然后亲自走完效果图和三视图流程。",
+              )}</p>
+            </div>
+          </header>
+          <div className="sample-preview__canvas">
+            <img src={DEMO_FURNITURE_SKETCH_URL} alt={copy("Sketch for the built-in furniture example", "内置家具案例草图")} />
+          </div>
+          <div className="sample-preview__actions">
+            <Button variant="secondary" onClick={() => setShowDemoPreview(false)}>{copy("Back", "返回")}</Button>
+            <Button size="lg" onClick={confirmDemoInput}><Sparkle />{copy("Use this example", "使用这个案例")}</Button>
+          </div>
+        </section>
+      )}
+
+      {stage === "input" && !showDemoPreview && (
         <section className="card card--pad furniture-intake" aria-labelledby="furniture-intake-title">
           <header className="furniture-intake__head">
-            <h2 id="furniture-intake-title">{copy("Collect your inspiration", "收集你的灵感")}</h2>
-            <p>{copy("Upload either image or both. When both are present, choose which one should lead.", "手绘草图和灵感图可以二选一，也可以同时上传；两张都有时再决定更接近哪一张。")}</p>
+            <div>
+              <h2 id="furniture-intake-title">{copy("Collect your inspiration", "收集你的灵感")}</h2>
+              <p>{copy("Upload either image or both. When both are present, choose which one should lead.", "手绘草图和灵感图可以二选一，也可以同时上传；两张都有时再决定更接近哪一张。")}</p>
+            </div>
+            <Button variant="secondary" onClick={() => void openDemoPreview()}>{copy("Try the built-in example", "试试内置案例")}</Button>
           </header>
           <div className="furniture-source-grid">
             <div className="furniture-upload-shell">
@@ -378,7 +499,7 @@ export function FurniturePage() {
             <div className="input-summary-panel__body">
               <div className="input-summary__sources">
                 {summaryHasSketch && (
-                  <figure>{hasSketch && furniture.sketchUrl ? <img src={furniture.sketchUrl} alt="" /> : <span>{copy("Used", "已采用")}</span>}<figcaption>{copy("Sketch", "草图")}{hasSketch && furniture.sketchName ? ` · ${furniture.sketchName}` : ""}</figcaption></figure>
+                  <figure>{summarySketchUrl ? <img src={summarySketchUrl} alt="" /> : <span>{copy("Used", "已采用")}</span>}<figcaption>{copy("Sketch", "草图")}{summarySketchName ? ` · ${summarySketchName}` : ""}</figcaption></figure>
                 )}
                 {summaryHasInspiration && (
                   <figure>{hasInspiration && furniture.inspirationUrl ? <img src={furniture.inspirationUrl} alt="" /> : <span>{copy("Used", "已采用")}</span>}<figcaption>{copy("Inspiration", "灵感")}{hasInspiration && furniture.inspirationName ? ` · ${furniture.inspirationName}` : ""}</figcaption></figure>
@@ -405,8 +526,12 @@ export function FurniturePage() {
                 <div className="render-panel__meta">
                   <div className="render-panel__decision">
                     <div className="render-panel__swatches">{uniqueMaterials.map((material) => <span className="swatch" key={`${material.material}-${material.finish}`}><i className="swatch__dot" style={{ background: MATERIAL_COLORS[material.material] ?? "#806044" }} aria-hidden="true" />{localizeFurnitureTerm(material.material, lang, copy("Custom material", "定制材质"))}</span>)}</div>
-                    <Button disabled={furniture.phase === "generating" || generatingOrthographic || generated.response.status === "failed"} onClick={() => void onConfirm()}>{t("furn.thisIsIt")}</Button>
+                    <div className="render-panel__actions">
+                      <Button variant="secondary" disabled={furniture.phase === "generating"} onClick={() => void downloadRender()}><Download size={16} />{copy("Download render", "下载效果图")}</Button>
+                      <Button disabled={furniture.phase === "generating" || generatingOrthographic || generated.response.status === "failed"} onClick={() => void onConfirm()}>{t("furn.thisIsIt")}</Button>
+                    </div>
                   </div>
+                  {feedback && <p className="render-panel__feedback" role="status">{feedback}</p>}
                   {orthographicError && (
                     <div className="render-panel__orthographic-error" role="alert">
                       <span>{orthographicError}</span>

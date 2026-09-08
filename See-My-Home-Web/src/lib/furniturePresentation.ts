@@ -12,10 +12,14 @@ const ZH_TERMS: Record<string, string> = {
   cherry: "樱桃木",
   travertine: "洞石",
   "matte black": "哑光黑",
+  "matte black stain": "哑光黑色染色",
   "blackened steel": "发黑钢",
   "brushed brass": "拉丝黄铜",
   "solid wood": "实木",
   "natural stone": "天然石材",
+  glass: "玻璃",
+  "tempered glass": "钢化玻璃",
+  clear: "透明",
   none: "无",
   top: "桌面",
   "table top": "桌面",
@@ -46,6 +50,9 @@ const ZH_TERMS: Record<string, string> = {
   "inset drawer": "嵌入式抽屉",
   "vertical drawer divider": "抽屉竖向分隔件",
   "round blackened steel knob": "圆形发黑钢拉手",
+  "freeform ash top": "自由曲面白蜡木桌面",
+  "sculpted slab leg": "弧形板式桌腿",
+  "freeform glass shelf": "自由曲面玻璃层板",
 };
 
 const ROLE_ZH: Record<FurnitureDesignSpec["components"][number]["role"], string> = {

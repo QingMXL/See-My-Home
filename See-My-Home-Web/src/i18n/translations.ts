@@ -546,6 +546,8 @@ export const TAG_ZH: Record<string, string> = {
   "White Oak": "白橡木",
   Ash: "白蜡木",
   "Matte Black": "哑光黑",
+  "Tempered Glass": "钢化玻璃",
+  "Matte Black Stain": "哑光黑色染色",
   "Metal Base": "金属底座",
   "Wood Tapered": "实木锥形腿",
   "Plinth Base": "落地底座",

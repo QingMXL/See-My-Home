@@ -20,7 +20,18 @@
 
 .furniture-intake__head {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-2);
+  align-items: start;
+}
+
+.furniture-intake__head > div {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.furniture-intake__head .btn {
+  white-space: nowrap;
 }
 
 .furniture-intake__head h2,
@@ -41,6 +52,20 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-4);
+}
+
+.furniture-demo-preview {
+  width: min(52rem, 100%);
+  margin-inline: auto;
+}
+
+.furniture-demo-preview .sample-preview__canvas {
+  background: #fff;
+}
+
+.furniture-demo-preview .sample-preview__canvas img {
+  max-height: 34rem;
+  object-fit: contain;
 }
 
 .furniture-upload-shell {
@@ -454,6 +479,7 @@
 
 .render-panel__decision {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-4);
   align-items: center;
   justify-content: space-between;
@@ -466,6 +492,25 @@
 
 .render-panel__decision .btn {
   flex: 0 0 auto;
+}
+
+.render-panel__actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.render-panel__feedback {
+  margin: 0;
+  border-top: 1px solid var(--color-line);
+  padding: var(--space-2) var(--space-4);
+  color: var(--color-ink-soft);
+  font-size: var(--text-xs);
+  text-align: right;
 }
 
 .render-panel__orthographic-error {
@@ -838,6 +883,14 @@
     padding: var(--space-4);
   }
 
+  .furniture-intake__head {
+    grid-template-columns: 1fr;
+  }
+
+  .furniture-intake__head .btn {
+    justify-self: start;
+  }
+
   .furniture-upload--large {
     grid-template-columns: 4.75rem minmax(0, 1fr);
     min-height: 7rem;
@@ -851,6 +904,22 @@
 
   .input-summary__sources {
     grid-template-columns: 1fr;
+  }
+
+  .render-panel__decision {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .render-panel__decision .render-panel__swatches {
+    padding: 0;
+  }
+
+  .render-panel__actions {
+    width: 100%;
+  }
+
+  .render-panel__actions .btn {
+    flex: 1 1 auto;
   }
 }
 
