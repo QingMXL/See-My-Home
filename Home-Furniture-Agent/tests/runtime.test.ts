@@ -85,15 +85,18 @@ test('starts a furniture turn and completes it through durable polling', async (
         { seq: 14, eventType: 'run.finished', payload: { status: 'succeeded' }, runId: 'run_async' },
       ] satisfies SessionEvent[];
     },
-    async getArtifact() {
+    async listArtifacts() {
       return {
-        artifact_id: 'art_async_001',
-        file_name: 'furniture_async_001_req_async_001_table.png',
-        source_path: '/workspace/artifacts/furniture_async_001/furniture_async_001_req_async_001_table.png',
-        content_type: 'image/png',
-        size: 1024,
-        status: 'ready',
-        run_id: 'run_async',
+        artifacts: [{
+          artifact_id: 'art_async_001',
+          file_name: 'furniture_async_001_req_async_001_table.png',
+          source_path: '/workspace/artifacts/furniture_async_001/furniture_async_001_req_async_001_table.png',
+          content_type: 'image/png',
+          size: 1024,
+          status: 'ready',
+          run_id: 'run_async',
+        }],
+        has_more: false,
       };
     },
   } as unknown as ZooworkClient;
