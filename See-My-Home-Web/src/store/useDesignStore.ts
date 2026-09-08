@@ -126,10 +126,11 @@ interface DesignStore {
   setFurnitureAppearance: (key: "secondaryMaterial" | "topShape" | "edgeProfile" | "finish", value: string) => void;
   unlockFurnitureControl: (control: FurnitureControlKey) => void;
   setFurniturePhase: (phase: GenerationPhase, stepIndex?: number) => void;
-  setFurnitureAgentRun: (run: FurnitureGenerationResult) => void;
+  setFurnitureAgentRun: (run: FurnitureGenerationResult | null) => void;
   setFurnitureOrthographicRun: (run: FurnitureOrthographicResult | null) => void;
   setFurnitureAgentError: (message: string | null) => void;
   confirmFurniture: () => void;
+  resetFurniture: () => void;
 
   saveDesign: (design: Omit<SavedDesign, "id" | "savedAt">) => void;
   deleteDesign: (id: string) => void;
@@ -353,8 +354,12 @@ export const useDesignStore = create<DesignStore>()(
         ...(kind === "sketch"
           ? { sketchName: name, sketchUrl: url, sketchAsset: null }
           : { inspirationName: name, inspirationUrl: url, inspirationAsset: null }),
+        agentRun: null,
         confirmed: false,
         orthographicRun: null,
+        agentError: null,
+        phase: "idle",
+        stepIndex: 0,
       },
     })),
   removeFurnitureSource: (kind) =>
@@ -434,6 +439,7 @@ export const useDesignStore = create<DesignStore>()(
   setFurnitureAgentError: (agentError) =>
     set((s) => ({ furniture: { ...s.furniture, agentError } })),
   confirmFurniture: () => set((s) => ({ furniture: { ...s.furniture, confirmed: true } })),
+  resetFurniture: () => set(() => ({ furniture: { ...initialFurniture } })),
 
   saveDesign: (design) =>
     set((s) => ({ saved: [{ ...design, id: makeId(), savedAt: Date.now() }, ...s.saved] })),

@@ -124,6 +124,7 @@ export function FurniturePage() {
     setFurnitureOrthographicRun,
     setFurnitureAgentError,
     confirmFurniture,
+    resetFurniture,
     saveDesign,
   } = useDesignStore();
   const sketchInputRef = useRef<HTMLInputElement>(null);
@@ -149,7 +150,8 @@ export function FurniturePage() {
   const generated = furniture.agentRun;
   const orthographic = furniture.orthographicRun;
   const spec = generated?.response.design_spec;
-  const isDemoResult = generated?.project_id === DEMO_FURNITURE_PROJECT_ID;
+  const isDemoResult = generated?.project_id === DEMO_FURNITURE_PROJECT_ID
+    && generated.generated_image.provider_model === "Pre-rendered demo";
   const summaryHasSketch = Boolean(generated?.request_context?.sketch_asset_id);
   const summaryHasInspiration = Boolean(generated?.request_context?.inspiration_asset_id);
   const summarySketchUrl = furniture.sketchUrl ?? (isDemoResult ? DEMO_FURNITURE_SKETCH_URL : null);
@@ -235,15 +237,19 @@ export function FurniturePage() {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
+    const replacingDemo = isDemoFurnitureAsset(furniture.sketchAsset) || isDemoResult;
     const previousUrl = kind === "sketch" ? furniture.sketchUrl : furniture.inspirationUrl;
     if (previousUrl?.startsWith("blob:")) URL.revokeObjectURL(previousUrl);
+    if (replacingDemo) resetFurniture();
     const localUrl = URL.createObjectURL(file);
     setFurnitureSource(kind, file.name, localUrl);
     setFurnitureAgentError(null);
     setUploading(kind);
     try {
-      const existingAsset = [furniture.sketchAsset, furniture.inspirationAsset].find((asset) => asset && !isDemoFurnitureAsset(asset));
-      const projectId = existingAsset?.project_id ?? (isDemoSketch ? undefined : furniture.projectId ?? undefined);
+      const existingAsset = replacingDemo
+        ? undefined
+        : [furniture.sketchAsset, furniture.inspirationAsset].find((asset) => asset && !isDemoFurnitureAsset(asset));
+      const projectId = replacingDemo ? undefined : existingAsset?.project_id ?? furniture.projectId ?? undefined;
       const asset = await uploadFurnitureImage(file, kind, lang === "zh" ? "zh-CN" : "en-US", projectId);
       setFurnitureUploadedAsset(kind, asset);
     } catch (error) {
@@ -257,8 +263,12 @@ export function FurniturePage() {
     const asset = kind === "sketch" ? furniture.sketchAsset : furniture.inspirationAsset;
     const localUrl = kind === "sketch" ? furniture.sketchUrl : furniture.inspirationUrl;
     if (localUrl?.startsWith("blob:")) URL.revokeObjectURL(localUrl);
+    if (isDemoFurnitureAsset(asset)) {
+      resetFurniture();
+      return;
+    }
     removeFurnitureSource(kind);
-    if (asset && !isDemoFurnitureAsset(asset)) {
+    if (asset) {
       void deleteFurnitureImage(asset).catch((error) => {
         setFurnitureAgentError(error instanceof Error ? error.message : copy("Image removal failed.", "图片删除失败。"));
       });
@@ -289,6 +299,7 @@ export function FurniturePage() {
     );
     setOrthographicError(null);
     setFurnitureAgentError(null);
+    if (!isRefinement) setFurnitureAgentRun(null);
     setFurniturePhase("generating", 0);
     navigate("/furniture/render");
     const stepOne = useDemoGeneration ? undefined : window.setTimeout(() => setFurniturePhase("generating", 1), 1200);

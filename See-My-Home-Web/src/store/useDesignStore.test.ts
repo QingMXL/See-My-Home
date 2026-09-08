@@ -1,9 +1,32 @@
 import { beforeEach, describe, expect, test } from "vitest";
+import {
+  createDemoFurnitureResult,
+  DEMO_FURNITURE_SKETCH_ASSET,
+} from "../data/furnitureDemo";
+import type { FurnitureGenerateInput } from "../lib/homeFurnitureApi";
 import { useDesignStore } from "./useDesignStore";
+
+const demoInput: FurnitureGenerateInput = {
+  project_id: "demo_home_furniture",
+  sketch_asset_id: DEMO_FURNITURE_SKETCH_ASSET.asset_id,
+  locale: "en-US",
+  table_type: "dining_table",
+  description: "Demo furniture",
+  locked_controls: [],
+  dimensions_mm: { width: 1800, depth: 900, height: 750 },
+  primary_material: "Ash",
+  secondary_material: "Tempered Glass",
+  top_shape: "freeform",
+  edge_profile: "Soft Radius",
+  base_style: "Twin Pedestal",
+  finish: "Matte Black Stain",
+  storage: "Open Shelf",
+};
 
 describe("useDesignStore", () => {
   beforeEach(() => {
     useDesignStore.getState().resetLayout();
+    useDesignStore.getState().resetFurniture();
     useDesignStore.getState().setLayoutRooms([{
       id: "test-room",
       label: "Guest Bedroom",
@@ -148,6 +171,43 @@ describe("useDesignStore", () => {
       orthographicRun: null,
       phase: "idle",
       confirmed: false,
+    });
+  });
+
+  test("replacing a demo source immediately removes its pre-rendered result", () => {
+    useDesignStore.getState().setFurnitureSource("sketch", "Furniture Example", "/demo/home-furniture/source-sketch.png");
+    useDesignStore.getState().setFurnitureUploadedAsset("sketch", DEMO_FURNITURE_SKETCH_ASSET);
+    useDesignStore.getState().setFurnitureAgentRun(createDemoFurnitureResult(demoInput));
+
+    useDesignStore.getState().setFurnitureSource("sketch", "my-sketch.png", "blob:my-sketch");
+
+    expect(useDesignStore.getState().furniture).toMatchObject({
+      sketchName: "my-sketch.png",
+      sketchUrl: "blob:my-sketch",
+      sketchAsset: null,
+      agentRun: null,
+      orthographicRun: null,
+      phase: "idle",
+    });
+  });
+
+  test("resetting furniture removes all demo-specific inputs and controls", () => {
+    useDesignStore.getState().setFurnitureSource("sketch", "Furniture Example", "/demo/home-furniture/source-sketch.png");
+    useDesignStore.getState().setFurnitureUploadedAsset("sketch", DEMO_FURNITURE_SKETCH_ASSET);
+    useDesignStore.getState().setFurniturePrompt("Demo-only prompt");
+    useDesignStore.getState().setFurnitureOption("material", "Ash");
+    useDesignStore.getState().setFurnitureAgentRun(createDemoFurnitureResult(demoInput));
+
+    useDesignStore.getState().resetFurniture();
+
+    expect(useDesignStore.getState().furniture).toMatchObject({
+      projectId: null,
+      sketchName: null,
+      sketchAsset: null,
+      prompt: "",
+      material: "Walnut",
+      lockedControls: [],
+      agentRun: null,
     });
   });
 
