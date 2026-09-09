@@ -271,12 +271,31 @@ test('builds a strict directly-overhead visible-surfaces-only top plan request',
   await runtime.startFurnitureTurn({ agentId: 'agent_private_001', sessionId: 'session_top' }, topRequest);
 
   assert.match(postedContent, /TOP PLAN IS STRICT/i);
-  assert.match(postedContent, /optical axis exactly perpendicular to the tabletop/i);
-  assert.match(postedContent, /tabletop plane parallel to the image plane/i);
-  assert.match(postedContent, /Do not draw legs, apron, base, stretcher, shelf, drawers.*through it/i);
+  assert.match(postedContent, /optical axis exactly perpendicular to the floor/i);
+  assert.match(postedContent, /principal horizontal plane parallel to the image plane/i);
+  assert.match(postedContent, /Do not draw lower components through opaque upper components/i);
   assert.match(postedContent, /do not use dashed hidden lines/i);
   assert.match(postedContent, /orthographic_projection_correct=true/i);
   assert.match(postedContent, /orthographic_visible_surfaces_correct=true/i);
+});
+
+test('builds category-specific anatomy instructions for chairs, sofas, and lamps', async () => {
+  const posted: string[] = [];
+  const fakeClient = {
+    async postEvents(_agentId: string, _sessionId: string, events: { content?: string }[]) {
+      posted.push(events[0]?.content ?? '');
+      return { events: [{ id: `event_${posted.length}`, seq: posted.length, type: 'user.message', accepted: true }] };
+    },
+  } as unknown as ZooworkClient;
+  const runtime = new HomeFurnitureRuntime(fakeClient, 'agent_private_001');
+
+  await runtime.startFurnitureTurn({ agentId: 'agent_private_001', sessionId: 'chair' }, { ...request, table_type: 'lounge_chair' });
+  await runtime.startFurnitureTurn({ agentId: 'agent_private_001', sessionId: 'sofa' }, { ...request, table_type: 'sectional_sofa' });
+  await runtime.startFurnitureTurn({ agentId: 'agent_private_001', sessionId: 'lamp' }, { ...request, table_type: 'floor_lamp' });
+
+  assert.match(posted[0]!, /chair seat, back, arms/i);
+  assert.match(posted[1]!, /sofa module count and arrangement/i);
+  assert.match(posted[2]!, /lamp shade or diffuser/i);
 });
 
 test('requires explicit projection and visible-surface QA for every orthographic artifact', () => {

@@ -138,6 +138,18 @@ describe("useDesignStore", () => {
     expect(useDesignStore.getState().furniture.lockedControls).not.toContain("primary_material");
   });
 
+  test("switching furniture category clears incompatible locked controls", () => {
+    useDesignStore.getState().setFurnitureOption("legs", "Twin Pedestal");
+    useDesignStore.getState().setFurnitureOption("shelves", "Two Drawers");
+    expect(useDesignStore.getState().furniture.lockedControls).toContain("base_style");
+
+    useDesignStore.getState().setFurnitureTableType("floor_lamp");
+
+    expect(useDesignStore.getState().furniture.tableType).toBe("floor_lamp");
+    expect(useDesignStore.getState().furniture.lockedControls).toEqual([]);
+    expect(useDesignStore.getState().furniture.confirmed).toBe(false);
+  });
+
   test("normalizes the adjustable sketch weight to safe five-point steps", () => {
     useDesignStore.getState().setFurnitureSketchWeight(63);
     expect(useDesignStore.getState().furniture.sketchWeight).toBe(65);

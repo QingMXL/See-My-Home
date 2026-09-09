@@ -1,7 +1,7 @@
 import { upload } from "@vercel/blob/client";
 
 export type FurnitureSourceKind = "sketch" | "inspiration";
-export type FurnitureTableType =
+export type FurnitureItemType =
   | "dining_table"
   | "coffee_table"
   | "console_table"
@@ -10,7 +10,31 @@ export type FurnitureTableType =
   | "bedside_table"
   | "nesting_tables"
   | "bar_table"
-  | "other_table";
+  | "other_table"
+  | "dining_chair"
+  | "armchair"
+  | "lounge_chair"
+  | "office_chair"
+  | "stool"
+  | "bench"
+  | "other_chair"
+  | "sofa"
+  | "loveseat"
+  | "sectional_sofa"
+  | "chaise_lounge"
+  | "sofa_bed"
+  | "ottoman"
+  | "other_sofa"
+  | "table_lamp"
+  | "floor_lamp"
+  | "desk_lamp"
+  | "pendant_light"
+  | "chandelier"
+  | "wall_sconce"
+  | "other_lamp";
+
+/** @deprecated Kept for compatibility with the v1 wire field named table_type. */
+export type FurnitureTableType = FurnitureItemType;
 export type FurnitureTopShape = "rectangular" | "round" | "oval" | "square" | "freeform";
 export type FurnitureControlKey =
   | "dimensions_mm"
@@ -58,7 +82,7 @@ export interface FurnitureDesignSpec {
   components: {
     id: string;
     name: string;
-    role: "top" | "support" | "apron" | "stretcher" | "shelf" | "drawer" | "hardware" | "other";
+    role: "top" | "support" | "apron" | "stretcher" | "shelf" | "drawer" | "hardware" | "frame" | "seat" | "back" | "arm" | "cushion" | "upholstery" | "shade" | "diffuser" | "light_source" | "mount" | "other";
     quantity: number;
     dimensions_mm?: Partial<FurnitureDimensions>;
   }[];
@@ -69,7 +93,7 @@ export interface FurnitureAgentResponse {
   contract_version: "home-furniture-v1";
   request_id: string;
   status: "completed" | "needs_confirmation" | "failed";
-  table_type: FurnitureTableType;
+  table_type: FurnitureItemType;
   artifact_id?: string;
   design_summary: string;
   design_spec: FurnitureDesignSpec;
@@ -89,7 +113,7 @@ export interface FurnitureGenerateInput {
   sketch_asset_id?: string;
   inspiration_asset_id?: string;
   locale: "en-US" | "zh-CN";
-  table_type: FurnitureTableType;
+  table_type: FurnitureItemType;
   description: string;
   locked_controls: FurnitureControlKey[];
   dimensions_mm: FurnitureDimensions;
@@ -117,7 +141,7 @@ export interface FurnitureGenerationResult {
   session_id: string;
   request_id: string;
   project_id: string;
-  table_type: FurnitureTableType;
+  table_type: FurnitureItemType;
   source_priority: { sketch: number; inspiration: number };
   response: FurnitureAgentResponse;
   generated_image: {

@@ -1,41 +1,30 @@
-# Table visualization contract
+# Furniture visualization contract
 
-The request has two mutually exclusive modes.
+The request has two mutually exclusive modes. The historical `request.table_type` key identifies the exact supported furniture item.
 
 ## Concept render
 
-Generate one isolated product view on a quiet neutral studio background. When a sketch is present, preserve its camera viewpoint: viewing angle, elevation, visible faces, and framing should remain recognizably aligned with the sketch according to its source weight. Use a three-quarter view only when there is no sketch or the sketch itself uses that view. The complete table must be visible, with no room staging that hides its silhouette.
+Generate one isolated full-product view on a quiet neutral studio background. When a sketch is present, preserve its viewing angle, elevation, visible faces, framing, topology, component count, and placement according to its source weight. Use a three-quarter view only when no sketch exists or the sketch itself uses that view.
 
-Inspect each supplied source once before generation. After the concept raster is returned, materialize and publish it without a second `image` inspection; this avoids repeating visual analysis while preserving the source-led generation prompt. Keep strict post-generation inspection for orthographic geometry only.
+Inspect each supplied source once before generation. Materialize and publish the concept raster without a second image inspection. Express reference weighting through the prompt and specification only.
 
-When both visual references exist, the output should be recognizably closer to the image with the higher `source_priority` value. Express this balance through the natural-language design prompt and validated specification only; do not invent numeric image-weight or control-strength arguments that the current image tool schema does not expose.
+Preserve the requested item family and intended use, exact stated overall dimensions, principal form and edge detail, support/base/mount, primary and secondary materials, finish, and all specified major components. In particular:
 
-## Preserve
+- chairs: seat, back, arms, frame/supports, upholstery boundaries, swivel/cantilever/footrest features;
+- sofas: module arrangement and handedness, cushion count, arms, upholstery seams, frame, chaise/bed feature, legs or plinth;
+- lamps: shade/diffuser, light-head count, luminous element placement, stem or arms, base/canopy/wall mount, requested switch or cord;
+- tables: top, supports, apron, stretchers, storage, hardware.
 
-- table family and intended use
-- exact overall width, depth, and height stated in the prompt
-- top shape and edge profile
-- number, placement, and broad geometry of supports
-- apron, stretcher, shelf, drawer, cable opening, and other specified major components
-- primary and secondary material assignments
-- sketch camera viewpoint and framing when a sketch is present
+Avoid extra or missing parts, impossible intersections, floating components, visibly implausible supports, companion furniture, décor, people, room staging, text, dimensions, labels, logos, watermarks, or a camera that crops the product. Do not copy a branded product wholesale.
 
-## Avoid
+## Orthographic layer
 
-- extra or missing legs, pedestals, drawers, shelves, or nested pieces
-- impossible intersections, floating parts, visibly unstable support arrangements
-- chairs, stools, lamps, décor, tableware, people, text, dimensions, labels, logos, or watermarks
-- perspective that crops the table or prevents its main construction from being read
-- copying a branded reference product wholesale
+Each turn generates one raster from the confirmed product render as the sole image reference: front elevation, side elevation, or top plan. Show the complete requested item with confirmed component count, placement, silhouette, and recognizable proportions. Do not redesign or simplify it. Preserve width-to-height, depth-to-height, or width-to-depth from `confirmed_design_spec.dimensions_mm`.
 
-## Orthographic sheet
+Use clean black-and-white technical linework on pure white. Visible outer silhouette is noticeably heavier than internal component edges; unavoidable construction detail is thinner. Center the object with clear margins. Do not add another view, panel border, perspective convergence, room scene, materials, tonal fills, shading, shadows, props, generated labels, dimension numbers, title blocks, logos, or watermarks. Echo the confirmed specification unchanged.
 
-Each orthographic turn generates one raster using the confirmed product render as the sole image reference. Read `request.orthographic_view` and create exactly that one view: front elevation, side elevation, or top plan. Show the complete table with the confirmed component count, placement, silhouette, and recognizable proportions. Do not redesign or simplify drawers, shelves, supports, hardware, or curved structural details. Preserve the relevant width-to-height, depth-to-height, or width-to-depth ratio from `confirmed_design_spec.dimensions_mm`.
+For `orthographic_view=top`, output a strict plan, not a bird's-eye or elevated view. Center the camera directly above the furniture, set the optical axis perpendicular to the floor, and keep the principal horizontal plane parallel to the image plane. Use parallel projection with no convergence, skew, foreshortening, adjacent face, or underside. Draw only genuinely visible surfaces. Opaque upper parts hide lower parts: table tops hide underframes; seating cushions, arms, and backs occlude according to their real overlap; lamp shades, diffusers, canopies, and bases occlude parts below according to height. Omit hidden parts rather than drawing solid or dashed hidden lines. Reject invented projections.
 
-Use clean, uniform black-and-white technical linework on a pure white background. The furniture's visible outer silhouette must be noticeably heavier than internal component edges; keep internal edges medium weight and any unavoidable construction detail distinctly thinner. Keep the single object centered and fully visible with clear margins on every side. Do not add another view, a panel border, perspective convergence, room scene, materials, tonal fills, shading, shadows, props, generated labels, dimension numbers, title blocks, logos, or watermarks. Echo the confirmed design specification unchanged in the structured response.
+After inspection, set `qa.orthographic_projection_correct` and `qa.orthographic_visible_surfaces_correct`; both must be true before publication. Perspective, adjacent-face leakage, hidden structure, unsupported component projection, or disagreement with the render is non-publishable.
 
-For `orthographic_view=top`, output a strict top plan rather than a bird's-eye or elevated view. Center the virtual camera directly above the table, point its optical axis exactly perpendicular to the tabletop, and keep the tabletop plane parallel to the image plane. Use parallel projection with no convergence, skew, foreshortening, visible tabletop thickness, or adjacent front/side/underside face. Draw only what is actually visible from directly above. Every opaque tabletop or upper surface occludes the apron, base, stretchers, shelves, drawers, legs, and other components below it; omit those hidden parts instead of drawing them with solid or dashed lines. A lower component may appear outside the tabletop silhouette only when the confirmed render unambiguously proves it projects beyond the top and would be visible from directly above. Reject an invented projection.
-
-After inspection, explicitly set `qa.orthographic_projection_correct` and `qa.orthographic_visible_surfaces_correct`. Both must be true before publication. Perspective, adjacent-face leakage, hidden structure through an opaque top, unsupported support projection outside the top footprint, or disagreement with the confirmed render makes the layer non-publishable and must trigger failure rather than a warning.
-
-The application starts three independent orthographic turns and combines the three published rasters into one 3840 × 2160 shop-drawing sheet. It normalizes the geometry layers to one confirmed-dimension scale and adds deterministic annotations from `confirmed_design_spec`: front width and height, side depth and height plus top thickness, and top width and depth. The final layout uses a large front elevation at upper left, a side elevation at upper right, and a top view below, with a pure white background, fine border, thin extension and dimension lines, arrowheads, sans-serif engineering labels, and every numeric value followed by `mm`. Image generation is not dimensional proof. Pass or fail each geometry layer on the presence of one complete requested view, recognizable component consistency, adequate whitespace, the required line hierarchy, and absence of extra views, shading, and material texture. Report minor raster ratio drift as a warning; cropping, materially different furniture, missing major components, or multiple views fail. The product does not claim fabrication readiness.
+The application combines three published rasters into one 3840 × 2160 shop-drawing sheet, normalizes them to one confirmed-dimension scale, and adds deterministic width/height, depth/height, and width/depth annotations. It adds confirmed `design_spec.top.thickness_mm` to the side view only for table types. Image generation is not dimensional proof. This product does not claim fabrication readiness.

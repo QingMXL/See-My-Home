@@ -1,7 +1,12 @@
 import { readFileSync } from 'node:fs';
 import opentype from 'opentype.js';
 import sharp, { type OverlayOptions } from 'sharp';
-import type { FurnitureDesignSpec, OrthographicView } from '../../Home-Furniture-Agent/src/contracts.js';
+import {
+  furnitureCategory,
+  type FurnitureDesignSpec,
+  type FurnitureItemType,
+  type OrthographicView,
+} from '../../Home-Furniture-Agent/src/contracts.js';
 
 export const ORTHOGRAPHIC_SHEET_WIDTH = 3840;
 export const ORTHOGRAPHIC_SHEET_HEIGHT = 2160;
@@ -182,6 +187,7 @@ function topThicknessDimension(frame: OrthographicViewFrame, spec: FurnitureDesi
 export function buildDimensionAnnotationSvg(input: {
   frames: OrthographicViewFrame[];
   spec: FurnitureDesignSpec;
+  furnitureType?: FurnitureItemType;
 }): string {
   const { frames, spec } = input;
   const [front, side, top] = frames;
@@ -199,7 +205,7 @@ export function buildDimensionAnnotationSvg(input: {
     verticalDimension(side, `${height} mm`),
     horizontalDimension(top, `${width} mm`),
     verticalDimension(top, `${depth} mm`),
-    topThicknessDimension(side, spec),
+    ...(furnitureCategory(input.furnitureType ?? 'dining_table') === 'table' ? [topThicknessDimension(side, spec)] : []),
   ].join('');
 
   return `
@@ -220,6 +226,7 @@ export function buildDimensionAnnotationSvg(input: {
 export async function createDimensionedOrthographicPng(input: {
   sources: OrthographicImageSources;
   spec: FurnitureDesignSpec;
+  furnitureType?: FurnitureItemType;
 }): Promise<Buffer> {
   const prepared = await Promise.all(VIEW_ORDER.map((view) => prepareView(input.sources[view], view)));
   const frames = targetFrames(input.spec);
@@ -231,7 +238,11 @@ export async function createDimensionedOrthographicPng(input: {
     left: frames[index]!.left,
     top: frames[index]!.top,
   })));
-  const annotations = buildDimensionAnnotationSvg({ frames, spec: input.spec });
+  const annotations = buildDimensionAnnotationSvg({
+    frames,
+    spec: input.spec,
+    ...(input.furnitureType ? { furnitureType: input.furnitureType } : {}),
+  });
   return sharp({
     create: { width: ORTHOGRAPHIC_SHEET_WIDTH, height: ORTHOGRAPHIC_SHEET_HEIGHT, channels: 3, background: '#ffffff' },
   })

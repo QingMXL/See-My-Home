@@ -8,7 +8,7 @@
     "contract_version": { "const": "home-furniture-v1" },
     "request_id": { "type": "string", "minLength": 1, "maxLength": 160 },
     "status": { "enum": ["completed", "needs_confirmation", "failed"] },
-    "table_type": { "enum": ["dining_table", "coffee_table", "console_table", "side_table", "desk", "bedside_table", "nesting_tables", "bar_table", "other_table"] },
+    "table_type": { "enum": ["dining_table", "coffee_table", "console_table", "side_table", "desk", "bedside_table", "nesting_tables", "bar_table", "other_table", "dining_chair", "armchair", "lounge_chair", "office_chair", "stool", "bench", "other_chair", "sofa", "loveseat", "sectional_sofa", "chaise_lounge", "sofa_bed", "ottoman", "other_sofa", "table_lamp", "floor_lamp", "desk_lamp", "pendant_light", "chandelier", "wall_sconce", "other_lamp"] },
     "artifact_id": { "type": "string", "minLength": 1, "maxLength": 240 },
     "design_summary": { "type": "string", "maxLength": 1200 },
     "design_spec": {
@@ -21,9 +21,9 @@
           "additionalProperties": false,
           "required": ["width", "depth", "height"],
           "properties": {
-            "width": { "type": "integer", "minimum": 250, "maximum": 5000 },
-            "depth": { "type": "integer", "minimum": 200, "maximum": 2000 },
-            "height": { "type": "integer", "minimum": 150, "maximum": 1500 }
+            "width": { "type": "integer", "minimum": 80, "maximum": 5000 },
+            "depth": { "type": "integer", "minimum": 80, "maximum": 2500 },
+            "height": { "type": "integer", "minimum": 100, "maximum": 3000 }
           }
         },
         "top": {
@@ -33,7 +33,7 @@
           "properties": {
             "shape": { "enum": ["rectangular", "round", "oval", "square", "freeform"] },
             "edge_profile": { "type": "string", "minLength": 1, "maxLength": 120 },
-            "thickness_mm": { "type": "integer", "minimum": 5, "maximum": 250 }
+            "thickness_mm": { "type": "integer", "minimum": 1, "maximum": 1000 }
           }
         },
         "base": {
@@ -42,7 +42,7 @@
           "required": ["style", "support_count"],
           "properties": {
             "style": { "type": "string", "minLength": 1, "maxLength": 120 },
-            "support_count": { "type": "integer", "minimum": 1, "maximum": 12 },
+            "support_count": { "type": "integer", "minimum": 1, "maximum": 32 },
             "inset_mm": { "type": "integer", "minimum": 0, "maximum": 1000 }
           }
         },
@@ -72,15 +72,15 @@
             "properties": {
               "id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$" },
               "name": { "type": "string", "minLength": 1, "maxLength": 120 },
-              "role": { "enum": ["top", "support", "apron", "stretcher", "shelf", "drawer", "hardware", "other"] },
-              "quantity": { "type": "integer", "minimum": 1, "maximum": 24 },
+              "role": { "enum": ["top", "support", "apron", "stretcher", "shelf", "drawer", "hardware", "frame", "seat", "back", "arm", "cushion", "upholstery", "shade", "diffuser", "light_source", "mount", "other"] },
+              "quantity": { "type": "integer", "minimum": 1, "maximum": 64 },
               "dimensions_mm": {
                 "type": "object",
                 "additionalProperties": false,
                 "properties": {
                   "width": { "type": "integer", "minimum": 1, "maximum": 5000 },
-                  "depth": { "type": "integer", "minimum": 1, "maximum": 2000 },
-                  "height": { "type": "integer", "minimum": 1, "maximum": 1500 }
+                  "depth": { "type": "integer", "minimum": 1, "maximum": 2500 },
+                  "height": { "type": "integer", "minimum": 1, "maximum": 3000 }
                 }
               }
             }

@@ -4,14 +4,15 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { resolve } from 'node:path';
 import { loadEnvFile } from 'node:process';
 import { createZooworkClient, ZooworkError } from '@zoowork-ai/sdk';
+import { FURNITURE_ITEM_TYPES } from './contracts.js';
 import type {
   FurnitureControlKey,
   FurnitureDesignControls,
   FurnitureDesignSpec,
+  FurnitureItemType,
   FurnitureTurnRequest,
   OrthographicView,
   SupportedLocale,
-  TableType,
   TopShape,
 } from './contracts.js';
 import { projectRoot } from './paths.js';
@@ -163,7 +164,7 @@ function sourceUrl(asset: UploadedAsset): string {
   return `${publicBaseUrl()}/api/site/furniture/source/${encodeURIComponent(asset.assetId)}/${asset.accessToken}`;
 }
 
-const tableTypes = new Set<TableType>(['dining_table', 'coffee_table', 'console_table', 'side_table', 'desk', 'bedside_table', 'nesting_tables', 'bar_table', 'other_table']);
+const furnitureItemTypes = new Set<FurnitureItemType>(FURNITURE_ITEM_TYPES);
 const topShapes = new Set<TopShape>(['rectangular', 'round', 'oval', 'square', 'freeform']);
 const furnitureControlKeys = new Set<FurnitureControlKey>([
   'dimensions_mm', 'primary_material', 'secondary_material', 'top_shape', 'edge_profile',
@@ -183,9 +184,9 @@ function controls(input: Record<string, unknown>): FurnitureDesignControls {
   if (!topShapes.has(shape)) throw new Error('top_shape is unsupported');
   return {
     dimensions_mm: {
-      width: dimension(values.width, 'dimensions_mm.width', 250, 5000),
-      depth: dimension(values.depth, 'dimensions_mm.depth', 200, 2000),
-      height: dimension(values.height, 'dimensions_mm.height', 150, 1500),
+      width: dimension(values.width, 'dimensions_mm.width', 80, 5000),
+      depth: dimension(values.depth, 'dimensions_mm.depth', 80, 2500),
+      height: dimension(values.height, 'dimensions_mm.height', 100, 3000),
     },
     primary_material: requireString(input.primary_material, 'primary_material').slice(0, 120),
     secondary_material: optionalString(input.secondary_material, 'secondary_material', 120),
@@ -252,8 +253,8 @@ function sourcePriority(input: Record<string, unknown>, hasSketch: boolean, hasI
 
 async function runGeneration(input: Record<string, unknown>) {
   const projectId = requireString(input.project_id, 'project_id');
-  const tableType = requireString(input.table_type, 'table_type') as TableType;
-  if (!tableTypes.has(tableType)) throw new Error('table_type is unsupported');
+  const furnitureType = requireString(input.table_type, 'table_type') as FurnitureItemType;
+  if (!furnitureItemTypes.has(furnitureType)) throw new Error('table_type is unsupported');
   const sketch = getAsset(input.sketch_asset_id, projectId, 'sketch');
   const inspiration = getAsset(input.inspiration_asset_id, projectId, 'inspiration');
   const description = optionalString(input.description, 'description', 4000);
@@ -265,7 +266,7 @@ async function runGeneration(input: Record<string, unknown>) {
     request_id: newId('req'),
     project_id: projectId,
     locale: selectedLocale(input.locale),
-    table_type: tableType,
+    table_type: furnitureType,
     ...(sketch ? { sketch_asset_ref: sourceUrl(sketch) } : {}),
     ...(inspiration ? { inspiration_asset_ref: sourceUrl(inspiration) } : {}),
     ...(description ? { description } : {}),
@@ -281,7 +282,7 @@ async function runGeneration(input: Record<string, unknown>) {
     session_id: conversation.sessionId,
     request_id: request.request_id,
     project_id: projectId,
-    table_type: tableType,
+    table_type: furnitureType,
     source_priority: request.source_priority,
     response: result.response,
     generated_image: {
@@ -344,7 +345,7 @@ async function runOrthographic(input: Record<string, unknown>) {
     return { view, result, conversation, bytes: Buffer.from(await upstream.arrayBuffer()) };
   }));
   const sources = Object.fromEntries(generated.map((item) => [item.view, item.bytes])) as Record<OrthographicView, Buffer>;
-  const sheet = await createDimensionedOrthographicPng({ sources, spec: designResponse.design_spec });
+  const sheet = await createDimensionedOrthographicPng({ sources, spec: designResponse.design_spec, furnitureType: designResponse.table_type });
   const artifactId = newId('orthographic_sheet');
   const outputDirectory = resolve(projectRoot, '.runtime', 'artifacts');
   mkdirSync(outputDirectory, { recursive: true });

@@ -10,7 +10,7 @@
     "request_id": { "type": "string", "minLength": 1, "maxLength": 160 },
     "project_id": { "type": "string", "minLength": 1, "maxLength": 160 },
     "locale": { "enum": ["en-US", "zh-CN"] },
-    "table_type": { "enum": ["dining_table", "coffee_table", "console_table", "side_table", "desk", "bedside_table", "nesting_tables", "bar_table", "other_table"] },
+    "table_type": { "enum": ["dining_table", "coffee_table", "console_table", "side_table", "desk", "bedside_table", "nesting_tables", "bar_table", "other_table", "dining_chair", "armchair", "lounge_chair", "office_chair", "stool", "bench", "other_chair", "sofa", "loveseat", "sectional_sofa", "chaise_lounge", "sofa_bed", "ottoman", "other_sofa", "table_lamp", "floor_lamp", "desk_lamp", "pendant_light", "chandelier", "wall_sconce", "other_lamp"] },
     "sketch_asset_ref": { "type": "string", "format": "uri", "maxLength": 4096 },
     "inspiration_asset_ref": { "type": "string", "format": "uri", "maxLength": 4096 },
     "render_asset_ref": { "type": "string", "format": "uri", "maxLength": 4096 },
@@ -43,9 +43,9 @@
           "additionalProperties": false,
           "required": ["width", "depth", "height"],
           "properties": {
-            "width": { "type": "integer", "minimum": 250, "maximum": 5000 },
-            "depth": { "type": "integer", "minimum": 200, "maximum": 2000 },
-            "height": { "type": "integer", "minimum": 150, "maximum": 1500 }
+            "width": { "type": "integer", "minimum": 80, "maximum": 5000 },
+            "depth": { "type": "integer", "minimum": 80, "maximum": 2500 },
+            "height": { "type": "integer", "minimum": 100, "maximum": 3000 }
           }
         },
         "primary_material": { "type": "string", "minLength": 1, "maxLength": 120 },

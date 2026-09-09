@@ -28,8 +28,8 @@ import {
   type FurnitureControlKey,
   type FurnitureGenerationProgress,
   type FurnitureGenerateInput,
+  type FurnitureItemType,
   type FurnitureSourceKind,
-  type FurnitureTableType,
   type FurnitureTopShape,
 } from "../../lib/homeFurnitureApi";
 import {
@@ -43,19 +43,44 @@ import { useDesignStore } from "../../store/useDesignStore";
 import "../layout-flow/layout-flow.css";
 import "./furniture.css";
 
-const TABLE_TYPES: { value: FurnitureTableType; en: string; zh: string }[] = [
-  { value: "dining_table", en: "Dining table", zh: "餐桌" },
-  { value: "coffee_table", en: "Coffee table", zh: "茶几" },
-  { value: "console_table", en: "Console table", zh: "玄关桌" },
-  { value: "side_table", en: "Side table", zh: "边几" },
-  { value: "desk", en: "Desk", zh: "书桌" },
-  { value: "bedside_table", en: "Bedside table", zh: "床头桌" },
-  { value: "nesting_tables", en: "Nesting tables", zh: "套几" },
-  { value: "bar_table", en: "Bar table", zh: "吧台桌" },
-  { value: "other_table", en: "Other table", zh: "其他桌类" },
+type FurnitureCategory = "table" | "chair" | "sofa" | "lamp";
+type FurnitureTypeOption = { value: FurnitureItemType; en: string; zh: string };
+
+const TYPE_GROUPS: { category: FurnitureCategory; en: string; zh: string; options: FurnitureTypeOption[] }[] = [
+  { category: "table", en: "Tables", zh: "桌子", options: [
+    { value: "dining_table", en: "Dining table", zh: "餐桌" }, { value: "coffee_table", en: "Coffee table", zh: "茶几" },
+    { value: "console_table", en: "Console table", zh: "玄关桌" }, { value: "side_table", en: "Side table", zh: "边几" },
+    { value: "desk", en: "Desk", zh: "书桌" }, { value: "bedside_table", en: "Bedside table", zh: "床头桌" },
+    { value: "nesting_tables", en: "Nesting tables", zh: "套几" }, { value: "bar_table", en: "Bar table", zh: "吧台桌" },
+    { value: "other_table", en: "Other table", zh: "其他桌类" },
+  ] },
+  { category: "chair", en: "Chairs", zh: "椅子", options: [
+    { value: "dining_chair", en: "Dining chair", zh: "餐椅" }, { value: "armchair", en: "Armchair", zh: "扶手椅" },
+    { value: "lounge_chair", en: "Lounge chair", zh: "休闲椅" }, { value: "office_chair", en: "Office chair", zh: "办公椅" },
+    { value: "stool", en: "Stool", zh: "凳子" }, { value: "bench", en: "Bench", zh: "长凳" },
+    { value: "other_chair", en: "Other chair", zh: "其他椅子" },
+  ] },
+  { category: "sofa", en: "Sofas", zh: "沙发", options: [
+    { value: "sofa", en: "Sofa", zh: "沙发" }, { value: "loveseat", en: "Loveseat", zh: "双人沙发" },
+    { value: "sectional_sofa", en: "Sectional sofa", zh: "组合沙发" }, { value: "chaise_lounge", en: "Chaise lounge", zh: "贵妃榻" },
+    { value: "sofa_bed", en: "Sofa bed", zh: "沙发床" }, { value: "ottoman", en: "Ottoman", zh: "脚凳" },
+    { value: "other_sofa", en: "Other sofa", zh: "其他沙发" },
+  ] },
+  { category: "lamp", en: "Lamps", zh: "灯具", options: [
+    { value: "table_lamp", en: "Table lamp", zh: "台灯" }, { value: "floor_lamp", en: "Floor lamp", zh: "落地灯" },
+    { value: "desk_lamp", en: "Desk lamp", zh: "工作灯" }, { value: "pendant_light", en: "Pendant light", zh: "吊灯" },
+    { value: "chandelier", en: "Chandelier", zh: "枝形吊灯" }, { value: "wall_sconce", en: "Wall sconce", zh: "壁灯" },
+    { value: "other_lamp", en: "Other lamp", zh: "其他灯具" },
+  ] },
 ];
 
-const SIZE_PRESETS = [
+const FURNITURE_TYPES = TYPE_GROUPS.flatMap((group) => group.options);
+
+function categoryFor(type: FurnitureItemType): FurnitureCategory {
+  return TYPE_GROUPS.find((group) => group.options.some((option) => option.value === type))?.category ?? "table";
+}
+
+const TABLE_SIZES = [
   { label: "1800 × 900 × 750 mm", dimensions: { width: 1800, depth: 900, height: 750 } },
   { label: "1600 × 800 × 750 mm", dimensions: { width: 1600, depth: 800, height: 750 } },
   { label: "1400 × 700 × 750 mm", dimensions: { width: 1400, depth: 700, height: 750 } },
@@ -64,7 +89,37 @@ const SIZE_PRESETS = [
   { label: "600 × 600 × 520 mm", dimensions: { width: 600, depth: 600, height: 520 } },
 ] as const;
 
-const MATERIALS = ["Walnut", "White Oak", "Ash", "Cherry", "Travertine", "Matte Black"];
+const CATEGORY_SIZES = {
+  table: TABLE_SIZES,
+  chair: [
+    { label: "560 × 600 × 820 mm", dimensions: { width: 560, depth: 600, height: 820 } },
+    { label: "760 × 800 × 780 mm", dimensions: { width: 760, depth: 800, height: 780 } },
+    { label: "680 × 720 × 1050 mm", dimensions: { width: 680, depth: 720, height: 1050 } },
+    { label: "450 × 450 × 650 mm", dimensions: { width: 450, depth: 450, height: 650 } },
+    { label: "1400 × 500 × 820 mm", dimensions: { width: 1400, depth: 500, height: 820 } },
+  ],
+  sofa: [
+    { label: "2200 × 950 × 820 mm", dimensions: { width: 2200, depth: 950, height: 820 } },
+    { label: "1800 × 900 × 820 mm", dimensions: { width: 1800, depth: 900, height: 820 } },
+    { label: "2800 × 1600 × 820 mm", dimensions: { width: 2800, depth: 1600, height: 820 } },
+    { label: "900 × 1700 × 820 mm", dimensions: { width: 900, depth: 1700, height: 820 } },
+    { label: "800 × 650 × 450 mm", dimensions: { width: 800, depth: 650, height: 450 } },
+  ],
+  lamp: [
+    { label: "350 × 350 × 600 mm", dimensions: { width: 350, depth: 350, height: 600 } },
+    { label: "450 × 450 × 1600 mm", dimensions: { width: 450, depth: 450, height: 1600 } },
+    { label: "600 × 600 × 500 mm", dimensions: { width: 600, depth: 600, height: 500 } },
+    { label: "900 × 900 × 650 mm", dimensions: { width: 900, depth: 900, height: 650 } },
+    { label: "200 × 280 × 420 mm", dimensions: { width: 200, depth: 280, height: 420 } },
+  ],
+} as const;
+
+const CATEGORY_MATERIALS: Record<FurnitureCategory, string[]> = {
+  table: ["Walnut", "White Oak", "Ash", "Cherry", "Travertine", "Matte Black"],
+  chair: ["Walnut", "White Oak", "Leather", "Linen", "Bouclé", "Matte Black"],
+  sofa: ["Linen", "Wool", "Bouclé", "Velvet", "Leather", "Performance Fabric"],
+  lamp: ["Brushed Brass", "Matte Black", "Ceramic", "Opal Glass", "Paper", "Linen"],
+};
 const MATERIAL_COLORS: Record<string, string> = {
   Walnut: "#765037",
   "White Oak": "#cdb894",
@@ -73,14 +128,47 @@ const MATERIAL_COLORS: Record<string, string> = {
   Travertine: "#d9cebd",
   "Matte Black": "#353330",
   "Tempered glass": "#dce9e8",
+  Leather: "#8b5e45", Linen: "#d7cfbf", "Bouclé": "#e5dfd2", Wool: "#aaa293",
+  Velvet: "#526f62", "Performance Fabric": "#b5aa9a", "Brushed Brass": "#ad8a56",
+  Ceramic: "#c8c3b8", "Opal Glass": "#e8ece9", Paper: "#e7dcc4",
 };
-const SECONDARY_MATERIALS = ["Blackened Steel", "Brushed Brass", "Tempered Glass", "Solid Wood", "Natural Stone", "None"];
-const BASE_STYLES = ["Four Tapered Legs", "Trestle Base", "Twin Pedestal", "Central Pedestal", "Plinth Base"];
+const CATEGORY_SECONDARY_MATERIALS: Record<FurnitureCategory, string[]> = {
+  table: ["Blackened Steel", "Brushed Brass", "Tempered Glass", "Solid Wood", "Natural Stone", "None"],
+  chair: ["Solid Wood", "Blackened Steel", "Brushed Brass", "Cane", "None"],
+  sofa: ["Solid Wood", "Blackened Steel", "Brushed Brass", "Leather", "None"],
+  lamp: ["Brushed Brass", "Blackened Steel", "Opal Glass", "Fabric", "None"],
+};
+const CATEGORY_BASE_STYLES: Record<FurnitureCategory, string[]> = {
+  table: ["Four Tapered Legs", "Trestle Base", "Twin Pedestal", "Central Pedestal", "Plinth Base"],
+  chair: ["Four Legs", "Sled Base", "Cantilever Base", "Swivel Base", "Pedestal Base"],
+  sofa: ["Exposed Legs", "Recessed Plinth", "Continuous Base", "Floating Base"],
+  lamp: ["Round Base", "Tripod Base", "Ceiling Canopy", "Wall Plate", "Integrated Mount"],
+};
 const TOP_SHAPES: FurnitureTopShape[] = ["rectangular", "round", "oval", "square", "freeform"];
-const EDGE_PROFILES = ["Soft Radius", "Square Edge", "Bullnose", "Beveled Edge", "Live Edge"];
-const FINISHES = ["Matte Clear Oil", "Matte Black Stain", "Satin Lacquer", "Natural Soap", "High Gloss", "Textured Powder Coat"];
-const STORAGE_OPTIONS = ["No Storage", "One Drawer", "Two Drawers", "Open Shelf", "Cable Management"];
-const HARDWARE_OPTIONS = ["No Hardware", "Round Knob", "Bar Pull", "Integrated Pull"];
+const CATEGORY_EDGE_PROFILES: Record<FurnitureCategory, string[]> = {
+  table: ["Soft Radius", "Square Edge", "Bullnose", "Beveled Edge", "Live Edge"],
+  chair: ["Soft Radius", "Piped Edge", "Knife Edge", "Exposed Frame", "Sculpted Edge"],
+  sofa: ["Piped Edge", "Knife Edge", "Box Edge", "Rounded Seam", "Channel Detail"],
+  lamp: ["Rolled Rim", "Sharp Rim", "Flared Edge", "Pleated Edge", "Seamless Edge"],
+};
+const CATEGORY_FINISHES: Record<FurnitureCategory, string[]> = {
+  table: ["Matte Clear Oil", "Matte Black Stain", "Satin Lacquer", "Natural Soap", "High Gloss", "Textured Powder Coat"],
+  chair: ["Natural Finish", "Matte Clear Oil", "Satin Lacquer", "Stain-Resistant", "Waxed Leather"],
+  sofa: ["Natural Finish", "Stain-Resistant", "Brushed Texture", "Smooth Upholstery", "Distressed Leather"],
+  lamp: ["Brushed Finish", "Polished Finish", "Textured Powder Coat", "Frosted Finish", "Natural Weave"],
+};
+const CATEGORY_FEATURES: Record<FurnitureCategory, string[]> = {
+  table: ["No Storage", "One Drawer", "Two Drawers", "Open Shelf", "Cable Management"],
+  chair: ["No Additional Feature", "Armrests", "Swivel", "Footrest", "Stackable"],
+  sofa: ["Fixed Cushions", "Loose Cushions", "Chaise Module", "Reclining", "Hidden Storage"],
+  lamp: ["Dimmable", "Adjustable Arm", "Multi-Light", "Up / Down Light", "Cordless"],
+};
+const CATEGORY_DETAILS: Record<FurnitureCategory, string[]> = {
+  table: ["No Hardware", "Round Knob", "Bar Pull", "Integrated Pull"],
+  chair: ["No Arms", "Open Arms", "Upholstered Arms", "Integrated Joinery"],
+  sofa: ["Low Arms", "Track Arms", "Rounded Arms", "Armless"],
+  lamp: ["No Visible Switch", "Inline Switch", "Touch Control", "Rotary Dimmer"],
+};
 
 const FURNITURE_PROGRESS_STEP: Record<FurnitureGenerationProgress, number> = {
   analyzing: 0,
@@ -91,8 +179,9 @@ const FURNITURE_PROGRESS_STEP: Record<FurnitureGenerationProgress, number> = {
 
 type FurnitureStage = "input" | "render" | "drawings";
 
-function sizeDimensions(size: string) {
-  return SIZE_PRESETS.find((preset) => preset.label === size)?.dimensions ?? SIZE_PRESETS[0].dimensions;
+function sizeDimensions(size: string, category: FurnitureCategory) {
+  const presets = CATEGORY_SIZES[category];
+  return presets.find((preset) => preset.label === size)?.dimensions ?? presets[0].dimensions;
 }
 
 function routeStage(pathname: string): FurnitureStage {
@@ -150,7 +239,9 @@ export function FurniturePage() {
   const hasSketch = Boolean(furniture.sketchAsset);
   const hasInspiration = Boolean(furniture.inspirationAsset);
   const hasBothImages = hasSketch && hasInspiration;
-  const isDemoSketch = isDemoFurnitureAsset(furniture.sketchAsset) && !hasInspiration;
+  const isDemoSketch = isDemoFurnitureAsset(furniture.sketchAsset)
+    && !hasInspiration
+    && furniture.tableType === "dining_table";
   const sketchWeight = furniture.sketchWeight ?? 80;
   const visibleSketchWeight = hasBothImages ? sketchWeight : hasSketch ? 100 : hasInspiration ? 0 : sketchWeight;
   const visibleInspirationWeight = hasBothImages ? 100 - sketchWeight : hasInspiration ? 100 : hasSketch ? 0 : 100 - sketchWeight;
@@ -165,7 +256,16 @@ export function FurniturePage() {
   const summaryHasInspiration = Boolean(generated?.request_context?.inspiration_asset_id);
   const summarySketchUrl = furniture.sketchUrl ?? (isDemoResult ? DEMO_FURNITURE_SKETCH_URL : null);
   const summarySketchName = furniture.sketchName ?? (isDemoResult ? DEMO_FURNITURE_FILE_NAME : null);
-  const tableLabel = TABLE_TYPES.find((option) => option.value === furniture.tableType);
+  const category = categoryFor(furniture.tableType);
+  const furnitureLabel = FURNITURE_TYPES.find((option) => option.value === furniture.tableType);
+  const sizePresets = CATEGORY_SIZES[category];
+  const materialOptions = CATEGORY_MATERIALS[category];
+  const secondaryMaterialOptions = CATEGORY_SECONDARY_MATERIALS[category];
+  const baseStyleOptions = CATEGORY_BASE_STYLES[category];
+  const edgeProfileOptions = CATEGORY_EDGE_PROFILES[category];
+  const finishOptions = CATEGORY_FINISHES[category];
+  const featureOptions = CATEGORY_FEATURES[category];
+  const detailOptions = CATEGORY_DETAILS[category];
   const canGenerate = Boolean(furniture.sketchAsset || furniture.inspirationAsset || furniture.prompt.trim()) && !uploading;
   const steps = [
     { title: copy("Collect", "收集灵感"), hint: copy("Images & brief", "图片与描述") },
@@ -176,10 +276,13 @@ export function FurniturePage() {
     en: "A furniture concept generated from your confirmed inputs and adjustments.",
     zh: "已根据你确认的输入和调整生成家具概念方案。",
   }) : "";
-  const promptExample = copy(
-    "Example: A 1800 × 900 × 750 mm dining table with curved legs, softly rounded edges, and solid walnut. Keep the top thin and the silhouette simple.",
-    "例如：一张 1800 × 900 × 750 mm 的餐桌，弧形桌腿、圆角边缘、胡桃木实木；桌面保持轻薄，整体轮廓简洁。",
-  );
+  const promptExample = category === "chair"
+    ? copy("Example: A compact lounge chair with a curved upholstered back, generous seat, and four slim walnut legs.", "例如：一把紧凑的休闲椅，弧形软包靠背、宽松坐面和四条纤细胡桃木椅腿。")
+    : category === "sofa"
+      ? copy("Example: A low three-seat sofa with rounded arms, three loose back cushions, warm ivory bouclé, and a recessed timber base.", "例如：一张低矮三人沙发，圆润扶手、三个活动靠垫、暖象牙色羊羔绒面料和内收木底座。")
+      : category === "lamp"
+        ? copy("Example: A sculptural floor lamp with one opal-glass shade, a slim brushed-brass stem, and a compact round base.", "例如：一盏雕塑感落地灯，一个乳白玻璃灯罩、纤细拉丝黄铜灯杆和小巧圆形底座。")
+        : copy("Example: A 1800 × 900 × 750 mm dining table with curved legs, softly rounded edges, and solid walnut. Keep the top thin and the silhouette simple.", "例如：一张 1800 × 900 × 750 mm 的餐桌，弧形桌腿、圆角边缘、胡桃木实木；桌面保持轻薄，整体轮廓简洁。");
 
   const makeInput = (description: string, hardConstraints: FurnitureControlKey[]): FurnitureGenerateInput => ({
     project_id: furniture.projectId ?? `furniture_${crypto.randomUUID()}`,
@@ -189,7 +292,7 @@ export function FurniturePage() {
     table_type: furniture.tableType,
     description,
     locked_controls: hardConstraints,
-    dimensions_mm: { ...sizeDimensions(furniture.size) },
+    dimensions_mm: { ...sizeDimensions(furniture.size, category) },
     primary_material: furniture.material,
     secondary_material: furniture.secondaryMaterial,
     top_shape: furniture.topShape,
@@ -286,6 +389,15 @@ export function FurniturePage() {
     }
   };
 
+  const onFurnitureTypeChange = (nextType: FurnitureItemType) => {
+    // The bundled example assets are intentionally table-only and are not Blob
+    // inputs that may be sent to ZooWork as a different category.
+    if (isDemoFurnitureAsset(furniture.sketchAsset) && nextType !== "dining_table") {
+      resetFurniture();
+    }
+    setFurnitureTableType(nextType);
+  };
+
   const onGenerate = async (isRefinement = false) => {
     if (!isRefinement && !furniture.sketchAsset && !furniture.inspirationAsset && !furniture.prompt.trim()) {
       setFurnitureAgentError(copy("Add a sketch, an inspiration image, or a written description.", "请添加草图、灵感图或文字描述。"));
@@ -364,7 +476,7 @@ export function FurniturePage() {
       confirmFurniture();
       saveDesign({
         project: "My Home",
-        title: `${lang === "zh" ? tableLabel?.zh : tableLabel?.en} · ${localizeFurnitureTerm(spec.materials[0]?.material ?? furniture.material, lang, copy("Custom material", "定制材质"))}`,
+        title: `${lang === "zh" ? furnitureLabel?.zh : furnitureLabel?.en} · ${localizeFurnitureTerm(spec.materials[0]?.material ?? furniture.material, lang, copy("Custom material", "定制材质"))}`,
         kind: "Furniture",
         detail: `${spec.dimensions_mm.width} × ${spec.dimensions_mm.depth} × ${spec.dimensions_mm.height} mm`,
       });
@@ -389,7 +501,7 @@ export function FurniturePage() {
       const blobUrl = URL.createObjectURL(await response.blob());
       const link = document.createElement("a");
       link.href = blobUrl;
-      link.download = `${generated?.table_type ?? "table"}-orthographic-views.png`;
+      link.download = `${generated?.table_type ?? "furniture"}-orthographic-views.png`;
       link.click();
       window.setTimeout(() => URL.revokeObjectURL(blobUrl), 0);
       flash(copy("Concept views downloaded.", "概念三视图已下载。"));
@@ -401,7 +513,7 @@ export function FurniturePage() {
   const downloadRender = async () => {
     if (!generated) return;
     try {
-      await downloadImage(generated.generated_image.url, `${generated.table_type ?? "table"}-concept-render`);
+      await downloadImage(generated.generated_image.url, `${generated.table_type ?? "furniture"}-concept-render`);
       flash(copy("Render downloaded.", "效果图已下载。"));
     } catch {
       flash(copy("The render could not be downloaded. Please try again.", "效果图下载失败，请重试。"));
@@ -427,7 +539,7 @@ export function FurniturePage() {
       <div className="flow-head">
         <div>
           <h1 className="flow-title">{t("furn.title")}</h1>
-          <p className="flow-sub">{copy("V1 designs tables from a sketch, one inspiration image, and text.", "第一版专注各种桌子，支持草图、单张灵感图与文字描述。")}</p>
+          <p className="flow-sub">{copy("Design tables, chairs, sofas, and lamps from a sketch, one inspiration image, and text.", "支持桌子、椅子、沙发和灯具，可结合草图、单张灵感图与文字描述。")}</p>
         </div>
         <div className="flow-stepper"><Stepper steps={steps} current={currentStep} /></div>
       </div>
@@ -501,6 +613,16 @@ export function FurniturePage() {
               onChange={(event) => setFurnitureSketchWeight(100 - Number(event.target.value))}
             />
           </div>
+          <div className="furniture-type-field">
+            <label htmlFor="furniture-intake-type" className="tag-group__name">{copy("Furniture type", "家具类型")}</label>
+            <select id="furniture-intake-type" value={furniture.tableType} onChange={(event) => onFurnitureTypeChange(event.target.value as FurnitureItemType)}>
+              {TYPE_GROUPS.map((group) => (
+                <optgroup key={group.category} label={lang === "zh" ? group.zh : group.en}>
+                  {group.options.map((option) => <option value={option.value} key={option.value}>{lang === "zh" ? option.zh : option.en}</option>)}
+                </optgroup>
+              ))}
+            </select>
+          </div>
           <div className="input-panel__prompt">
             <label htmlFor="furniture-prompt" className="tag-group__name">{t("furn.prompt")}</label>
             <textarea id="furniture-prompt" rows={5} value={furniture.prompt} onChange={(event) => setFurniturePrompt(event.target.value)} placeholder={promptExample}/>
@@ -566,7 +688,7 @@ export function FurniturePage() {
             <div className="refine-panel__body">
               <fieldset className="material-picker">
                 <legend>{copy("Color / material", "颜色 / 材质")}</legend>
-                <div>{MATERIALS.map((material) => (
+                <div>{materialOptions.map((material) => (
                   <button type="button" key={material} className="material-choice" aria-pressed={isLocked("primary_material") && furniture.material === material} onClick={() => setFurnitureOption("material", material)}>
                     <i style={{ background: MATERIAL_COLORS[material] }} aria-hidden="true" /><span>{tTag(material)}</span>
                   </button>
@@ -582,15 +704,15 @@ export function FurniturePage() {
               <details className="advanced-controls">
                 <summary>{copy("Advanced adjustments", "高级调整")}</summary>
                 <ul className="refine-list refine-list--advanced">
-                  <li><label htmlFor="furniture-type">{copy("Table type", "桌子类型")}</label><select id="furniture-type" value={furniture.tableType} onChange={(event) => setFurnitureTableType(event.target.value as FurnitureTableType)}>{TABLE_TYPES.map((option) => <option value={option.value} key={option.value}>{lang === "zh" ? option.zh : option.en}</option>)}</select></li>
-                  <li><label htmlFor="furniture-size">{copy("Dimensions", "整体尺寸")}</label><select id="furniture-size" value={isLocked("dimensions_mm") ? furniture.size : ""} onChange={(event) => event.target.value ? setFurnitureOption("size", event.target.value) : unlockFurnitureControl("dimensions_mm")}><option value="">{autoLabel}</option>{SIZE_PRESETS.map((option) => <option value={option.label} key={option.label}>{option.label}</option>)}</select></li>
-                  <li><label htmlFor="furniture-secondary">{copy("Secondary material", "辅材")}</label><select id="furniture-secondary" value={isLocked("secondary_material") ? furniture.secondaryMaterial : ""} onChange={(event) => event.target.value ? setFurnitureAppearance("secondaryMaterial", event.target.value) : unlockFurnitureControl("secondary_material")}><option value="">{autoLabel}</option>{SECONDARY_MATERIALS.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
-                  <li><label htmlFor="furniture-shape">{copy("Top shape", "桌面形状")}</label><select id="furniture-shape" value={isLocked("top_shape") ? furniture.topShape : ""} onChange={(event) => event.target.value ? setFurnitureAppearance("topShape", event.target.value) : unlockFurnitureControl("top_shape")}><option value="">{autoLabel}</option>{TOP_SHAPES.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
-                  <li><label htmlFor="furniture-edge">{copy("Edge profile", "边缘造型")}</label><select id="furniture-edge" value={isLocked("edge_profile") ? furniture.edgeProfile : ""} onChange={(event) => event.target.value ? setFurnitureAppearance("edgeProfile", event.target.value) : unlockFurnitureControl("edge_profile")}><option value="">{autoLabel}</option>{EDGE_PROFILES.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
-                  <li><label htmlFor="furniture-base">{copy("Base / legs", "桌腿 / 底座")}</label><select id="furniture-base" value={isLocked("base_style") ? furniture.legs : ""} onChange={(event) => event.target.value ? setFurnitureOption("legs", event.target.value) : unlockFurnitureControl("base_style")}><option value="">{autoLabel}</option>{BASE_STYLES.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
-                  <li><label htmlFor="furniture-finish">{copy("Finish", "表面处理")}</label><select id="furniture-finish" value={isLocked("finish") ? furniture.finish : ""} onChange={(event) => event.target.value ? setFurnitureAppearance("finish", event.target.value) : unlockFurnitureControl("finish")}><option value="">{autoLabel}</option>{FINISHES.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
-                  <li><label htmlFor="furniture-storage">{copy("Storage", "抽屉 / 收纳")}</label><select id="furniture-storage" value={isLocked("storage") ? furniture.shelves : ""} onChange={(event) => event.target.value ? setFurnitureOption("shelves", event.target.value) : unlockFurnitureControl("storage")}><option value="">{autoLabel}</option>{STORAGE_OPTIONS.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
-                  <li><label htmlFor="furniture-hardware">{copy("Hardware", "拉手 / 五金")}</label><select id="furniture-hardware" value={isLocked("component_notes") ? furniture.handles : ""} onChange={(event) => event.target.value ? setFurnitureOption("handles", event.target.value) : unlockFurnitureControl("component_notes")}><option value="">{autoLabel}</option>{HARDWARE_OPTIONS.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
+                  <li><label htmlFor="furniture-type">{copy("Furniture type", "家具类型")}</label><select id="furniture-type" value={furniture.tableType} onChange={(event) => onFurnitureTypeChange(event.target.value as FurnitureItemType)}>{TYPE_GROUPS.map((group) => <optgroup key={group.category} label={lang === "zh" ? group.zh : group.en}>{group.options.map((option) => <option value={option.value} key={option.value}>{lang === "zh" ? option.zh : option.en}</option>)}</optgroup>)}</select></li>
+                  <li><label htmlFor="furniture-size">{copy("Dimensions", "整体尺寸")}</label><select id="furniture-size" value={isLocked("dimensions_mm") ? furniture.size : ""} onChange={(event) => event.target.value ? setFurnitureOption("size", event.target.value) : unlockFurnitureControl("dimensions_mm")}><option value="">{autoLabel}</option>{sizePresets.map((option) => <option value={option.label} key={option.label}>{option.label}</option>)}</select></li>
+                  <li><label htmlFor="furniture-secondary">{copy("Secondary material", "辅材")}</label><select id="furniture-secondary" value={isLocked("secondary_material") ? furniture.secondaryMaterial : ""} onChange={(event) => event.target.value ? setFurnitureAppearance("secondaryMaterial", event.target.value) : unlockFurnitureControl("secondary_material")}><option value="">{autoLabel}</option>{secondaryMaterialOptions.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
+                  <li><label htmlFor="furniture-shape">{category === "chair" ? copy("Seat form", "坐面形状") : category === "sofa" ? copy("Overall form", "整体形状") : category === "lamp" ? copy("Shade / body form", "灯罩 / 灯体形状") : copy("Top shape", "桌面形状")}</label><select id="furniture-shape" value={isLocked("top_shape") ? furniture.topShape : ""} onChange={(event) => event.target.value ? setFurnitureAppearance("topShape", event.target.value) : unlockFurnitureControl("top_shape")}><option value="">{autoLabel}</option>{TOP_SHAPES.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
+                  <li><label htmlFor="furniture-edge">{category === "lamp" ? copy("Rim / edge detail", "边口 / 细节") : copy("Edge profile", "边缘造型")}</label><select id="furniture-edge" value={isLocked("edge_profile") ? furniture.edgeProfile : ""} onChange={(event) => event.target.value ? setFurnitureAppearance("edgeProfile", event.target.value) : unlockFurnitureControl("edge_profile")}><option value="">{autoLabel}</option>{edgeProfileOptions.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
+                  <li><label htmlFor="furniture-base">{category === "lamp" ? copy("Base / mount", "底座 / 安装方式") : category === "sofa" ? copy("Base / feet", "底座 / 沙发脚") : copy("Base / legs", "支脚 / 底座")}</label><select id="furniture-base" value={isLocked("base_style") ? furniture.legs : ""} onChange={(event) => event.target.value ? setFurnitureOption("legs", event.target.value) : unlockFurnitureControl("base_style")}><option value="">{autoLabel}</option>{baseStyleOptions.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
+                  <li><label htmlFor="furniture-finish">{copy("Finish", "表面处理")}</label><select id="furniture-finish" value={isLocked("finish") ? furniture.finish : ""} onChange={(event) => event.target.value ? setFurnitureAppearance("finish", event.target.value) : unlockFurnitureControl("finish")}><option value="">{autoLabel}</option>{finishOptions.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
+                  <li><label htmlFor="furniture-storage">{category === "table" ? copy("Storage", "抽屉 / 收纳") : copy("Feature", "功能")}</label><select id="furniture-storage" value={isLocked("storage") ? furniture.shelves : ""} onChange={(event) => event.target.value ? setFurnitureOption("shelves", event.target.value) : unlockFurnitureControl("storage")}><option value="">{autoLabel}</option>{featureOptions.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
+                  <li><label htmlFor="furniture-hardware">{category === "table" ? copy("Hardware", "拉手 / 五金") : copy("Component detail", "部件细节")}</label><select id="furniture-hardware" value={isLocked("component_notes") ? furniture.handles : ""} onChange={(event) => event.target.value ? setFurnitureOption("handles", event.target.value) : unlockFurnitureControl("component_notes")}><option value="">{autoLabel}</option>{detailOptions.map((option) => <option value={option} key={option}>{tTag(option)}</option>)}</select></li>
                 </ul>
               </details>
             </div>
@@ -615,14 +737,14 @@ export function FurniturePage() {
             <div className="card card--pad drawings__views">
               <h2>{copy("Concept Orthographic Views", "概念级三视图")}</h2>
               <div className="orthographic-sheet-frame">
-                <img src={orthographic.orthographic_image.url} alt={copy("One dimensioned black-and-white orthographic sheet showing the confirmed table from the front, side, and top", "与已确认效果图一致、带尺寸的黑白正视、侧视和顶视三视图合成图")} />
+                <img src={orthographic.orthographic_image.url} alt={copy("One dimensioned black-and-white orthographic sheet showing the confirmed furniture from the front, side, and top", "与已确认效果图一致、带尺寸的黑白正视、侧视和顶视三视图合成图")} />
               </div>
               <p className="drawings__note">{copy("Generated from the confirmed render; exact overall dimensions are applied from the confirmed specification.", "基于已确认效果图生成，并按确认规格标注准确的整体尺寸。")}</p>
             </div>
             <aside className="card card--pad spec">
               <h2>{t("furn.spec")}</h2>
               <ul className="spec__list">
-                <li><strong>{copy("Table type", "桌子类型")}</strong><span>{lang === "zh" ? tableLabel?.zh : tableLabel?.en}</span></li>
+                <li><strong>{copy("Furniture type", "家具类型")}</strong><span>{lang === "zh" ? furnitureLabel?.zh : furnitureLabel?.en}</span></li>
                 <li><strong>{t("furn.spec.dims")}</strong><span>{spec.dimensions_mm.width} × {spec.dimensions_mm.depth} × {spec.dimensions_mm.height} mm</span></li>
                 <li><strong>{t("furn.spec.materials")}</strong><span>{localizeMaterialLine(spec.materials, lang)}</span></li>
                 <li><strong>{t("furn.spec.finish")}</strong><span>{localizeFinishLine(spec.materials, lang)}</span></li>
@@ -637,7 +759,7 @@ export function FurniturePage() {
         </section>
       )}
 
-      {furniture.phase === "generating" && <GeneratingOverlay title={copy("Designing your table", "正在设计你的桌子")} steps={FURNITURE_GENERATION_STEPS} activeIndex={furniture.stepIndex} startedAt={generationStartedAt ?? undefined} />}
+      {furniture.phase === "generating" && <GeneratingOverlay title={copy("Designing your furniture", "正在设计你的家具")} steps={FURNITURE_GENERATION_STEPS} activeIndex={furniture.stepIndex} startedAt={generationStartedAt ?? undefined} />}
       {generatingOrthographic && <GeneratingOverlay title={copy("Creating the concept views", "正在生成概念三视图")} steps={FURNITURE_ORTHOGRAPHIC_STEPS} activeIndex={orthographicStep} />}
     </main>
   );

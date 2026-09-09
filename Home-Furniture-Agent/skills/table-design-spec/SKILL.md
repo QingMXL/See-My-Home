@@ -1,23 +1,24 @@
 ---
 name: table-design-spec
-description: Use whenever See My Home asks to design or revise a table from a sketch, inspiration image, written description, dimensions, materials, or component controls. Covers dining tables, coffee tables, console tables, side tables, desks, bedside tables, nesting tables, bar tables, and other table-like furniture; produces a dimensionally consistent concept specification before rendering.
+description: Use whenever See My Home asks to design or revise a table, chair, sofa, or lamp from a sketch, inspiration image, written description, dimensions, materials, or component controls. Produces a category-correct, dimensionally consistent concept specification before rendering.
 ---
 
-# Table design specification
+# Furniture design specification
 
-Create a coherent, concept-level table definition before any image is generated.
+Create a coherent, concept-level furniture definition before any image is generated. The stable Skill name is retained for deployed-agent compatibility, but its scope includes tables, chairs, sofas, and lamps.
 
 Read `references/design-contract.md` before returning the specification.
 
 ## Workflow
 
-1. Inspect the hand sketch when present and identify its topology, proportions, silhouette, and component placement.
-2. Inspect the inspiration image when present and identify its form language, material, finish, edge character, and base language.
-3. When both are present, apply `source_priority` as the relative evidence weight: move the concept closer to the higher-weight image and retain fewer cues from the lower-weight image. At equal weights, synthesize both. Never invent image-tool weighting parameters.
-4. Treat only fields listed in `locked_controls` as hard UI constraints. Unlocked `design_controls` are fallbacks and yield to clear sketch or text evidence. Millimetres are canonical.
-5. Resolve the table type, top shape, edge profile, base style, materials, finish, storage, and component notes. Preserve visible component count, placement, and hardware from a sketch unless an applicable locked control overrides it.
-6. Return components with stable IDs, quantities, roles, and dimensions that do not exceed the overall envelope. For visible tops, drawers, shelves, supports, and other major parts, populate the available width, depth, and height needed by the concept drawing's CAD-like dimension band. Leave an unsupported axis absent instead of inventing fabrication detail.
-7. Check width, depth, and height across the design summary, design specification, and every orthographic-view instruction.
-8. Ask at most three questions, and only when a missing or conflicting answer materially changes the concept.
+1. Read the exact item type from the historical `request.table_type` field and determine its category.
+2. Inspect the hand sketch when present and identify topology, proportions, silhouette, component placement, and viewpoint.
+3. Inspect the inspiration image when present and identify form language, material, finish, detail character, and support or mount language.
+4. When both are present, apply `source_priority` as relative evidence weight. Never invent image-tool weighting parameters.
+5. Treat only fields listed in `locked_controls` as hard UI constraints. Unlocked controls are fallbacks and yield to clear sketch or text evidence. Millimetres are canonical.
+6. Resolve category-correct anatomy: table top/support/storage; chair seat/back/arms/frame; sofa modules/cushions/arms/frame; or lamp shade/diffuser/light source/stem/base/mount. Preserve visible component counts and placement unless a locked control overrides them.
+7. In legacy `design_spec.top`, record the primary upper or defining surface: tabletop for tables, seat or main seat envelope for chairs/sofas, and shade/diffuser or main luminous-body footprint for lamps. In `design_spec.base`, record the support, frame, plinth, pedestal, canopy, or mount. State the semantic meaning in `drawing_notes`.
+8. Return stable component IDs, quantities, roles, and coherent concept dimensions within the overall envelope. Leave unsupported axes absent instead of inventing fabrication detail.
+9. Check overall width, depth, and height across the summary, specification, and every orthographic instruction. Ask at most three questions only when a missing or conflicting answer materially changes the concept.
 
-Do not generate an image in this skill. Do not claim that the concept is fabrication-ready, structurally certified, or safe for a stated load.
+Do not generate an image in this skill. Do not claim fabrication readiness, structural or electrical certification, or verified safety.

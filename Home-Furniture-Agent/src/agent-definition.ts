@@ -24,6 +24,7 @@ export function createHomeFurnitureAgentResource(modelId: string): AgentResource
       application: 'see-my-home',
       agent_key: 'home-furniture',
       runtime_contract: 'home-furniture-v1',
+      supported_categories: 'tables-chairs-sofas-lamps',
     },
     tool_policy: HOME_FURNITURE_TOOL_POLICY,
     sandbox: { scope: 'session' },

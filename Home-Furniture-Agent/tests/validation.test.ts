@@ -62,7 +62,7 @@ const validResponse: FurnitureAgentResponse = {
   },
 };
 
-test('accepts sketch-led, inspiration-led, and text-only table requests', () => {
+test('accepts sketch-led, inspiration-led, and text-only furniture requests', () => {
   assert.doesNotThrow(() => assertFurnitureTurnRequest(validRequest));
   assert.doesNotThrow(() => assertFurnitureTurnRequest({
     ...validRequest,
@@ -79,9 +79,12 @@ test('accepts sketch-led, inspiration-led, and text-only table requests', () => 
     inspiration_asset_ref: undefined,
     source_priority: { sketch: 0, inspiration: 0 },
   }));
+  for (const table_type of ['lounge_chair', 'sectional_sofa', 'floor_lamp'] as const) {
+    assert.doesNotThrow(() => assertFurnitureTurnRequest({ ...validRequest, table_type }));
+  }
 });
 
-test('rejects unsupported furniture and inconsistent source priorities', () => {
+test('rejects unknown furniture and inconsistent source priorities', () => {
   assert.throws(() => assertFurnitureTurnRequest({ ...validRequest, table_type: 'chair' }), ContractValidationError);
   assert.throws(() => assertFurnitureTurnRequest({ ...validRequest, source_priority: { sketch: 0.5, inspiration: 0.2 } }), ContractValidationError);
 });

@@ -8,7 +8,7 @@ import type {
   FurnitureGenerationResult,
   FurnitureOrthographicResult,
   FurnitureControlKey,
-  FurnitureTableType,
+  FurnitureItemType,
   FurnitureTopShape,
   UploadedFurnitureAsset,
 } from "../lib/homeFurnitureApi";
@@ -63,7 +63,7 @@ interface FurnitureFlowState {
   inspirationUrl: string | null;
   inspirationAsset: UploadedFurnitureAsset | null;
   sketchWeight: number;
-  tableType: FurnitureTableType;
+  tableType: FurnitureItemType;
   prompt: string;
   refinementPrompt: string;
   material: string;
@@ -121,7 +121,7 @@ interface DesignStore {
   removeFurnitureSource: (kind: "sketch" | "inspiration") => void;
   setFurnitureUploadedAsset: (kind: "sketch" | "inspiration", asset: UploadedFurnitureAsset | null) => void;
   setFurnitureSketchWeight: (weight: number) => void;
-  setFurnitureTableType: (tableType: FurnitureTableType) => void;
+  setFurnitureTableType: (tableType: FurnitureItemType) => void;
   setFurnitureOption: (key: "material" | "size" | "legs" | "handles" | "shelves", value: string) => void;
   setFurnitureAppearance: (key: "secondaryMaterial" | "topShape" | "edgeProfile" | "finish", value: string) => void;
   unlockFurnitureControl: (control: FurnitureControlKey) => void;
@@ -397,7 +397,17 @@ export const useDesignStore = create<DesignStore>()(
       },
     })),
   setFurnitureTableType: (tableType) =>
-    set((s) => ({ furniture: { ...s.furniture, tableType, confirmed: false, orthographicRun: null } })),
+    set((s) => ({
+      furniture: {
+        ...s.furniture,
+        tableType,
+        // Category-specific controls from a previous item must never silently
+        // carry into a newly selected chair, sofa, lamp, or table.
+        lockedControls: [],
+        confirmed: false,
+        orthographicRun: null,
+      },
+    })),
   setFurnitureOption: (key, value) =>
     set((s) => {
       const controlByKey = {

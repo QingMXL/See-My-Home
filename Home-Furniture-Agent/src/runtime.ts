@@ -18,6 +18,7 @@ import type {
   FurnitureTurnRequest,
   FurnitureTurnResult,
 } from './contracts.js';
+import { furnitureCategory } from './contracts.js';
 import { requestSchemaPath, responseSchemaPath } from './paths.js';
 import {
   assertFurnitureTurnRequest,
@@ -184,7 +185,15 @@ export class HomeFurnitureRuntime {
   private buildEvents(request: FurnitureTurnRequest): OutboundEvent[] {
     const orthographic = request.output_mode === 'orthographic_sheet';
     const view = request.orthographic_view;
-    const filename = `${request.project_id}_${request.request_id}_${orthographic ? `orthographic-${view}` : 'table'}.png`;
+    const category = furnitureCategory(request.table_type);
+    const filename = `${request.project_id}_${request.request_id}_${orthographic ? `orthographic-${view}` : request.table_type}.png`;
+    const anatomyRequirement = category === 'chair'
+      ? 'Preserve the chair seat, back, arms when present, frame, support count, upholstery boundaries, and any swivel or footrest mechanism.'
+      : category === 'sofa'
+        ? 'Preserve the sofa module count and arrangement, seat and back cushion count, arm profile, frame, upholstery seams, chaise position, and visible legs or plinth.'
+        : category === 'lamp'
+          ? 'Preserve the lamp shade or diffuser, number and placement of light heads, stem or arms, base or mount, canopy when present, and visible switch or cord details requested by the user.'
+          : 'Preserve the table top, supports, apron, stretchers, shelves, drawers, hardware, and other specified major components.';
     const sources = [
       request.sketch_asset_ref ? `Inspect sketch_asset_ref exactly once with image: ${request.sketch_asset_ref}` : '',
       request.inspiration_asset_ref ? `Inspect inspiration_asset_ref exactly once with image: ${request.inspiration_asset_ref}` : '',
@@ -196,19 +205,20 @@ export class HomeFurnitureRuntime {
       .join('; ');
     const viewSpecificProjectionRequirement = view === 'top'
       ? [
-          'TOP PLAN IS STRICT: this is not a bird\'s-eye, elevated, three-quarter, transparent, or cutaway view. Place the virtual camera centered directly above the table with its optical axis exactly perpendicular to the tabletop and the tabletop plane parallel to the image plane. Use parallel orthographic projection only: no vanishing point, convergence, foreshortening, visible front/side face, visible tabletop thickness, or underside.',
-          'Draw only surfaces genuinely visible from directly above. Treat every opaque tabletop or upper surface as an occluder. Do not draw legs, apron, base, stretcher, shelf, drawers, or other under-table structure through it; do not use dashed hidden lines. A lower component may appear only where the confirmed render proves it physically projects beyond the tabletop footprint and would truly be visible from directly above. Never invent such a projection.',
-          'Before publishing the top plan, compare it with the confirmed render and the front/side implications in confirmed_design_spec. Reject it if the top outline is skewed, if parallel axes converge, if hidden under-structure shows through the top, or if supports protrude beyond the top without explicit visual evidence.',
+          'TOP PLAN IS STRICT: this is not a bird\'s-eye, elevated, three-quarter, transparent, or cutaway view. Place the virtual camera centered directly above the furniture with its optical axis exactly perpendicular to the floor and its principal horizontal plane parallel to the image plane. Use parallel orthographic projection only: no vanishing point, convergence, foreshortening, visible front/side face, visible thickness of the uppermost opaque surface, or underside.',
+          'Draw only surfaces genuinely visible from directly above. Treat every opaque upper surface as an occluder: for a table this is usually the top; for seating it includes seat, back, arm, and cushion surfaces according to their real overlap; for a lamp it includes the shade, diffuser, canopy, or base according to height. Do not draw lower components through opaque upper components and do not use dashed hidden lines. A lower component may appear only where the confirmed render proves it physically projects beyond the upper silhouette and would truly be visible from directly above.',
+          'Before publishing the top plan, compare it with the confirmed render and the front/side implications in confirmed_design_spec. Reject it if the plan outline is skewed, if parallel axes converge, if hidden structure shows through an opaque surface, or if a lower component protrudes without explicit visual evidence.',
         ].join(' ')
       : 'Use a strict orthographic elevation: the viewing axis is perpendicular to the requested front or side plane, parallel edges do not converge, and no adjacent top or side face is visible.';
     const outputRequirement = orthographic
       ? [
-          `Use table-concept-renderer in orthographic-sheet mode for the ${view} view. The confirmed design specification is immutable.`,
+          `Use table-concept-renderer in orthographic-sheet mode for the ${view} view of this ${category}. The confirmed design specification is immutable. The historical request.table_type field identifies the exact furniture item type: ${request.table_type}.`,
           sources,
           'Treat render_asset_ref as the sole visual authority. Do not inspect any image URL more than once.',
           `Generate one single full-object ${view} orthographic line view. Do not generate the other two views and do not make a three-panel sheet. Center the complete furniture with clear, even margins on every side.`,
           `The confirmed overall dimensions are width ${orthographicDimensions?.width} mm, depth ${orthographicDimensions?.depth} mm, and height ${orthographicDimensions?.height} mm. Preserve the ${view === 'front' ? 'width-to-height' : view === 'side' ? 'depth-to-height' : 'width-to-depth'} proportion recognizably; the application will typeset the exact values after generation.`,
           `Required component inventory: ${orthographicInventory || 'use confirmed_design_spec exactly'}. Every listed component that is visible from the ${view} direction must match render_asset_ref in count, placement, silhouette, open-or-closed state, and major curved details. Do not redesign, stylize, simplify, merge, add, or remove components.`,
+          anatomyRequirement,
           `This raster is the ${view} geometry layer for a standard furniture shop-drawing sheet. Use true orthographic projection with no perspective convergence and keep the whole object comfortably inside the canvas.`,
           viewSpecificProjectionRequirement,
           'Use a pure white background and clean, uniform black-and-white technical linework. Draw the product\'s visible outer silhouette noticeably heavier than internal component edges. Keep internal edges medium weight and reserve very thin strokes for any unavoidable construction detail. No beige or grey background, room scene, material rendering, tonal fill, shading, shadows, decorative props, extra views, border, title block, written labels, dimension numbers, logos, or watermark.',
@@ -223,10 +233,12 @@ export class HomeFurnitureRuntime {
           'Return one compact JSON object matching response_schema without Markdown fences. This is concept-level only, not fabrication-ready engineering.',
         ]
       : [
-          'Use table-design-spec and table-concept-renderer in concept-render mode. Execute directly and avoid narrating intermediate work.',
+          `Use table-design-spec and table-concept-renderer in concept-render mode for the requested ${category}. The historical request.table_type field identifies the exact furniture item type: ${request.table_type}. Execute directly and avoid narrating intermediate work.`,
           sources,
           'Inspect each provided source image exactly once before generation. Resolve one coherent specification using the authority and locked-control rules already supplied in this request.',
           request.sketch_asset_ref ? 'Preserve the sketch viewpoint, topology, proportions, component count, and placement according to source_priority.' : 'Use a clean readable three-quarter product view unless the written brief requests another viewpoint.',
+          anatomyRequirement,
+          `Generate only the requested ${request.table_type}; do not add companion furniture, people, décor, a room setting, text, dimensions, labels, logos, or watermarks.`,
           `Call image_generate exactly once with action="generate", the provided visual source input when available, a clean isolated product-render prompt, quality="high", and filename="${filename}".`,
           'After generation starts, call sessions_yield exactly once and end the waiting run.',
           `In the attachment continuation, call media_materialize exactly once for the returned artifactId with path="/workspace/artifacts/${request.project_id}/${filename}", then publish it exactly once. Do not call image to inspect the generated concept render a second time.`,

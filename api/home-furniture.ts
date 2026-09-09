@@ -3,14 +3,15 @@ import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { del } from '@vercel/blob';
 import { ZooworkError } from '@zoowork-ai/sdk';
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { FURNITURE_ITEM_TYPES } from '../Home-Furniture-Agent/src/contracts.js';
 import type {
   FurnitureControlKey,
   FurnitureDesignControls,
   FurnitureDesignSpec,
+  FurnitureItemType,
   FurnitureTurnResult,
   FurnitureTurnRequest,
   OrthographicView,
-  TableType,
   TopShape,
 } from '../Home-Furniture-Agent/src/contracts.js';
 import {
@@ -34,10 +35,7 @@ import { assertFurnitureAgentResponse } from '../Home-Furniture-Agent/src/valida
 
 export const config = { maxDuration: 300 };
 
-const tableTypes = new Set<TableType>([
-  'dining_table', 'coffee_table', 'console_table', 'side_table', 'desk',
-  'bedside_table', 'nesting_tables', 'bar_table', 'other_table',
-]);
+const furnitureItemTypes = new Set<FurnitureItemType>(FURNITURE_ITEM_TYPES);
 const topShapes = new Set<TopShape>(['rectangular', 'round', 'oval', 'square', 'freeform']);
 const furnitureControlKeys = new Set<FurnitureControlKey>([
   'dimensions_mm', 'primary_material', 'secondary_material', 'top_shape', 'edge_profile',
@@ -202,9 +200,9 @@ function parseControls(input: FurnitureApiInput): FurnitureDesignControls {
   if (!topShapes.has(topShape)) throw new Error('top_shape is unsupported');
   return {
     dimensions_mm: {
-      width: integerDimension(dimensions.width, 'dimensions_mm.width', 250, 5000),
-      depth: integerDimension(dimensions.depth, 'dimensions_mm.depth', 200, 2000),
-      height: integerDimension(dimensions.height, 'dimensions_mm.height', 150, 1500),
+      width: integerDimension(dimensions.width, 'dimensions_mm.width', 80, 5000),
+      depth: integerDimension(dimensions.depth, 'dimensions_mm.depth', 80, 2500),
+      height: integerDimension(dimensions.height, 'dimensions_mm.height', 100, 3000),
     },
     primary_material: requireString(input.primary_material, 'primary_material').slice(0, 120),
     secondary_material: optionalString(input.secondary_material, 'secondary_material', 120),
@@ -275,8 +273,8 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
 
   const locale = parseLocale(refine ? body.locale : input.locale);
   const projectId = requireString(input.project_id, 'project_id');
-  const tableType = requireString(input.table_type, 'table_type') as TableType;
-  if (!tableTypes.has(tableType)) throw new Error('table_type is unsupported');
+  const furnitureType = requireString(input.table_type, 'table_type') as FurnitureItemType;
+  if (!furnitureItemTypes.has(furnitureType)) throw new Error('table_type is unsupported');
   const description = optionalString(input.description, 'description', 4000);
 
   const sketchBlobUrl = input.sketch_asset_id
@@ -302,7 +300,7 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
     request_id: requestId,
     project_id: projectId,
     locale,
-    table_type: tableType,
+    table_type: furnitureType,
     ...(sketchRef ? { sketch_asset_ref: sketchRef } : {}),
     ...(inspirationRef ? { inspiration_asset_ref: inspirationRef } : {}),
     ...(description ? { description } : {}),
@@ -321,6 +319,7 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
       requestId,
       sessionId: conversation.sessionId,
       type,
+      furnitureType,
       hasSketch: Boolean(sketchRef),
       hasInspiration: Boolean(inspirationRef),
       lockedControlCount: turn.locked_controls.length,
@@ -390,7 +389,7 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
     session_id: conversation.sessionId,
     request_id: turn.request_id,
     project_id: projectId,
-    table_type: tableType,
+    table_type: furnitureType,
     source_priority: turn.source_priority,
     response: result.response,
     generated_image: { ...stored, provider_model: 'ZooWork imageGenerationModel' },
@@ -399,7 +398,7 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
       sketch_asset_id: sketchBlobUrl,
       inspiration_asset_id: inspirationBlobUrl,
       locale,
-      table_type: tableType,
+      table_type: furnitureType,
       description,
       source_priority: turn.source_priority,
       locked_controls: turn.locked_controls,
@@ -428,7 +427,7 @@ function orthographicTurn(input: {
   requestId: string;
   projectId: string;
   locale: 'en-US' | 'zh-CN';
-  tableType: TableType;
+  furnitureType: FurnitureItemType;
   renderAssetRef: string;
   spec: FurnitureDesignSpec;
   summary: string;
@@ -440,7 +439,7 @@ function orthographicTurn(input: {
     request_id: input.requestId,
     project_id: input.projectId,
     locale: input.locale,
-    table_type: input.tableType,
+    table_type: input.furnitureType,
     render_asset_ref: input.renderAssetRef,
     confirmed_design_spec: input.spec,
     orthographic_view: input.view,
@@ -470,7 +469,7 @@ async function orthographic(request: VercelRequest, response: VercelResponse): P
   const baseResponse = body.design_response;
   assertFurnitureAgentResponse(baseResponse);
   if (baseResponse.status === 'failed') throw new Error('A failed furniture design cannot produce orthographic views');
-  const tableType = baseResponse.table_type;
+  const furnitureType = baseResponse.table_type;
   const renderBlobUrl = privateResultBlobUrl(body.render_image_url, 'furniture', projectId);
   if (job && (job.projectId !== projectId || job.type !== 'agent.orthographic')) {
     throw new Error('job_token does not match this orthographic request');
@@ -488,7 +487,7 @@ async function orthographic(request: VercelRequest, response: VercelResponse): P
         requestId: viewRequestId,
         projectId,
         locale,
-        tableType,
+        furnitureType,
         renderAssetRef,
         spec: baseResponse.design_spec,
         summary: baseResponse.design_summary,
@@ -522,7 +521,7 @@ async function orthographic(request: VercelRequest, response: VercelResponse): P
       requestId: part.requestId,
       projectId,
       locale,
-      tableType,
+      furnitureType,
       renderAssetRef,
       spec: baseResponse.design_spec,
       summary: baseResponse.design_summary,
@@ -572,7 +571,7 @@ async function orthographic(request: VercelRequest, response: VercelResponse): P
       requestId: retryRequestId,
       projectId,
       locale,
-      tableType,
+      furnitureType,
       renderAssetRef,
       spec: baseResponse.design_spec,
       summary: baseResponse.design_summary,
@@ -621,6 +620,7 @@ async function orthographic(request: VercelRequest, response: VercelResponse): P
   const dimensionedPng = await createDimensionedOrthographicPng({
     sources: viewBuffers,
     spec: baseResponse.design_spec,
+    furnitureType,
   });
   const stored = await persistGeneratedImageBytes({
     bytes: dimensionedPng,

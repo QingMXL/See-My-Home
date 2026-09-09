@@ -49,6 +49,14 @@ test('builds engineering labels and dimensions as font-independent vector paths'
   assert.match(svg, /class="extension-line"/);
 });
 
+test('omits the table-only upper-surface thickness annotation for seating and lamps', () => {
+  const sofaSvg = buildDimensionAnnotationSvg({ frames, spec, furnitureType: 'sofa' });
+  const lampSvg = buildDimensionAnnotationSvg({ frames, spec, furnitureType: 'floor_lamp' });
+  assert.doesNotMatch(sofaSvg, /data-label="36 mm"/);
+  assert.doesNotMatch(lampSvg, /data-label="36 mm"/);
+  assert.match(sofaSvg, /data-label="1500 mm"/);
+});
+
 test('exports one black-and-white PNG composed from three independent views', async () => {
   const sources = {
     front: viewSource(900, 520, 80),
