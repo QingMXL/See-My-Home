@@ -113,6 +113,50 @@ test('starts a furniture turn and completes it through durable polling', async (
   }
 });
 
+test('completes a successful confirmation response even when no image was generated', async () => {
+  const confirmationResponse: FurnitureAgentResponse = {
+    ...response,
+    status: 'needs_confirmation',
+    artifact_id: undefined,
+    design_summary: 'The uploaded sketch is not a table, so no render was generated.',
+    questions: ['Please upload a table sketch or confirm that the sketch should be ignored.'],
+    qa: { ...response.qa, function_plausible: false, publishable: false },
+  };
+  const fakeClient = {
+    async listAllEvents() {
+      return [
+        { seq: 11, eventType: 'run.started', payload: {}, runId: 'run_confirmation' },
+        {
+          seq: 12,
+          eventType: 'agent.tool',
+          payload: { phase: 'end', toolName: 'image', toolCallId: 'tool_inspect', isError: false },
+          runId: 'run_confirmation',
+        },
+        {
+          seq: 13,
+          eventType: 'agent.assistant',
+          payload: { message: { role: 'assistant', content: [{ type: 'text', text: JSON.stringify(confirmationResponse) }] } },
+          runId: 'run_confirmation',
+        },
+        { seq: 14, eventType: 'run.finished', payload: { status: 'succeeded' }, runId: 'run_confirmation' },
+      ] satisfies SessionEvent[];
+    },
+  } as unknown as ZooworkClient;
+  const runtime = new HomeFurnitureRuntime(fakeClient, 'agent_private_001');
+
+  const completed = await runtime.pollFurnitureTurn(
+    { agentId: 'agent_private_001', sessionId: 'session_confirmation' },
+    request,
+    10,
+  );
+
+  assert.equal(completed.status, 'completed');
+  if (completed.status === 'completed') {
+    assert.equal(completed.result.response.status, 'needs_confirmation');
+    assert.deepEqual(completed.result.artifacts, []);
+  }
+});
+
 test('reports durable concept-render progress from ZooWork tool events', async () => {
   let reads = 0;
   const fakeClient = {

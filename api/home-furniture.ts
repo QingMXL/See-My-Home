@@ -315,6 +315,13 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
     await zoo.ensureRunning();
     const conversation = await zoo.createConversation(projectId, newId(`furniture_${refine ? 'refine' : 'generate'}_${projectId}`));
     const started = await zoo.startFurnitureTurn(conversation, turn);
+    console.info(JSON.stringify({
+      level: 'info',
+      message: 'furniture generation started',
+      requestId,
+      sessionId: conversation.sessionId,
+      type,
+    }));
     sendJson(response, 202, {
       status: 'processing',
       job_token: signJob({
@@ -345,6 +352,22 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
   }
 
   const result = polled.result;
+  console.info(JSON.stringify({
+    level: 'info',
+    message: 'furniture generation reached terminal response',
+    requestId: turn.request_id,
+    sessionId: conversation.sessionId,
+    type,
+    agentStatus: result.response.status,
+    artifactCount: result.artifacts.length,
+  }));
+  if (result.response.status !== 'completed') {
+    const guidance = [...result.response.questions, ...result.response.warnings]
+      .map((item) => item.trim())
+      .find(Boolean)
+      ?? result.response.design_summary.trim();
+    throw new Error(guidance || 'Home Furniture Agent needs more information before it can generate an image');
+  }
   const artifact = result.artifacts.find((candidate) => candidate.status === 'ready'
     && (candidate.contentType?.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(candidate.fileName ?? '')));
   if (!artifact) throw new Error(result.response.warnings.join(' ') || 'Home Furniture Agent completed without a readable published image artifact');

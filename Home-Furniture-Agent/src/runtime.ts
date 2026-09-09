@@ -285,7 +285,7 @@ export class HomeFurnitureRuntime {
       }
       if (isRunFinished(event)) {
         const outcome = runOutcome(event);
-        if (outcome !== 'succeeded' || (this.hasJson(assistantBySeq) && this.hasTerminalTool(toolsBySeq))) {
+        if (outcome !== 'succeeded' || this.hasJson(assistantBySeq)) {
           finalOutcome = outcome;
           runId = event.runId ?? runId;
         }
@@ -390,7 +390,7 @@ export class HomeFurnitureRuntime {
       if (!isRunFinished(event)) continue;
       const candidate = runOutcome(event);
       if (!candidate) continue;
-      if (candidate !== 'succeeded' || (this.hasJson(assistantBySeq) && this.hasTerminalTool(toolsBySeq))) {
+      if (candidate !== 'succeeded' || this.hasJson(assistantBySeq)) {
         outcome = candidate;
         runId = event.runId ?? runId;
         break;
@@ -412,11 +412,6 @@ export class HomeFurnitureRuntime {
       try { extractJsonObject(candidate); return true; }
       catch { return false; }
     });
-  }
-
-  private hasTerminalTool(tools: Map<number, AgentToolTrace>): boolean {
-    return [...tools.values()].some((call) => call.phase === 'end'
-      && (call.toolName === 'artifact_publish' || call.toolName === 'media_materialize'));
   }
 
   private async artifactsForTurn(
