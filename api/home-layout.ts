@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
+import { put } from '@vercel/blob';
 import { ZooworkError } from '@zoowork-ai/sdk';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import sharp from 'sharp';
@@ -22,6 +23,7 @@ import {
   type LayoutPlacementKind,
   type LayoutRenderPlan,
 } from '../Home-Layout-Agent/src/layout-planning.js';
+import { renderLayoutControlOverlaySvg } from '../Home-Layout-Agent/src/layout-control.js';
 import { assertHomeModel } from '../Home-Layout-Agent/src/validation.js';
 import {
   newId,
@@ -77,6 +79,7 @@ interface LayoutJob {
   homeId: string;
   type: 'agent.generate' | 'agent.refine';
   repairAttempt: number;
+  controlImageUsed: boolean;
   expiresAt: number;
 }
 
@@ -129,6 +132,7 @@ function verifyJob(value: unknown): LayoutJob | null {
     || typeof job.repairAttempt !== 'number'
     || !Number.isSafeInteger(job.repairAttempt)
     || job.repairAttempt < 0
+    || typeof job.controlImageUsed !== 'boolean'
     || typeof job.expiresAt !== 'number'
     || job.expiresAt < Date.now()
   ) throw new Error('job_token is invalid or expired');
@@ -259,6 +263,46 @@ async function readSourceAspectRatio(sourceUrl: string): Promise<number> {
   }
 }
 
+async function createLayoutControlImage(input: {
+  sourceUrl: string;
+  homeId: string;
+  requestId: string;
+  plan: LayoutRenderPlan;
+  rooms: ConfirmedRoom[];
+  openings: RoomMapOpening[];
+}): Promise<{ assetRef: string; width: number; height: number }> {
+  const upstream = await fetch(input.sourceUrl, { signal: AbortSignal.timeout(15_000) });
+  if (!upstream.ok) throw new Error(`Source plan download failed while building control image (${upstream.status})`);
+  const sourceBytes = Buffer.from(await upstream.arrayBuffer());
+  if (sourceBytes.byteLength === 0) throw new Error('Source plan is empty');
+  const normalized = await sharp(sourceBytes, { pages: 1 })
+    .rotate()
+    .resize({ width: 2_200, height: 2_200, fit: 'inside', withoutEnlargement: true })
+    .png()
+    .toBuffer({ resolveWithObject: true });
+  const overlay = renderLayoutControlOverlaySvg({
+    width: normalized.info.width,
+    height: normalized.info.height,
+    plan: input.plan,
+    rooms: input.rooms,
+    openings: input.openings,
+  });
+  const controlBytes = await sharp(normalized.data)
+    .composite([{ input: Buffer.from(overlay, 'utf8'), blend: 'over' }])
+    .png({ compressionLevel: 8 })
+    .toBuffer();
+  const blob = await put(
+    `controls/layout/${encodeURIComponent(input.homeId)}/${encodeURIComponent(input.requestId)}.png`,
+    controlBytes,
+    { access: 'private', addRandomSuffix: true, contentType: 'image/png', cacheControlMaxAge: 86_400 },
+  );
+  return {
+    assetRef: await temporaryBlobReadUrl(blob.url),
+    width: normalized.info.width,
+    height: normalized.info.height,
+  };
+}
+
 function architecturalType(code: ConfirmedRoom['functionCode']): string {
   if (['living_room', 'family_room', 'den', 'home_theater', 'game_room'].includes(code)) return 'living_room';
   if (code === 'kitchen') return 'kitchen';
@@ -314,7 +358,11 @@ function metricPlacementPolygon(placement: LayoutRenderPlan['placements'][number
   ]);
 }
 
-function buildHomeModel(value: ReturnType<typeof confirmedInput>, plan: LayoutRenderPlan): HomeModel {
+function buildHomeModel(
+  value: ReturnType<typeof confirmedInput>,
+  plan: LayoutRenderPlan,
+  controlImage?: { assetRef: string; width: number; height: number } | null,
+): HomeModel {
   const timestamp = new Date().toISOString();
   const sourceId = 'src_floor_plan_001';
   const confirmationId = 'src_confirmation_001';
@@ -337,6 +385,14 @@ function buildHomeModel(value: ReturnType<typeof confirmedInput>, plan: LayoutRe
     },
     sources: [
       { id: sourceId, kind: 'floor_plan', label: value.fileName, asset_ref: value.sourceUrl, provider_model: 'zoowork:imageModel', received_at: timestamp },
+      ...(controlImage ? [{
+        id: 'src_layout_control_001',
+        kind: 'vision_model_output',
+        label: 'Deterministic source-locked furniture and circulation control image',
+        asset_ref: controlImage.assetRef,
+        provider_model: 'see-my-home:control-renderer-v1',
+        received_at: timestamp,
+      }] : []),
       { id: confirmationId, kind: 'user_correction', label: 'User-confirmed room functions and boundaries', asset_ref: null, provider_model: null, received_at: timestamp },
     ],
     floors: [{ id: floorId, label: 'Main floor', level_index: 0, state: 'user_confirmed', confidence: 1, source_refs: [sourceId, confirmationId] }],
@@ -380,7 +436,8 @@ function buildHomeModel(value: ReturnType<typeof confirmedInput>, plan: LayoutRe
     ],
     constraints: [
       ...value.excluded.map((region, index) => ({ id: `constraint_excluded_${index + 1}`, category: 'physical', statement: `${region.label} is excluded from furnishing and room programming (${region.reason}).`, strength: 'hard', status: 'active', state: 'user_confirmed', confidence: 1, source_refs: [sourceId, confirmationId] })),
-      ...plan.keepout_zones.map((zone, index) => ({ id: `constraint_opening_${index + 1}`, category: 'physical', statement: `${zone.opening_ref} has a ${zone.reason} keep-out zone of ${zone.clearance_mm} mm; no furniture or cabinetry may overlap it.`, strength: 'hard', status: 'active', state: 'inferred', confidence: plan.scale.confidence, source_refs: [sourceId] })),
+      ...plan.keepout_zones.map((zone, index) => ({ id: `constraint_keepout_${index + 1}`, category: 'physical', statement: `${zone.opening_ref ?? zone.id} has a ${zone.reason} keep-out zone of ${zone.clearance_mm} mm in ${zone.space_refs.join(', ') || 'adjacent spaces'}; no furniture, fixtures, appliances, or cabinetry may overlap it.`, strength: 'hard', status: 'active', state: 'inferred', confidence: plan.scale.confidence, source_refs: [sourceId] })),
+      ...plan.functional_zones.map((zone, index) => ({ id: `constraint_functional_zone_${index + 1}`, category: 'physical', statement: `${zone.space_ref} uses ${zone.kind}; the single shower or tub remains in the wet zone and the single toilet plus vanity remain in the dry zone.`, strength: 'hard', status: 'active', state: 'inferred', confidence: plan.scale.confidence, source_refs: [sourceId] })),
     ],
     problems: [], opportunities: [],
     open_questions: value.questions.map((question) => ({ ...question, status: 'open' })),
@@ -427,8 +484,18 @@ async function analyze(request: VercelRequest, response: VercelResponse): Promis
   });
 }
 
-function visualizationRequest(value: ReturnType<typeof confirmedInput>, plan: LayoutRenderPlan, message: string, type: 'agent.generate' | 'agent.refine', requestId = newId('req')): HomeTurnRequest {
-  const renderPolicy = `Preserve every confirmed polygon, wall, column, door, opening, and window from the source plan. Keep excluded regions outside furnishing and finishes. Generate one new label-free colorized floor plan with realistic furniture, sanitary fixtures, appliances, flooring, and material textures. Use only Banana Pro and Image 2 through ZooWork; prefer Banana Pro for geometry-preserving image-to-image work and Image 2 as the clean-plan fallback. Follow each room_program as a sensible first draft, apply explicit user instructions with highest priority, and avoid duplicate primary furniture or fixtures. Assess only circulation, function, adjacency, privacy, daylight, storage demand, activity conflict, and underused space. Publish every readable raster even if it has quality warnings; only a missing, corrupt, empty, or unreadable image may remain unpublished. This is a ${type} turn.`;
+function visualizationRequest(
+  value: ReturnType<typeof confirmedInput>,
+  plan: LayoutRenderPlan,
+  message: string,
+  type: 'agent.generate' | 'agent.refine',
+  requestId = newId('req'),
+  hasControlImage = false,
+): HomeTurnRequest {
+  const controlPolicy = hasControlImage
+    ? 'Use sources[src_layout_control_001].asset_ref as the image_generate image reference. It is the original plan with deterministic opening, circulation, wet/dry-zone, and furniture-footprint guides. Cyan segments mark immutable door gaps or open passages; thinner blue segments mark immutable windows. Convert each furniture footprint into exactly one realistic top-down object, then remove every colored guide, dashed line, and control stroke from the final pixels. Cross-check sources[src_floor_plan_001] for immutable walls and openings.'
+    : 'Use sources[src_floor_plan_001].asset_ref as the image_generate image reference and follow the normalized placement plan exactly.';
+  const renderPolicy = `${controlPolicy} Preserve every confirmed polygon, wall, column, door, opening, and window from the source plan. Door gaps and open passages are immutable negative space: never close, move, redraw, cover, or place cabinetry across them. Keep excluded regions outside furnishing and finishes. Generate one new label-free colorized floor plan with realistic furniture, sanitary fixtures, appliances, flooring, and material textures. Use only Banana Pro and Image 2 through ZooWork; prefer Banana Pro for geometry-preserving image-to-image work and Image 2 as the clean-plan fallback. Follow each room_program as a sensible first draft, apply explicit user instructions with highest priority, and avoid duplicate primary furniture or fixtures. In every full bathroom render exactly one toilet and exactly one vanity in the dry zone plus exactly one shower or tub in the wet zone, with a clear separation between wet and dry areas. Assess only circulation, function, adjacency, privacy, daylight, storage demand, activity conflict, and underused space. Publish every readable raster even if it has quality warnings; only a missing, corrupt, empty, or unreadable image may remain unpublished. This is a ${type} turn.`;
   const userMessage = `${message.trim().slice(0, 1_800)}\n\n${renderPolicy}\n\n${layoutPlanPrompt(plan, value.rooms)}`.slice(0, 8_000);
   return {
     schema_version: '1.0', request_id: requestId, home_id: value.homeId, operation: 'visualize', locale: value.locale,
@@ -463,12 +530,27 @@ async function generate(request: VercelRequest, response: VercelResponse, type: 
   if (job && (job.homeId !== value.homeId || job.type !== type)) throw new Error('job_token does not match this request');
   if (!job && value.sourceUrl) value.sourceUrl = await temporaryBlobReadUrl(value.sourceUrl);
   const plan = buildLayoutRenderPlan({ rooms: value.rooms, openings: value.openings, tags: value.tags, considerations: value.considerations, sourceAspectRatio: value.sourceAspectRatio });
-  const model = buildHomeModel(value, plan);
   const defaultMessage = `Generate the layout. Priorities: ${value.tags.join(', ') || 'none specified'}. Special considerations: ${value.considerations || 'none specified'}.`;
   const message = typeof source.user_message === 'string' && source.user_message.trim() ? source.user_message.trim() : defaultMessage;
   const zoo = runtime();
   const requestId = job?.requestId ?? newId('req');
-  const turn = visualizationRequest(value, plan, message, type, requestId);
+  let controlImage: { assetRef: string; width: number; height: number } | null = null;
+  if (!job && value.sourceUrl) {
+    try {
+      controlImage = await createLayoutControlImage({
+        sourceUrl: value.sourceUrl,
+        homeId: value.homeId,
+        requestId,
+        plan,
+        rooms: value.rooms,
+        openings: value.openings,
+      });
+    } catch (error) {
+      plan.qa.warnings.push(`Control image unavailable; generation will use the original source and structured plan only: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  const model = buildHomeModel(value, plan, controlImage);
+  const turn = visualizationRequest(value, plan, message, type, requestId, controlImage !== null);
   const event: UiAgentEvent = { type, project_id: value.homeId, mode: 'layout' };
   if (!job) {
     await zoo.ensureRunning();
@@ -484,6 +566,7 @@ async function generate(request: VercelRequest, response: VercelResponse, type: 
         homeId: value.homeId,
         type,
         repairAttempt: started.repairAttempt,
+        controlImageUsed: controlImage !== null,
         expiresAt: Date.now() + 30 * 60 * 1000,
       }),
       poll_after_ms: 3_000,
@@ -526,6 +609,11 @@ async function generate(request: VercelRequest, response: VercelResponse, type: 
     session_id: conversation.sessionId, image_processing_status: value.sourceUrl ? 'analyzed' : 'sample_geometry',
     intake, diagnosis: result.response, visualization: result.response, generated_image: generatedImage,
     render_plan: plan, event_trace: type === 'agent.refine' ? ['agent.refine'] : ['room_map.confirm', 'agent.generate'],
+    render_trace: {
+      structured_plan: plan.qa.status,
+      control_image: job.controlImageUsed ? 'used' : 'unavailable',
+      final_image: generatedImage ? 'published' : 'missing',
+    },
     request_context: source,
   });
 }

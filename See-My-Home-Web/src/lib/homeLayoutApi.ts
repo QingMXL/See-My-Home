@@ -88,6 +88,11 @@ export interface LayoutGenerationResult {
     note: string | null;
   } | null;
   render_plan?: LayoutRenderPlan;
+  render_trace?: {
+    structured_plan: "passed" | "needs_review";
+    control_image: "used" | "unavailable";
+    final_image: "published" | "missing";
+  };
   request_context?: GenerateLayoutInput;
 }
 
@@ -115,22 +120,31 @@ export interface LayoutPlacement {
   depth_mm?: number;
   clearance_mm?: number;
   scale_status?: "unknown" | "estimated" | "confirmed";
+  zone_ref?: string | null;
   rotation_deg: number;
 }
 
 export interface LayoutRenderPlan {
-  schema_version: "1.0" | "1.1";
+  schema_version: "1.0" | "1.1" | "1.2";
   geometry_revision: number;
   placement_revision: number;
-  render_strategy: "source_locked_svg_overlay";
+  render_strategy: "source_locked_svg_overlay" | "source_locked_control_overlay";
   placements: LayoutPlacement[];
   scale?: Record<string, unknown>;
   keepout_zones?: {
     id: string;
-    reason: "door_opening" | "door_swing" | "entry_landing" | "open_passage";
-    opening_ref: string;
+    reason: "door_opening" | "door_swing" | "entry_landing" | "open_passage" | "circulation_path";
+    opening_ref: string | null;
+    space_refs?: string[];
     polygon: number[][];
     clearance_mm: number;
+  }[];
+  functional_zones?: {
+    id: string;
+    space_ref: string;
+    kind: "bathroom_dry" | "bathroom_wet";
+    polygon: number[][];
+    basis_opening_ref: string | null;
   }[];
   qa: {
     status: "passed" | "needs_review";

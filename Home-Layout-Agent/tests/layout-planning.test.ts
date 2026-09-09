@@ -61,3 +61,47 @@ test('uses physical furniture dimensions and keeps entry storage outside the doo
   ]);
   assert.equal(overlaps(storageBounds, bounds(entryKeepout!.polygon)), false);
 });
+
+test('uses a consistent median door span instead of one outlier for plan scale', () => {
+  const scale = calibratePlanScale([
+    door({ id: 'door_a', segment: [[0.1, 0.1], [0.15, 0.1]], confidence: 0.8 }),
+    door({ id: 'door_b', segment: [[0.2, 0.1], [0.252, 0.1]], confidence: 0.9 }),
+    door({ id: 'door_outlier', segment: [[0.3, 0.1], [0.43, 0.1]], confidence: 0.99 }),
+  ], 1);
+
+  assert.equal(scale.status, 'estimated');
+  assert.ok(scale.millimeters_per_source_x_unit > 15_000);
+  assert.ok(scale.millimeters_per_source_x_unit < 18_000);
+});
+
+test('creates one wet and one dry bathroom zone with one primary fixture in each role', () => {
+  const bathroomDoor = door({
+    id: 'door_bathroom',
+    door_type: 'interior',
+    position: [0.2, 0],
+    segment: [[0.175, 0], [0.225, 0]],
+    connects_space_ids: ['space_bathroom'],
+  });
+  const plan = buildLayoutRenderPlan({
+    openings: [bathroomDoor],
+    rooms: [{ id: 'space_bathroom', label: 'Bathroom', functionCode: 'bathroom', polygon: [[0, 0], [0.4, 0], [0.4, 0.5], [0, 0.5]] }],
+  });
+
+  assert.equal(plan.functional_zones.filter((zone) => zone.space_ref === 'space_bathroom').length, 2);
+  assert.equal(plan.placements.filter((placement) => placement.kind === 'toilet').length, 1);
+  assert.equal(plan.placements.filter((placement) => placement.kind === 'vanity').length, 1);
+  assert.equal(plan.placements.filter((placement) => placement.kind === 'shower').length, 1);
+  assert.equal(plan.placements.find((placement) => placement.kind === 'shower')?.zone_ref, 'zone_space_bathroom_wet');
+  assert.ok(plan.keepout_zones.some((zone) => zone.reason === 'circulation_path' && zone.space_refs.includes('space_bathroom')));
+});
+
+test('omits entry storage when a narrow arrival corridor cannot keep 900 mm clear', () => {
+  const entryDoor = door({ position: [0.06, 0], segment: [[0.035, 0], [0.085, 0]], connects_space_ids: ['space_entry'] });
+  const plan = buildLayoutRenderPlan({
+    openings: [entryDoor],
+    rooms: [{ id: 'space_entry', label: 'Entry', functionCode: 'entry', polygon: [[0, 0], [0.12, 0], [0.12, 0.5], [0, 0.5]] }],
+  });
+
+  assert.equal(plan.placements.some((placement) => placement.kind === 'storage'), false);
+  assert.ok(plan.qa.issues.some((issue) => issue.includes('900 mm continuous arrival path')));
+});

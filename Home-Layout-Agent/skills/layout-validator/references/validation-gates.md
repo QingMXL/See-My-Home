@@ -10,6 +10,8 @@ Blocking:
 - A primary bed, toilet, sink/vanity, shower/tub zone, kitchen sink, cooktop, refrigerator, sofa, TV/media wall, dining table, or desk is duplicated without a resolved count that permits it.
 - A known door/opening is blocked.
 - A furniture footprint intersects a door-opening, visible swing, entry-landing, or open-passage keep-out polygon.
+- A furniture, fixture, appliance, or cabinetry footprint intersects a continuous 900 mm circulation corridor.
+- A full bathroom places its shower/tub outside the wet zone or its toilet/vanity outside the dry zone.
 - Furniture in different rooms was sized from different room-relative scales, or a footprint falls outside its catalogued metric range without an explicit user override.
 - A placement or assessment references an `excluded_region`.
 

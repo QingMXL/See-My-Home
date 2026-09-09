@@ -1,11 +1,11 @@
 {
   "schema_version": "1.0",
-  "release_set": "2026-09-09.1",
+  "release_set": "2026-09-09.2",
   "agents": {
     "home-layout": {
       "directory": "Home-Layout-Agent",
       "package": "@see-my-home/home-layout-agent",
-      "package_version": "0.3.0",
+      "package_version": "0.4.0",
       "runtime_contract": "home-layout-v2",
       "agent_id_env": "ZOOWORK_AGENT_ID",
       "api_namespace": "/api/home-layout",

@@ -17,8 +17,9 @@ Read [the validation gates](references/validation-gates.md).
 4. Count integrity: after explicit overrides, count every object named in `default_object_counts` per room and reject any value below `min_count` or above `max_count`.
 5. Primary fixture sanity: no duplicated beds, toilets, sinks, vanities, shower/tub zones, kitchen sinks, cooktops, refrigerators, sofas, TVs/media walls, dining tables, or desks unless the resolved count explicitly allows it.
 6. Scale sanity: all placements use the same calibration and remain within their catalogued metric size range. Estimated door calibration is allowed for planning but must remain labelled estimated.
-7. Relationship sanity: seating faces its media target; kitchen work elements form a coherent run; no furniture intersects a door-opening, door-swing, entry-landing, or open-passage keep-out polygon.
-8. Exclusion integrity: no placement, finish, room program, or assessment target may reference an `excluded_region`.
-9. Output safety: room labels are not baked into generated pixels.
+7. Relationship sanity: seating faces its media target; kitchen work elements form a coherent run; no furniture intersects a door-opening, door-swing, entry-landing, open-passage, or continuous-circulation keep-out polygon.
+8. Bathroom zoning: in every full bathroom, the single vanity and toilet remain in the dry zone and the single shower or tub remains in the wet zone; the entrance and door swing stay clear.
+9. Exclusion integrity: no placement, finish, room program, or assessment target may reference an `excluded_region`.
+10. Output safety: room labels are not baked into generated pixels.
 
 Return concise blocking issues and warnings. Before generation, the Runtime removes or relocates an unsafe placement and then renders the remaining validated plan; it does not suppress the complete image because one item could not be placed. Post-generation quality findings remain warnings on the published readable raster. Without confirmed scale, describe clearances as estimated rather than certified.

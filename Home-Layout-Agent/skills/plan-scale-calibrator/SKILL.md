@@ -13,7 +13,7 @@ Read [the scale contract](references/scale-contract.md) before using a door or d
 
 1. Use an explicit user-confirmed measurement when available.
 2. Otherwise use a legible printed dimension tied to visible endpoints.
-3. Otherwise use the highest-confidence visible single-door opening segment as an estimated 850 mm reference.
+3. Otherwise collect plausible visible single-door opening segments, reject sliding/double doors and obvious length outliers, and use the median consistent span as an estimated 850 mm reference. Keep the highest-confidence member only as the stable reference ID.
 4. If no reliable segment exists, keep scale `unknown` and use one consistent relative door-unit fallback for the entire plan.
 
 Never certify inferred scale as measured. Use the same calibrated x/y conversion for every room, furniture item, fixture, appliance, clearance, and keep-out zone.
