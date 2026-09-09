@@ -298,6 +298,36 @@ test('builds category-specific anatomy instructions for chairs, sofas, and lamps
   assert.match(posted[2]!, /lamp shade or diffuser/i);
 });
 
+test('accepts legitimate narrow lamp side elevations and strengthens targeted retries', async () => {
+  let postedContent = '';
+  const fakeClient = {
+    async postEvents(_agentId: string, _sessionId: string, events: { content?: string }[]) {
+      postedContent = events[0]?.content ?? '';
+      return { events: [{ id: 'event_lamp_side', seq: 18, type: 'user.message', accepted: true }] };
+    },
+  } as unknown as ZooworkClient;
+  const runtime = new HomeFurnitureRuntime(fakeClient, 'agent_private_001');
+  const lampSideRequest: FurnitureTurnRequest = {
+    ...request,
+    table_type: 'floor_lamp',
+    output_mode: 'orthographic_sheet',
+    orthographic_view: 'side',
+    render_asset_ref: 'https://example.com/confirmed-lamp.png',
+    confirmed_design_spec: response.design_spec,
+    description: `${response.design_summary}\n\nAUTOMATIC ORTHOGRAPHIC RETRY for the side view.`,
+    source_priority: { sketch: 0, inspiration: 0 },
+    locked_controls: [],
+  };
+
+  await runtime.startFurnitureTurn({ agentId: 'agent_private_001', sessionId: 'lamp_side' }, lampSideRequest);
+
+  assert.match(postedContent, /legitimately narrow depth-to-height silhouette/i);
+  assert.match(postedContent, /rotationally symmetric lamp/i);
+  assert.match(postedContent, /roughly 70-80% of the canvas height/i);
+  assert.match(postedContent, /targeted automatic retry/i);
+  assert.match(postedContent, /genuinely fresh raster/i);
+});
+
 test('requires explicit projection and visible-surface QA for every orthographic artifact', () => {
   const topRequest: FurnitureTurnRequest = {
     ...request,

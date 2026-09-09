@@ -432,7 +432,15 @@ function orthographicTurn(input: {
   spec: FurnitureDesignSpec;
   summary: string;
   view: OrthographicView;
+  retryAttempt?: number;
 }): FurnitureTurnRequest {
+  const retryGuidance = input.retryAttempt
+    ? [
+        `AUTOMATIC ORTHOGRAPHIC RETRY for the ${input.view} view. The previous raster was not publishable; generate a fresh image rather than repeating it.`,
+        'Keep the entire product inside the canvas with clear margins, make it occupy roughly 70-80% of the available height or width, and use solid dark outer contours with clearly readable internal edges.',
+        'Check that every extremity and required component is present before publication. Preserve the confirmed proportions; do not widen a naturally slender object merely to fill the canvas.',
+      ].join(' ')
+    : '';
   return {
     contract_version: 'home-furniture-v1',
     output_mode: 'orthographic_sheet',
@@ -443,7 +451,7 @@ function orthographicTurn(input: {
     render_asset_ref: input.renderAssetRef,
     confirmed_design_spec: input.spec,
     orthographic_view: input.view,
-    description: input.summary,
+    description: [input.summary, retryGuidance].filter(Boolean).join('\n\n'),
     source_priority: { sketch: 0, inspiration: 0 },
     locked_controls: [],
     design_controls: confirmedControls(input.spec),
@@ -459,6 +467,19 @@ function jobWithOrthographicParts(base: Omit<FurnitureJob, 'sessionId' | 'posted
 function readableImageArtifact(result: FurnitureTurnResult) {
   return result.artifacts.find((candidate) => candidate.status === 'ready'
     && (candidate.contentType?.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(candidate.fileName ?? '')));
+}
+
+function orthographicFailureDiagnostic(result: FurnitureTurnResult) {
+  return {
+    agentStatus: result.response.status,
+    warnings: result.response.warnings,
+    questions: result.response.questions,
+    qa: result.response.qa,
+    completedTools: result.toolCalls
+      .filter((call) => call.phase === 'end')
+      .map((call) => ({ toolName: call.toolName, isError: call.isError })),
+    artifactCount: result.artifacts.length,
+  };
 }
 
 async function orthographic(request: VercelRequest, response: VercelResponse): Promise<void> {
@@ -553,6 +574,14 @@ async function orthographic(request: VercelRequest, response: VercelResponse): P
     }
     if (polledPart.status !== 'missing') throw new Error('orthographic view is still processing');
     if (polledPart.part.retryAttempt >= 1) {
+      console.error(JSON.stringify({
+        level: 'error',
+        message: 'orthographic view artifact unavailable after targeted retry',
+        requestId: polledPart.part.requestId,
+        projectId,
+        view: polledPart.part.view,
+        ...orthographicFailureDiagnostic(polledPart.result),
+      }));
       throw new Error(locale === 'zh-CN'
         ? `${polledPart.part.view} 三视图未能生成完整、可读取的图片，自动重试后仍未成功。`
         : `The ${polledPart.part.view} view did not produce a complete readable image after an automatic retry.`);
@@ -564,7 +593,7 @@ async function orthographic(request: VercelRequest, response: VercelResponse): P
       requestId: polledPart.part.requestId,
       projectId,
       view: polledPart.part.view,
-      agentStatus: polledPart.result.response.status,
+      ...orthographicFailureDiagnostic(polledPart.result),
     }));
     const retryRequestId = newId(`ortho_${polledPart.part.view}_retry`);
     const retryTurn = orthographicTurn({
@@ -576,6 +605,7 @@ async function orthographic(request: VercelRequest, response: VercelResponse): P
       spec: baseResponse.design_spec,
       summary: baseResponse.design_summary,
       view: polledPart.part.view,
+      retryAttempt: 1,
     });
     const retryConversation = await zoo.createConversation(projectId, newId(`furniture_orthographic_${polledPart.part.view}_retry_${projectId}`));
     const retryStarted = await zoo.startFurnitureTurn(retryConversation, retryTurn);
