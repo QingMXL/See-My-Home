@@ -177,6 +177,11 @@
   white-space: nowrap;
 }
 
+.furniture-upload .furniture-upload__status--success {
+  color: #397452;
+  font-weight: 650;
+}
+
 .source-mix {
   display: grid;
   gap: 0.55rem;

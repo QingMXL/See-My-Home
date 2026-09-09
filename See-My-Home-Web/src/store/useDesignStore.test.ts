@@ -265,6 +265,30 @@ describe("useDesignStore", () => {
     expect(persisted.furniture.refinementPrompt).toBe("");
   });
 
+  test("does not persist furniture hard constraints across a page reload", () => {
+    useDesignStore.getState().setFurnitureOption("legs", "Twin Pedestal");
+    expect(useDesignStore.getState().furniture.lockedControls).toContain("base_style");
+
+    const partialize = useDesignStore.persist.getOptions().partialize;
+    const persisted = partialize?.(useDesignStore.getState()) as ReturnType<typeof useDesignStore.getState>;
+
+    expect(persisted.furniture.lockedControls).toEqual([]);
+  });
+
+  test("migrates persisted furniture hard constraints out of a fresh intake", async () => {
+    const migrate = useDesignStore.persist.getOptions().migrate;
+    const migrated = await migrate?.({
+      furniture: {
+        ...useDesignStore.getState().furniture,
+        legs: "Twin Pedestal",
+        lockedControls: ["base_style"],
+      },
+    }, 4) as ReturnType<typeof useDesignStore.getState>;
+
+    expect(migrated.furniture.legs).toBe("Twin Pedestal");
+    expect(migrated.furniture.lockedControls).toEqual([]);
+  });
+
   test("does not persist a bundled demo as a custom furniture result", () => {
     useDesignStore.getState().setFurnitureUploadedAsset("sketch", DEMO_FURNITURE_SKETCH_ASSET);
     useDesignStore.getState().setFurnitureAgentRun(createDemoFurnitureResult(demoInput));

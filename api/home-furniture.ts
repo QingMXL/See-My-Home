@@ -321,6 +321,9 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
       requestId,
       sessionId: conversation.sessionId,
       type,
+      hasSketch: Boolean(sketchRef),
+      hasInspiration: Boolean(inspirationRef),
+      lockedControlCount: turn.locked_controls.length,
     }));
     sendJson(response, 202, {
       status: 'processing',

@@ -181,14 +181,14 @@ export function FurniturePage() {
     "例如：一张 1800 × 900 × 750 mm 的餐桌，弧形桌腿、圆角边缘、胡桃木实木；桌面保持轻薄，整体轮廓简洁。",
   );
 
-  const makeInput = (description: string): FurnitureGenerateInput => ({
+  const makeInput = (description: string, hardConstraints: FurnitureControlKey[]): FurnitureGenerateInput => ({
     project_id: furniture.projectId ?? `furniture_${crypto.randomUUID()}`,
     ...(furniture.sketchAsset ? { sketch_asset_id: furniture.sketchAsset.asset_id } : {}),
     ...(furniture.inspirationAsset ? { inspiration_asset_id: furniture.inspirationAsset.asset_id } : {}),
     locale: lang === "zh" ? "zh-CN" : "en-US",
     table_type: furniture.tableType,
     description,
-    locked_controls: lockedControls,
+    locked_controls: hardConstraints,
     dimensions_mm: { ...sizeDimensions(furniture.size) },
     primary_material: furniture.material,
     secondary_material: furniture.secondaryMaterial,
@@ -262,6 +262,8 @@ export function FurniturePage() {
       const asset = await uploadFurnitureImage(file, kind, lang === "zh" ? "zh-CN" : "en-US", projectId);
       setFurnitureUploadedAsset(kind, asset);
     } catch (error) {
+      URL.revokeObjectURL(localUrl);
+      removeFurnitureSource(kind);
       setFurnitureAgentError(error instanceof Error ? error.message : copy("Image upload failed.", "图片上传失败。"));
     } finally {
       setUploading(null);
@@ -299,7 +301,9 @@ export function FurniturePage() {
     const description = isRefinement
       ? refinement ? `${previousDescription}\n\n${copy("Requested revision:", "本次调整：")} ${refinement}` : previousDescription
       : originalDescription;
-    const input = makeInput(description);
+    // Step 1 follows the current images and brief. Only controls deliberately
+    // changed in Step 2 become hard constraints during refinement.
+    const input = makeInput(description, isRefinement ? lockedControls : []);
     const useDemoGeneration = isDemoSketch || (
       isRefinement
       && isDemoResult
@@ -467,7 +471,7 @@ export function FurniturePage() {
               <button type="button" className="furniture-upload furniture-upload--large" disabled={Boolean(uploading)} onClick={() => sketchInputRef.current?.click()}>
                 {furniture.sketchUrl ? <img src={furniture.sketchUrl} alt={furniture.sketchName ?? t("furn.sketch")} /> : <span className="furniture-upload__plus">+</span>}
                 <span><strong>{t("furn.sketch")}</strong><small>{copy("Defines form and structure", "决定造型与结构")}</small></span>
-                <em>{uploading === "sketch" ? copy("Uploading…", "上传中…") : furniture.sketchName ?? copy("Choose image", "选择图片")}</em>
+                <em className={furniture.sketchAsset ? "furniture-upload__status--success" : undefined} aria-live="polite">{uploading === "sketch" ? copy("Uploading…", "上传中…") : furniture.sketchAsset ? `✓ ${copy("Uploaded", "上传成功")} · ${furniture.sketchName ?? furniture.sketchAsset.file_name}` : copy("Choose image", "选择图片")}</em>
               </button>
               {(furniture.sketchUrl || furniture.sketchAsset) && <button type="button" className="furniture-upload__remove" aria-label={copy("Remove sketch", "删除手绘草图")} disabled={Boolean(uploading)} onClick={() => onRemoveSource("sketch")}><X size={15} /></button>}
             </div>
@@ -475,7 +479,7 @@ export function FurniturePage() {
               <button type="button" className="furniture-upload furniture-upload--large" disabled={Boolean(uploading)} onClick={() => inspirationInputRef.current?.click()}>
                 {furniture.inspirationUrl ? <img src={furniture.inspirationUrl} alt={furniture.inspirationName ?? t("furn.inspiration")} /> : <span className="furniture-upload__plus">+</span>}
                 <span><strong>{t("furn.inspiration")}</strong><small>{copy("Defines style and material", "决定风格与材质")}</small></span>
-                <em>{uploading === "inspiration" ? copy("Uploading…", "上传中…") : furniture.inspirationName ?? copy("Choose image", "选择图片")}</em>
+                <em className={furniture.inspirationAsset ? "furniture-upload__status--success" : undefined} aria-live="polite">{uploading === "inspiration" ? copy("Uploading…", "上传中…") : furniture.inspirationAsset ? `✓ ${copy("Uploaded", "上传成功")} · ${furniture.inspirationName ?? furniture.inspirationAsset.file_name}` : copy("Choose image", "选择图片")}</em>
               </button>
               {(furniture.inspirationUrl || furniture.inspirationAsset) && <button type="button" className="furniture-upload__remove" aria-label={copy("Remove inspiration", "删除灵感图")} disabled={Boolean(uploading)} onClick={() => onRemoveSource("inspiration")}><X size={15} /></button>}
             </div>

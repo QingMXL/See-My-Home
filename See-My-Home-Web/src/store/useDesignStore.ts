@@ -495,7 +495,9 @@ export const useDesignStore = create<DesignStore>()(
             topShape: s.furniture.topShape,
             edgeProfile: s.furniture.edgeProfile,
             finish: s.furniture.finish,
-            lockedControls: s.furniture.lockedControls ?? [],
+            // Hard constraints are editing-session intent. Persisting them makes
+            // invisible Step 2 choices override a fresh Step 1 upload.
+            lockedControls: [],
             confirmed: demoFurniture ? false : s.furniture.confirmed,
             phase: !demoFurniture && s.furniture.phase === "done" ? "done" : "idle",
             agentRun: demoFurniture ? null : s.furniture.agentRun,
@@ -504,7 +506,7 @@ export const useDesignStore = create<DesignStore>()(
           },
         };
       },
-      version: 4,
+      version: 5,
       migrate: (persistedState, version) => {
         const state = persistedState as Partial<Pick<DesignStore, "saved" | "layout" | "style" | "furniture">>;
         if (!state.furniture) {
@@ -531,6 +533,7 @@ export const useDesignStore = create<DesignStore>()(
               agentRun: null,
               orthographicRun: null,
             } : {}),
+            ...(version < 5 ? { lockedControls: [] } : {}),
             prompt: "",
             refinementPrompt: "",
           },
