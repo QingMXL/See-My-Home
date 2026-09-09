@@ -122,10 +122,12 @@ export interface LayoutPlacement {
   scale_status?: "unknown" | "estimated" | "confirmed";
   zone_ref?: string | null;
   rotation_deg: number;
+  front_edge?: "top" | "right" | "bottom" | "left" | null;
+  faces_ref?: string | null;
 }
 
 export interface LayoutRenderPlan {
-  schema_version: "1.0" | "1.1" | "1.2";
+  schema_version: "1.0" | "1.1" | "1.2" | "1.3";
   geometry_revision: number;
   placement_revision: number;
   render_strategy: "source_locked_svg_overlay" | "source_locked_control_overlay";
@@ -145,6 +147,13 @@ export interface LayoutRenderPlan {
     kind: "bathroom_dry" | "bathroom_wet";
     polygon: number[][];
     basis_opening_ref: string | null;
+  }[];
+  material_zones?: {
+    id: string;
+    space_ref: string;
+    finish_family: "warm_wood" | "resilient_entry" | "ceramic_tile" | "exterior_tile";
+    polygon: number[][];
+    transition_policy: "clip_to_confirmed_polygon";
   }[];
   qa: {
     status: "passed" | "needs_review";

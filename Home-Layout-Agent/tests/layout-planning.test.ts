@@ -105,3 +105,43 @@ test('omits entry storage when a narrow arrival corridor cannot keep 900 mm clea
   assert.equal(plan.placements.some((placement) => placement.kind === 'storage'), false);
   assert.ok(plan.qa.issues.some((issue) => issue.includes('900 mm continuous arrival path')));
 });
+
+test('keeps the primary bed at its catalog size and rotates it instead of shrinking it', () => {
+  const plan = buildLayoutRenderPlan({
+    openings: [],
+    rooms: [{
+      id: 'space_primary',
+      label: 'Primary bedroom',
+      functionCode: 'primary_bedroom',
+      polygon: [[0.1, 0.1], [0.26, 0.1], [0.26, 0.245], [0.1, 0.245]],
+    }],
+  });
+  const bed = plan.placements.find((placement) => placement.kind === 'bed');
+
+  assert.equal(bed?.width_mm, 1800);
+  assert.equal(bed?.depth_mm, 2000);
+  assert.equal(bed?.rotation_deg, 90);
+});
+
+test('creates a single-instance kitchen manifest, reciprocal living-room facing, and clipped material zones', () => {
+  const plan = buildLayoutRenderPlan({
+    openings: [],
+    rooms: [
+      { id: 'space_living', label: 'Living', functionCode: 'living_room', polygon: [[0, 0], [0.48, 0], [0.48, 0.38], [0, 0.38]] },
+      { id: 'space_kitchen', label: 'Kitchen', functionCode: 'kitchen', polygon: [[0.5, 0], [1, 0], [1, 0.38], [0.5, 0.38]] },
+      { id: 'space_entry', label: 'Entry', functionCode: 'entry', polygon: [[0, 0.42], [0.24, 0.42], [0.24, 0.8], [0, 0.8]] },
+    ],
+  });
+  const sofa = plan.placements.find((placement) => placement.kind === 'sofa');
+  const tv = plan.placements.find((placement) => placement.kind === 'tv');
+
+  assert.equal(plan.schema_version, '1.3');
+  assert.equal(plan.placements.filter((placement) => placement.space_ref === 'space_kitchen' && placement.kind === 'sink').length, 1);
+  assert.equal(plan.placements.filter((placement) => placement.space_ref === 'space_kitchen' && placement.kind === 'cooktop').length, 1);
+  assert.equal(sofa?.faces_ref, tv?.id);
+  assert.equal(tv?.faces_ref, sofa?.id);
+  assert.ok(sofa?.front_edge);
+  assert.equal(plan.material_zones.length, 3);
+  assert.equal(plan.material_zones.find((zone) => zone.space_ref === 'space_entry')?.finish_family, 'resilient_entry');
+  assert.deepEqual(plan.material_zones.find((zone) => zone.space_ref === 'space_living')?.polygon, [[0, 0], [0.48, 0], [0.48, 0.38], [0, 0.38]]);
+});

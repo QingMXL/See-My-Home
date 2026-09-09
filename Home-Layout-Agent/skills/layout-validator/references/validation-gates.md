@@ -14,6 +14,8 @@ Blocking:
 - A full bathroom places its shower/tub outside the wet zone or its toilet/vanity outside the dry zone.
 - Furniture in different rooms was sized from different room-relative scales, or a footprint falls outside its catalogued metric range without an explicit user override.
 - A placement or assessment references an `excluded_region`.
+- A sofa/media pair lacks reciprocal facing references or its viewing axis crosses an opaque obstruction.
+- A floor finish extends outside its confirmed room material-zone polygon.
 
 Resolve blocking placement issues before image generation by relocating, resizing within the catalogued range, or omitting that unsafe placement with a warning. A readable generated raster is still published; validation does not restore the retired all-or-nothing publication gate.
 

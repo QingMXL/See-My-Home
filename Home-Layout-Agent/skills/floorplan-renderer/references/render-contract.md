@@ -7,9 +7,9 @@ Fallback strategy: `source_locked_control_overlay` when rasterization succeeds, 
 
 - Source geometry is immutable.
 - The generated plan uses normalized polygons and the validated placement plan to guide room materials, furniture, and fixtures. It keeps all `excluded_regions` untouched.
-- After user overrides, every object covered by `default_object_counts` should remain within its resolved room-specific min/max count; a mismatch is returned as a precise warning on the published candidate.
+- After user overrides, the placement manifest is the sole object-instance list. Every object covered by `default_object_counts` remains within its resolved room-specific min/max count; room-program names do not request additional copies. A mismatch is returned as a precise warning on the published candidate.
 - The deterministic control image must be supplied to `image_generate` when available and when the exposed tool supports the `image` input. It retains the source plan underneath its guides; the original remains the geometry cross-check.
-- Every control footprint maps to exactly one final object. Control colors and strokes are instructions, not final styling, and must disappear from the generated pixels.
+- Every uniquely shaped control footprint maps to exactly one final object. A planned 2000 mm bed remains about 2.35 times the estimated 850 mm door span; the sofa faces one television/media target across an unobstructed control axis. Material textures are clipped to their per-room material-zone polygons. Control colors and strokes are instructions, not final styling, and must disappear from the generated pixels.
 - Labels are a separate UI layer and use locale-aware browser fonts.
 - The base result uses ZooWork's injected `imageGenerationModel` and must require no external provider API key.
 - The application displays the published raster as the primary design view while retaining the deterministic overlay as a fallback and geometry-verification view.

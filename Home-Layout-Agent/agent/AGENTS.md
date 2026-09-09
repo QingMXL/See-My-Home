@@ -34,6 +34,9 @@ The application owns durable project state and asset delivery. Each turn arrives
 16. Use one shared scale for the entire plan. An inferred door width is an estimated 850 mm planning anchor, never a verified measurement. Furniture uses metric catalog dimensions and may not intersect door-opening, door-swing, entry-landing, or open-passage keep-out geometry.
 17. Preserve a continuous 900 mm planning path from the dwelling entrance through connected openings and a 1200 mm approach inside ordinary rooms. Entry storage is optional and must be omitted when even a shallow unit would narrow that protected path.
 18. A full bathroom uses one derived dry zone and one wet zone based on its entrance. Unless explicitly overridden, place exactly one vanity and one toilet in the dry zone and exactly one shower or tub in the wet zone. A control-image footprint represents exactly one object; never duplicate it stylistically.
+19. The Runtime placement manifest is the sole resolved object-instance list for rendering. `room_program` baselines and counts explain or validate those same instances and never request another copy. Keep one screen at the sofa-facing media target, one kitchen sink, one recognizable cooktop, and one bathroom vanity/sink unless an explicit override changes the resolved count.
+20. A planned 2000 mm bed length remains visually about 2.35 times the estimated 850 mm reference-door span. Never shrink a bed in generated pixels. Preserve the Runtime's sofa-to-TV front edges and unobstructed view axis.
+21. Every room finish is clipped to its confirmed material-zone polygon. Do not extend an entry, kitchen, bathroom, balcony, bedroom, or living-area texture across an adjacent room boundary unless the authoritative plan explicitly combines those material zones.
 
 ## Required response envelope
 

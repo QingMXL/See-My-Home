@@ -457,16 +457,15 @@ interface DefaultRoomProgram {
 function roomProgram(code: Exclude<RoomFunctionCode, 'unknown'>): DefaultRoomProgram {
   switch (code) {
     case 'living_room': case 'family_room': return {
-      baseline: ['sofa', 'television_or_media_wall', 'media_console', 'ambient_lighting'],
+      baseline: ['ambient_lighting'],
       conditional: [{ object: 'coffee_table', condition: 'Include only when comfortable circulation remains around the seating group.' }],
       counts: [
         { object: 'sofa', minCount: 1, maxCount: 1 },
         { object: 'television_or_media_wall', minCount: 1, maxCount: 1 },
-        { object: 'media_console', minCount: 0, maxCount: 1 },
       ],
     };
     case 'kitchen': return {
-      baseline: ['sink', 'cooktop', 'refrigerator', 'kitchen_cabinetry'],
+      baseline: ['kitchen_cabinetry'],
       conditional: [{ object: 'kitchen_island', condition: 'Include only when the visible room geometry supports safe circulation on all working sides.' }],
       counts: [
         { object: 'sink', minCount: 1, maxCount: 1 },
@@ -480,17 +479,17 @@ function roomProgram(code: Exclude<RoomFunctionCode, 'unknown'>): DefaultRoomPro
       counts: [{ object: 'dining_table', minCount: 1, maxCount: 1 }],
     };
     case 'primary_bedroom': return {
-      baseline: ['bed', 'bedside_access', 'clothing_storage'],
+      baseline: ['bedside_access', 'clothing_storage'],
       conditional: [{ object: 'king_bed', condition: 'Prefer when the visible room geometry preserves comfortable access on both sides; otherwise use a queen bed.' }],
       counts: [{ object: 'bed', minCount: 1, maxCount: 1 }],
     };
     case 'guest_bedroom': case 'kids_room': case 'nursery': return {
-      baseline: ['bed', 'bedside_access', 'clothing_storage'],
+      baseline: ['bedside_access', 'clothing_storage'],
       conditional: [{ object: 'desk_or_play_surface', condition: 'Include when requested or when usable floor area remains.' }],
       counts: [{ object: 'bed', minCount: 1, maxCount: 1 }],
     };
     case 'bathroom': return {
-      baseline: ['toilet', 'sink_or_vanity', 'shower_zone'],
+      baseline: [],
       conditional: [{ object: 'bathtub', condition: 'Use a bathtub instead of or with a shower only when visible geometry and user preference support it.' }],
       counts: [
         { object: 'toilet', minCount: 1, maxCount: 1 },
@@ -499,7 +498,7 @@ function roomProgram(code: Exclude<RoomFunctionCode, 'unknown'>): DefaultRoomPro
       ],
     };
     case 'powder_room': return {
-      baseline: ['toilet', 'sink_or_vanity'], conditional: [],
+      baseline: [], conditional: [],
       counts: [
         { object: 'toilet', minCount: 1, maxCount: 1 },
         { object: 'sink_or_vanity', minCount: 1, maxCount: 1 },
@@ -651,7 +650,15 @@ function buildConfirmedHomeModel(input: GenerateInput, state: ProjectState): { m
       },
       retention: 'replaceable', fixed: 'no', state: 'inferred', confidence: 0.82,
       source_refs: [sourceId, confirmationSourceId],
-    })), relationships: [],
+    })), relationships: renderPlan.placements.flatMap((placement) => placement.kind === 'sofa' && placement.faces_ref ? [{
+      id: `relationship_${placement.id}_visible_to_${placement.faces_ref}`,
+      type: 'visible_to' as const,
+      from_ref: placement.id,
+      to_ref: placement.faces_ref,
+      state: 'inferred' as const,
+      confidence: 0.9,
+      source_refs: [sourceId, confirmationSourceId],
+    }] : []),
     living_patterns: [
       ...confirmed.tags.map((tag, index) => ({ id: `pattern_priority_${index + 1}`, statement: tag, space_refs: [], frequency: 'unknown', priority: 'high', state: 'user_confirmed', confidence: 1, source_refs: [confirmationSourceId] })),
       ...(confirmed.considerations ? [{ id: 'pattern_special_considerations', statement: confirmed.considerations, space_refs: [], frequency: 'unknown', priority: 'high', state: 'user_confirmed', confidence: 1, source_refs: [confirmationSourceId] }] : []),
@@ -700,7 +707,7 @@ async function runVisualization(
   const event: UiAgentEvent = { type: eventType, project_id: state.projectId, mode: 'layout' };
   const request: HomeTurnRequest = {
     schema_version: '1.0', request_id: newId('req'), home_id: state.projectId, operation: 'visualize', locale,
-    user_message: `${userMessage.trim()} Preserve every confirmed room function, polygon, wall, column, door, opening, and window. Treat every door gap and open passage as immutable negative space and never close, move, redraw, cover, or place cabinetry across it. Keep every 900 mm continuous circulation path clear. In every full bathroom keep exactly one vanity and one toilet in the dry zone and exactly one shower or tub in the wet zone, with visible wet/dry separation. Keep excluded_regions completely outside furnishing, finishes, and room programming. Generate and publish one new label-free colorized floor-plan image with realistic furniture, fixtures, flooring, and material finishes inside the confirmed geometry. Use only the approved ZooWork image routes Banana Pro and Image 2: prefer Banana Pro for source-referenced geometry-preserving image-to-image work and Image 2 for clean-plan generation or pre-generation fallback. Set preferred_providers exactly to ["Banana Pro", "Image 2"], but use only model-selection arguments exposed by the current tool schema. Use the original source asset_ref as the visual reference when supported. Treat room_program baseline_objects as sensible first-draft defaults, use conditional_objects only when the visible space supports them, and let explicit user instructions override defaults. After applying those overrides, target every default_object_counts rule exactly and verify the count room by room, especially beds, toilets, sinks or vanities, shower or tub zones, kitchen sinks, cooktops, refrigerators, sofas, TVs or media walls, dining tables, and desks. Never replace a confirmed room with another function or add another room type's primary fixtures. Assess only circulation, functional relationships, adjacency, privacy, daylight, storage demand, activity conflict, or underused space. Mention only spaces present in the authoritative Home Model. Never report missing furniture, fixtures, appliances, typography, or render defects as design assessment items. After inspection, publish every readable generated raster even when quality warnings exist; only a missing, corrupt, empty, or technically unreadable file may remain unpublished.`,
+    user_message: `${userMessage.trim()} Preserve every confirmed room function, polygon, wall, column, door, opening, and window. Treat every door gap and open passage as immutable negative space and never close, move, redraw, cover, or place cabinetry across it. Keep every 900 mm continuous circulation path clear. Treat the Runtime placement manifest as the sole resolved object instance list: room_program names describe the same objects and never request another copy. Render each placement ID exactly once. Keep every bed at its planned metric footprint and keep a 2000 mm bed length visually about 2.35 times the estimated 850 mm reference door. Keep one unobstructed sofa-to-TV view axis and exactly one television screen; an optional low console belongs to that same media target. In every full bathroom keep exactly one vanity and one toilet in the dry zone and exactly one shower or tub in the wet zone. In every kitchen keep exactly one sink, one visibly recognizable cooktop, and one refrigerator. Confine every flooring texture to its confirmed room material polygon without bleeding into an adjacent room. Keep excluded_regions completely outside furnishing, finishes, and room programming. Generate and publish one new label-free colorized floor-plan image with realistic furniture, fixtures, flooring, and material finishes inside the confirmed geometry. Use only the approved ZooWork image routes Banana Pro and Image 2: prefer Banana Pro for source-referenced geometry-preserving image-to-image work and Image 2 for clean-plan generation or pre-generation fallback. Set preferred_providers exactly to ["Banana Pro", "Image 2"], but use only model-selection arguments exposed by the current tool schema. Use the original source asset_ref as the visual reference when supported. Apply explicit user instructions with highest priority. Never replace a confirmed room with another function or add another room type's primary fixtures. Assess only circulation, functional relationships, adjacency, privacy, daylight, storage demand, activity conflict, or underused space. Mention only spaces present in the authoritative Home Model. Never report missing furniture, fixtures, appliances, typography, or render defects as design assessment items. After inspection, publish every readable generated raster even when quality warnings exist; only a missing, corrupt, empty, or technically unreadable file may remain unpublished.`,
     evidence: [],
     visualization_request: {
       mode: 'colorized_plan', selected_entity_refs: selectedRefs,

@@ -36,9 +36,19 @@ export interface LayoutPlacement {
   width_mm: number;
   depth_mm: number;
   rotation_deg: number;
+  front_edge: 'top' | 'right' | 'bottom' | 'left' | null;
+  faces_ref: string | null;
   clearance_mm: number;
   scale_status: ScaleCalibration['status'];
   zone_ref: string | null;
+}
+
+export interface LayoutMaterialZone {
+  id: string;
+  space_ref: string;
+  finish_family: 'warm_wood' | 'resilient_entry' | 'ceramic_tile' | 'exterior_tile';
+  polygon: number[][];
+  transition_policy: 'clip_to_confirmed_polygon';
 }
 
 export interface LayoutKeepoutZone {
@@ -59,13 +69,14 @@ export interface LayoutFunctionalZone {
 }
 
 export interface LayoutRenderPlan {
-  schema_version: '1.2';
+  schema_version: '1.3';
   geometry_revision: number;
   placement_revision: number;
   render_strategy: 'source_locked_control_overlay';
   scale: ScaleCalibration;
   keepout_zones: LayoutKeepoutZone[];
   functional_zones: LayoutFunctionalZone[];
+  material_zones: LayoutMaterialZone[];
   placements: LayoutPlacement[];
   qa: {
     status: 'passed' | 'needs_review';
@@ -92,6 +103,8 @@ interface PlacementIntent {
   instance?: string;
   zoneKind?: LayoutFunctionalZone['kind'];
   preferredSource?: [number, number];
+  allowCompact?: boolean;
+  allowRotation?: boolean;
 }
 
 const DEFAULT_DOOR_WIDTH_MM = 850;
@@ -510,7 +523,7 @@ function roomIntents(room: PlanningRoom, tags: string[], considerations: string,
   switch (room.functionCode) {
     case 'living_room': case 'family_room': case 'den':
       return [
-        { kind: 'sofa', x: 0.28, y: 0.58 },
+        { kind: 'sofa', x: 0.28, y: 0.58, allowCompact: true },
         { kind: 'tv', x: 0.82, y: 0.58 },
         { kind: 'coffee_table', x: 0.53, y: 0.58 },
       ];
@@ -549,7 +562,7 @@ function roomIntents(room: PlanningRoom, tags: string[], considerations: string,
     case 'pantry': case 'storage':
       return [{ kind: 'storage', x: 0.14, y: 0.5 }];
     case 'entry': case 'mudroom':
-      return [{ kind: 'storage', x: 0.12, y: 0.5, width: 900, depth: 300, clearance: 900 }];
+      return [{ kind: 'storage', x: 0.12, y: 0.5, width: 900, depth: 300, clearance: 900, allowRotation: false }];
     case 'balcony': return [{ kind: 'outdoor_seating', x: 0.5, y: 0.5 }];
     default: return [];
   }
@@ -569,8 +582,8 @@ function placementCandidates(
     [bounds.left + (bounds.right - bounds.left) * (1 - preferredX), bounds.top + (bounds.bottom - bounds.top) * (1 - preferredY)],
     [(bounds.left + bounds.right) / 2, (bounds.top + bounds.bottom) / 2],
   ];
-  for (const y of [0.2, 0.35, 0.5, 0.65, 0.8]) {
-    for (const x of [0.18, 0.32, 0.5, 0.68, 0.82]) {
+  for (const y of [0.12, 0.2, 0.35, 0.5, 0.65, 0.8, 0.88]) {
+    for (const x of [0.1, 0.18, 0.32, 0.5, 0.68, 0.82, 0.9]) {
       candidates.push([
         bounds.left + (bounds.right - bounds.left) * x,
         bounds.top + (bounds.bottom - bounds.top) * y,
@@ -589,48 +602,113 @@ function placeIntent(
   existing: LayoutPlacement[],
 ): LayoutPlacement | null {
   const bounds = polygonBounds(room.polygon);
-  const roomWidthMm = (bounds.right - bounds.left) * scale.millimeters_per_source_x_unit;
-  const roomHeightMm = (bounds.bottom - bounds.top) * scale.millimeters_per_source_y_unit;
   const spec = FURNITURE_SPECS[intent.kind];
   const requestedWidth = intent.width ?? spec.width;
   const requestedDepth = intent.depth ?? spec.depth;
-  const maxWidth = Math.max(spec.minWidth, roomWidthMm - 500);
-  const maxDepth = Math.max(spec.minDepth, roomHeightMm - 500);
-  const widthMm = clamp(Math.min(requestedWidth, maxWidth), spec.minWidth, requestedWidth);
-  const depthMm = clamp(Math.min(requestedDepth, maxDepth), spec.minDepth, requestedDepth);
-  const width = widthMm / scale.millimeters_per_source_x_unit;
-  const height = depthMm / scale.millimeters_per_source_y_unit;
   const roomKeepouts = keepouts.filter((zone) => zone.space_refs.length === 0 || zone.space_refs.includes(room.id));
   const functionalZone = intent.zoneKind
     ? functionalZones.find((zone) => zone.space_ref === room.id && zone.kind === intent.zoneKind)
     : undefined;
   const candidateBounds = functionalZone ? polygonBounds(functionalZone.polygon) : bounds;
-  for (const [x, y] of placementCandidates(candidateBounds, intent.x, intent.y, intent.preferredSource)) {
-    const rectangle = rectangleFor(x, y, width, height);
-    if (!polygonContainsRectangle(room.polygon, rectangle)) continue;
-    if (functionalZone && !polygonContainsRectangle(functionalZone.polygon, rectangle)) continue;
-    if (roomKeepouts.some((zone) => polygonsOverlap(rectangle, zone.polygon))) continue;
-    const collision = existing.some((placement) => placement.space_ref === room.id
-      && !overlapsAllowed(intent.kind, placement.kind)
-      && polygonsOverlap(rectangle, rectangleFor(placement.x, placement.y, placement.width, placement.height)));
-    if (collision) continue;
-    return {
-      id: `placement_${room.id}_${intent.kind}${intent.instance ? `_${intent.instance}` : ''}`,
-      space_ref: room.id,
-      kind: intent.kind,
-      x,
-      y,
-      width,
-      height,
-      width_mm: Math.round(widthMm),
-      depth_mm: Math.round(depthMm),
-      rotation_deg: 0,
-      clearance_mm: intent.clearance ?? spec.clearance,
-      scale_status: scale.status,
-      zone_ref: functionalZone?.id ?? null,
-    };
+  const physicalSizes: Array<[number, number]> = [[requestedWidth, requestedDepth]];
+  if (intent.allowCompact && (spec.minWidth !== requestedWidth || spec.minDepth !== requestedDepth)) {
+    physicalSizes.push([spec.minWidth, spec.minDepth]);
+  }
+  for (const [widthMm, depthMm] of physicalSizes) {
+    const rotations: Array<0 | 90> = intent.allowRotation === false ? [0] : [0, 90];
+    for (const rotationDeg of rotations) {
+      const sourceWidthMm = rotationDeg === 0 ? widthMm : depthMm;
+      const sourceHeightMm = rotationDeg === 0 ? depthMm : widthMm;
+      const width = sourceWidthMm / scale.millimeters_per_source_x_unit;
+      const height = sourceHeightMm / scale.millimeters_per_source_y_unit;
+      for (const [x, y] of placementCandidates(candidateBounds, intent.x, intent.y, intent.preferredSource)) {
+        const rectangle = rectangleFor(x, y, width, height);
+        if (!polygonContainsRectangle(room.polygon, rectangle)) continue;
+        if (functionalZone && !polygonContainsRectangle(functionalZone.polygon, rectangle)) continue;
+        if (roomKeepouts.some((zone) => polygonsOverlap(rectangle, zone.polygon))) continue;
+        const collision = existing.some((placement) => placement.space_ref === room.id
+          && !overlapsAllowed(intent.kind, placement.kind)
+          && polygonsOverlap(rectangle, rectangleFor(placement.x, placement.y, placement.width, placement.height)));
+        if (collision) continue;
+        return {
+          id: `placement_${room.id}_${intent.kind}${intent.instance ? `_${intent.instance}` : ''}`,
+          space_ref: room.id,
+          kind: intent.kind,
+          x,
+          y,
+          width,
+          height,
+          width_mm: Math.round(widthMm),
+          depth_mm: Math.round(depthMm),
+          rotation_deg: rotationDeg,
+          front_edge: null,
+          faces_ref: null,
+          clearance_mm: intent.clearance ?? spec.clearance,
+          scale_status: scale.status,
+          zone_ref: functionalZone?.id ?? null,
+        };
+      }
+    }
   }
   return null;
+}
+
+function facingToward(from: LayoutPlacement, to: LayoutPlacement, scale: ScaleCalibration): NonNullable<LayoutPlacement['front_edge']> {
+  const dx = (to.x - from.x) * scale.millimeters_per_source_x_unit;
+  const dy = (to.y - from.y) * scale.millimeters_per_source_y_unit;
+  if (Math.abs(dx) >= Math.abs(dy)) return dx >= 0 ? 'right' : 'left';
+  return dy >= 0 ? 'bottom' : 'top';
+}
+
+function assignFacingRelationships(placements: LayoutPlacement[], rooms: PlanningRoom[], scale: ScaleCalibration): void {
+  for (const room of rooms) {
+    const sofa = placements.find((placement) => placement.space_ref === room.id && placement.kind === 'sofa');
+    const tv = placements.find((placement) => placement.space_ref === room.id && placement.kind === 'tv');
+    if (!sofa || !tv) continue;
+    sofa.faces_ref = tv.id;
+    sofa.front_edge = facingToward(sofa, tv, scale);
+    tv.faces_ref = sofa.id;
+    tv.front_edge = facingToward(tv, sofa, scale);
+  }
+}
+
+function materialFamily(room: PlanningRoom): LayoutMaterialZone['finish_family'] {
+  if (room.functionCode === 'balcony') return 'exterior_tile';
+  if (['bathroom', 'powder_room', 'kitchen', 'laundry_room'].includes(room.functionCode)) return 'ceramic_tile';
+  if (['entry', 'mudroom'].includes(room.functionCode)) return 'resilient_entry';
+  return 'warm_wood';
+}
+
+function buildMaterialZones(rooms: PlanningRoom[]): LayoutMaterialZone[] {
+  return rooms.map((room) => ({
+    id: `material_${room.id}`,
+    space_ref: room.id,
+    finish_family: materialFamily(room),
+    polygon: room.polygon.map((point) => [...point]),
+    transition_policy: 'clip_to_confirmed_polygon',
+  }));
+}
+
+function exactCountKinds(room: PlanningRoom): LayoutPlacementKind[] {
+  switch (room.functionCode) {
+    case 'living_room': case 'family_room': case 'den': return ['sofa', 'tv'];
+    case 'kitchen': return ['sink', 'cooktop', 'refrigerator'];
+    case 'dining_room': return ['dining_table'];
+    case 'primary_bedroom': case 'guest_bedroom': case 'kids_room': case 'nursery': return ['bed'];
+    case 'bathroom': return ['toilet', 'vanity', 'shower'];
+    case 'powder_room': return ['toilet', 'vanity'];
+    case 'home_office': return ['desk'];
+    default: return [];
+  }
+}
+
+function validateExactPlacementCounts(rooms: PlanningRoom[], placements: LayoutPlacement[], issues: string[]): void {
+  for (const room of rooms) {
+    for (const kind of exactCountKinds(room)) {
+      const count = placements.filter((placement) => placement.space_ref === room.id && placement.kind === kind).length;
+      if (count !== 1) issues.push(`${room.id}: resolved single-instance manifest requires exactly one ${kind}; planned count is ${count}`);
+    }
+  }
 }
 
 export function buildLayoutRenderPlan(input: {
@@ -666,20 +744,23 @@ export function buildLayoutRenderPlan(input: {
       }
     }
   }
+  validateExactPlacementCounts(input.rooms, placements, issues);
   if (scale.status === 'unknown') {
     warnings.push('No reliable door segment was available; furniture uses a consistent relative door-unit fallback and metric dimensions are not certified.');
   } else {
     warnings.push(`Furniture scale is estimated from ${scale.reference_entity_ref} using an ${scale.reference_length_mm} mm reference door width.`);
   }
+  assignFacingRelationships(placements, input.rooms, scale);
 
   return {
-    schema_version: '1.2',
+    schema_version: '1.3',
     geometry_revision: input.revision ?? 1,
     placement_revision: input.revision ?? 1,
     render_strategy: 'source_locked_control_overlay',
     scale,
     keepout_zones: keepoutZones,
     functional_zones: functionalZones,
+    material_zones: buildMaterialZones(input.rooms),
     placements,
     qa: { status: issues.length === 0 ? 'passed' : 'needs_review', issues, warnings },
   };
@@ -691,17 +772,20 @@ export function layoutPlanPrompt(plan: LayoutRenderPlan, rooms: PlanningRoom[]):
     ? `Shared scale: ${plan.scale.reference_entity_ref} is treated as ${plan.scale.reference_length_mm} mm (estimated, not measured).`
     : 'Shared scale: relative door-unit fallback; preserve the supplied normalized footprints exactly.';
   const placements = plan.placements.map((placement) =>
-    `${labels.get(placement.space_ref) ?? placement.space_ref}: exactly one planned ${placement.kind} instance ${placement.width_mm}x${placement.depth_mm} mm at normalized center ${placement.x.toFixed(3)},${placement.y.toFixed(3)}${placement.zone_ref ? ` within ${placement.zone_ref}` : ''}.`);
+    `${labels.get(placement.space_ref) ?? placement.space_ref}: render placement ID ${placement.id} exactly once as ${placement.kind}, physical size ${placement.width_mm}x${placement.depth_mm} mm (${(placement.width_mm / DEFAULT_DOOR_WIDTH_MM).toFixed(2)}x${(placement.depth_mm / DEFAULT_DOOR_WIDTH_MM).toFixed(2)} of the 850 mm reference door), normalized center ${placement.x.toFixed(3)},${placement.y.toFixed(3)}, rotation ${placement.rotation_deg} degrees${placement.faces_ref ? `, front edge ${placement.front_edge} facing ${placement.faces_ref}` : ''}${placement.zone_ref ? ` within ${placement.zone_ref}` : ''}.`);
   const keepouts = plan.keepout_zones.map((zone) =>
     `${zone.opening_ref ?? zone.id}: ${zone.reason} for ${zone.space_refs.join(', ') || 'adjacent spaces'}, keep ${zone.clearance_mm} mm clear inside polygon ${zone.polygon.map((point) => point.map((coordinate) => coordinate.toFixed(3)).join(',')).join(' / ')}; no furniture, fixture, appliance, or cabinetry may overlap it.`);
   const zones = plan.functional_zones.map((zone) =>
     `${labels.get(zone.space_ref) ?? zone.space_ref}: ${zone.kind} is ${zone.polygon.map((point) => point.map((coordinate) => coordinate.toFixed(3)).join(',')).join(' / ')}; keep the shower or tub inside the wet zone and the vanity plus single toilet in the dry zone.`);
+  const materialZones = plan.material_zones.map((zone) =>
+    `${labels.get(zone.space_ref) ?? zone.space_ref}: confine ${zone.finish_family} flooring to ${zone.id} polygon ${zone.polygon.map((point) => point.map((coordinate) => coordinate.toFixed(3)).join(',')).join(' / ')}; stop the texture at the confirmed polygon boundary and do not bleed into an adjacent room.`);
   return [
-    'AUTHORITATIVE PRE-GENERATION PLACEMENT PLAN.',
+    'AUTHORITATIVE SINGLE-INSTANCE PRE-GENERATION MANIFEST.',
     scaleLine,
-    'Use the listed physical dimensions and normalized footprints as hard layout guidance. The control image is the pixel-level placement authority: convert each outlined footprint into exactly one realistic object and remove all guide colors and strokes. Do not enlarge a sofa or bed beyond its planned footprint; use a straight sofa unless an L-sectional is explicitly requested and fits. Never close, move, redraw, or cover a door gap. Never place cabinets, wardrobes, beds, sofas, tables, sanitary fixtures, or appliances in an opening or continuous-circulation keep-out zone.',
+    'The placement IDs below are the sole resolved furniture/fixture/appliance instance list. Room-program baseline names explain why these instances exist; they are not additional requests. Never add a second copy of an object already represented by a placement ID. Use the listed physical dimensions and normalized footprints as hard layout guidance. The control image is the pixel-level placement authority: convert each outlined footprint into exactly one realistic object and remove all guide colors and strokes. Keep a 2000 mm bed length visually about 2.35 times an 850 mm reference-door span. Do not resize a bed. Use a straight sofa unless an L-sectional is explicitly requested and fits. A television and its optional low console form one media target, never two screens. Preserve the sofa-to-TV view axis. Never close, move, redraw, or cover a door gap. Never place cabinets, wardrobes, beds, sofas, tables, sanitary fixtures, or appliances in an opening or continuous-circulation keep-out zone.',
     ...placements,
     ...zones,
+    ...materialZones,
     ...keepouts,
     ...plan.qa.issues.map((issue) => `Planning warning: ${issue}. Do not fill the unresolved area by blocking an opening.`),
   ].join('\n').slice(0, 4_500);
