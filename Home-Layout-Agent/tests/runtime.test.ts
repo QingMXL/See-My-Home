@@ -177,6 +177,11 @@ test('uses the compact room-map contract for project.create', async () => {
   verboseRoomMap.summary = 'x'.repeat(1_300);
   verboseRoomMap.spaces[0]!.id = 'ROOM 1';
   verboseRoomMap.boundaries[0]!.separates_space_ids = ['ROOM 1'];
+  const legacyOpening = verboseRoomMap.openings[0] as unknown as Record<string, unknown>;
+  delete legacyOpening.segment;
+  delete legacyOpening.boundary_ref;
+  delete legacyOpening.door_type;
+  delete legacyOpening.swing;
   const fakeClient = {
     async postEvents(_agentId: string, _sessionId: string, events: { content?: unknown }[]) {
       postedContent = String(events[0]?.content ?? '');
@@ -202,6 +207,8 @@ test('uses the compact room-map contract for project.create', async () => {
   assert.ok(envelope.contracts.room_map_response_schema);
   assert.equal(result.response.spaces[0]?.id, 'room_1');
   assert.deepEqual(result.response.boundaries[0]?.separates_space_ids, ['room_1']);
+  assert.equal(result.response.openings[0]?.segment, null);
+  assert.equal(result.response.openings[0]?.door_type, 'unknown');
   assert.equal(result.response.summary.length, 1_200);
 });
 

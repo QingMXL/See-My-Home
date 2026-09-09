@@ -28,6 +28,7 @@ Read these files before returning a changed model:
 11. A confirmed room function must have one `room_program` keyed by `space_ref`. Keep `baseline_objects` as soft first-draft defaults, use `conditional_objects` only when geometry and preferences support them, and store explicit changes in `user_overrides`. Add `default_object_counts` for primary objects whose accidental duplication or omission changes usability. These are design intent, not observations in `objects`.
 12. User overrides take precedence over system defaults. A later request may include, exclude, replace, or change the count of a default object without changing the room function unless the user explicitly requests that conversion. Update the affected `default_object_counts` to the resolved count so downstream planning and QA have one unambiguous target.
 13. Store light wells, double-height openings, voids, shafts, outside-envelope areas, and user-deleted regions in `excluded_regions`, never in `spaces` or `room_programs`. Multiple genuine balconies remain independent included spaces.
+14. Preserve opening segments, door type, and visible swing evidence. Store one shared scale calibration for the complete plan; an 850 mm inferred door reference remains `estimated`. Planned furniture objects keep both normalized footprint geometry and catalogued millimeter dimensions in their labels until a dedicated placement field is introduced.
 
 ## Status
 

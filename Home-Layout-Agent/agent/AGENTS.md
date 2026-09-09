@@ -11,7 +11,7 @@ The application owns durable project state and asset delivery. Each turn arrives
 - `runtime_contract: room-map-v1` with `ui_event.type: project.create`: use `room-map-parser`, call the verified ZooWork `image` tool exactly once, and return the compact Room Map response. Do not build a Home Model or diagnose in this phase.
 - `ui_event.type: room_map.confirm`: normally does not reach the Agent. The Runtime commits user-confirmed labels, normalized polygons, boundary status, and living priorities into the Home Model.
 - `ui_event.type: room_map.confirm`: use `home-model-maintainer` to commit the edited normalized polygons and room functions. User-edited geometry supersedes the inferred polygon.
-- `ui_event.type: agent.generate` / `operation: visualize`: use `furniture-layout-planner`, then `layout-validator`, then `floorplan-renderer`. Return diagnosis and a source-referenced render brief, call the injected `image_generate` capability once, call `sessions_yield` once and end the waiting run without final JSON, then materialize, inspect, and publish one usable raster artifact in ZooWork's automatic attachment continuation. The application Runtime keeps the confirmed geometry and validated placement plan as the fallback and validation authority.
+- `ui_event.type: agent.generate` / `operation: visualize`: use `plan-scale-calibrator`, then `furniture-layout-planner`, then `layout-validator`, then `floorplan-renderer`. Return diagnosis and a source-referenced render brief, call the injected `image_generate` capability once, call `sessions_yield` once and end the waiting run without final JSON, then materialize, inspect, and publish one usable raster artifact in ZooWork's automatic attachment continuation. The application Runtime keeps the confirmed geometry and validated placement plan as the fallback and validation authority.
 - Use `material-stylizer` for an explicit optional style/concept request. Both the base colorized plan and optional concepts use the injected `image_generate` model without another provider key. Generated imagery is never the geometry authority.
 
 ## Universal invariants
@@ -31,6 +31,7 @@ The application owns durable project state and asset delivery. Each turn arrives
 13. Keep `excluded_regions` outside furnishing, finish, room-program, and assessment scope. Multiple genuine balconies remain valid independent spaces; light wells, double-height openings, voids, shafts, outside-envelope areas, and user-deleted regions are exclusions.
 14. After explicit user overrides, `default_object_counts` is the image-QA target. Missing or duplicated count-controlled objects and missing soft baseline objects are warnings attached to the published candidate, not publication blockers.
 15. Banana Pro and Image 2 are the only approved image-generation routes. Prefer Banana Pro for source-referenced geometry preservation and Image 2 for clean-plan generation or pre-generation fallback. Never request another key or invent unsupported model-selection parameters.
+16. Use one shared scale for the entire plan. An inferred door width is an estimated 850 mm planning anchor, never a verified measurement. Furniture uses metric catalog dimensions and may not intersect door-opening, door-swing, entry-landing, or open-passage keep-out geometry.
 
 ## Required response envelope
 

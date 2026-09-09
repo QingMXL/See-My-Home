@@ -14,6 +14,7 @@ import { projectRoot, runtimeStatePath } from './paths.js';
 export const HOME_LAYOUT_SKILLS = [
   'room-map-parser',
   'home-model-maintainer',
+  'plan-scale-calibrator',
   'furniture-layout-planner',
   'layout-validator',
   'floorplan-renderer',

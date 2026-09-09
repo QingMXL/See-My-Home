@@ -134,7 +134,14 @@
       "properties": {
         "status": { "enum": ["unknown", "estimated", "confirmed"] },
         "millimeters_per_source_unit": { "type": ["number", "null"], "exclusiveMinimum": 0 },
-        "source_ref": { "oneOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] }
+        "source_ref": { "oneOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+        "basis": { "enum": ["door_reference", "printed_dimension", "user_measurement", "unknown"] },
+        "reference_entity_ref": { "oneOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+        "reference_length_mm": { "type": ["integer", "null"], "exclusiveMinimum": 0 },
+        "millimeters_per_source_x_unit": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "millimeters_per_source_y_unit": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "source_aspect_ratio": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "confidence": { "$ref": "#/$defs/confidence" }
       }
     },
     "source": {

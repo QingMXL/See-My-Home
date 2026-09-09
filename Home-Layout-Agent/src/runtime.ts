@@ -161,6 +161,7 @@ function canonicalizeRoomMapCandidate(candidate: Record<string, unknown>): Recor
       && JSON.stringify(polygon) === JSON.stringify([[0, 0], [1, 0], [1, 1], [0, 1]]);
     return !(item.confidence === 0 && item.boundary_confidence === 0 && isFullFrame);
   }) : spaces;
+  const normalizedOpenings = normalizeItems(candidate.openings, 'opening');
   const result: Record<string, unknown> = {
     ...candidate,
     spaces: Array.isArray(usableSpaces) ? usableSpaces.map((entry) => {
@@ -177,7 +178,19 @@ function canonicalizeRoomMapCandidate(candidate: Record<string, unknown>): Recor
       };
     }) : spaces,
     boundaries: normalizeItems(candidate.boundaries, 'boundary'),
-    openings: normalizeItems(candidate.openings, 'opening'),
+    openings: Array.isArray(normalizedOpenings) ? normalizedOpenings.map((entry) => {
+      if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) return entry;
+      const item = entry as Record<string, unknown>;
+      return {
+        ...item,
+        segment: Array.isArray(item.segment) ? item.segment : null,
+        boundary_ref: typeof item.boundary_ref === 'string' ? item.boundary_ref : null,
+        door_type: typeof item.door_type === 'string' ? item.door_type : item.kind === 'door' ? 'unknown' : null,
+        swing: typeof item.swing === 'object' && item.swing !== null && !Array.isArray(item.swing)
+          ? item.swing
+          : null,
+      };
+    }) : normalizedOpenings,
     questions: normalizeItems(candidate.questions, 'question'),
   };
   const normalizeRef = (value: unknown): unknown => {
@@ -198,6 +211,23 @@ function canonicalizeRoomMapCandidate(candidate: Record<string, unknown>): Recor
     : value;
   result.boundaries = rewriteRefs(result.boundaries, 'separates_space_ids');
   result.openings = rewriteRefs(result.openings, 'connects_space_ids');
+  if (Array.isArray(result.openings)) {
+    result.openings = result.openings.map((entry) => {
+      if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) return entry;
+      const item = entry as Record<string, unknown>;
+      const swing = typeof item.swing === 'object' && item.swing !== null && !Array.isArray(item.swing)
+        ? item.swing as Record<string, unknown>
+        : null;
+      return {
+        ...item,
+        boundary_ref: item.boundary_ref === null ? null : normalizeRef(item.boundary_ref),
+        swing: swing ? {
+          ...swing,
+          opens_into_space_id: swing.opens_into_space_id === null ? null : normalizeRef(swing.opens_into_space_id),
+        } : null,
+      };
+    });
+  }
   result.questions = rewriteRefs(result.questions, 'related_refs');
   return result;
 }
@@ -485,7 +515,7 @@ export class HomeLayoutRuntime {
         runtime_timestamp: new Date().toISOString(),
         contracts: { room_map_response_schema: ROOM_MAP_SCHEMA },
         output_requirement:
-          'Use the room-map-parser skill. Inspect the uploaded asset_ref with the ZooWork image tool exactly once and never retry that tool. Return only one compact JSON object matching room_map_response_schema in the final assistant response. Keep summary under 240 characters. Segment every defensible enclosed or functionally distinct space into its own source-faithful polygon, retaining every visible concave corner; use four points only for an actually rectangular region. Never return the whole dwelling envelope as one room when interior walls, door openings, fixtures, furniture groups, or printed labels show multiple rooms. Before returning, compare the polygon count with the visible region count and correct under-segmentation within the same inspection. Keep adjacent polygons aligned with minimal gaps and no material overlaps. Identify boundary paths, openings, one canonical suggested_function_code, planning_status, and exclusion_reason for every region. Multiple real balconies are valid included spaces. Mark light wells, double-height openings, raised/open voids, service shafts, and outside-envelope regions excluded; do not mislabel them as balconies. Use uncertain when exclusion is not visually defensible. If the image fetch fails, return insufficient_input with an empty spaces array; never fabricate a full-frame placeholder. Do not call sessions_yield. Do not build a Home Model, diagnose, generate an image, access databases, use shell tools, or ask for another API key.',
+          'Use the room-map-parser skill. Inspect the uploaded asset_ref with the ZooWork image tool exactly once and never retry that tool. Return only one compact JSON object matching room_map_response_schema in the final assistant response. Keep summary under 240 characters. Segment every defensible enclosed or functionally distinct space into its own source-faithful polygon, retaining every visible concave corner; use four points only for an actually rectangular region. Never return the whole dwelling envelope as one room when interior walls, door openings, fixtures, furniture groups, or printed labels show multiple rooms. Before returning, compare the polygon count with the visible region count and correct under-segmentation within the same inspection. Keep adjacent polygons aligned with minimal gaps and no material overlaps. Identify boundary paths and every visible door, window, and passage. For each opening, return its center position and the visible opening segment between its two wall-edge endpoints; identify the containing boundary, door type, hinge and swing only when visually defensible, otherwise use the schema null or unknown values. Classify the dwelling entrance as door_type="entry" whenever the evidence is clear. Also return one canonical suggested_function_code, planning_status, and exclusion_reason for every region. Multiple real balconies are valid included spaces. Mark light wells, double-height openings, raised/open voids, service shafts, and outside-envelope regions excluded; do not mislabel them as balconies. Use uncertain when exclusion is not visually defensible. Do not invent measurements: the Runtime will treat a visible door segment as an estimated 850 mm scale reference. If the image fetch fails, return insufficient_input with an empty spaces array; never fabricate a full-frame placeholder. Do not call sessions_yield. Do not build a Home Model, diagnose, generate an image, access databases, use shell tools, or ask for another API key.',
         request,
       }),
       idempotency_key: `${request.request_id}:room-map`,
@@ -518,7 +548,7 @@ export class HomeLayoutRuntime {
         request.operation === 'intake'
           ? 'Inspect every HTTPS asset_ref with the ZooWork platform visual capability. Then return one JSON object only that validates exactly against the embedded contracts. Do not call any provider API or request another key.'
           : request.operation === 'visualize'
-            ? 'In this request, produce an evidence-backed diagnosis and visualization brief from the authoritative confirmed Home Model. Diagnosis.assessment_items must contain at most five concise bilingual design observations and may discuss only circulation, functional relationships, adjacency, privacy, daylight, storage demand, activity conflict, or underused space. Furniture, fixture, appliance, sanitary-equipment, typography, and render defects are generation-quality observations and must never appear as design assessment items. Build the image prompt from every room_program. Treat baseline_objects as first-draft defaults, apply conditional_objects only when visible geometry and user preferences support them, then apply explicit user_overrides or the current user request with highest priority. After those overrides, target every default_object_counts min_count and max_count exactly and inspect beds, toilets, sinks or vanities, shower or tub zones, kitchen sinks, cooktops, refrigerators, sofas, TVs or media walls, dining tables, and desks room by room. Preserve each confirmed room function and request a label-free result. Set visualization_brief.preferred_providers exactly to ["Banana Pro", "Image 2"]. Prefer Banana Pro for source-referenced geometry-preserving image-to-image work and Image 2 for clean-plan generation or pre-generation fallback. Use only model-selection fields that the current image tool schema actually exposes; otherwise omit model and provider so ZooWork applies its configured route. Call image_generate exactly once with action="generate", image when supported, prompt, quality="high", filename="<home_id>_<request_id>_layout.png", and aspectRatio="4:3". Do not call action="list", action="status", or launch a retry after generation starts. After the background task starts, call sessions_yield exactly once and end that run with one brief waiting sentence. ZooWork will automatically start a continuation run when the attachment arrives. Only in that continuation, call media_materialize exactly once with the returned async attachment artifactId and path="/workspace/artifacts/<home_id>/<home_id>_<request_id>_layout.png", then inspect that materialized image once. If the materialized file is a readable raster image, always call artifact_publish exactly once with that same path. Geometry drift, changed room functions, incompatible fixtures, default_object_counts mismatches, missing furniture, styling weaknesses, and hallucinated or illegible text must be listed precisely in warnings but must not suppress publication. Return status="completed" with both diagnosis and visualization_brief populated after publication. Only a missing, corrupt, empty, or technically unreadable image may remain unpublished and return status="failed". Do not call any provider API or request another key.'
+            ? 'In this request, produce an evidence-backed diagnosis and visualization brief from the authoritative confirmed Home Model. The Runtime has already calibrated one shared plan scale, created metric-catalog furniture objects, and rejected placements that intersect door/opening keep-out zones; treat those object polygons, physical dimensions, openings, and hard constraints as authoritative image guidance. Never resize furniture from room-relative percentages, enlarge a sofa beyond its planned footprint, or place cabinetry across an entrance. Diagnosis.assessment_items must contain at most five concise bilingual design observations and may discuss only circulation, functional relationships, adjacency, privacy, daylight, storage demand, activity conflict, or underused space. Furniture, fixture, appliance, sanitary-equipment, typography, and render defects are generation-quality observations and must never appear as design assessment items. Build the image prompt from every room_program. Treat baseline_objects as first-draft defaults, apply conditional_objects only when visible geometry and user preferences support them, then apply explicit user_overrides or the current user request with highest priority. After those overrides, target every default_object_counts min_count and max_count exactly and inspect beds, toilets, sinks or vanities, shower or tub zones, kitchen sinks, cooktops, refrigerators, sofas, TVs or media walls, dining tables, and desks room by room. Preserve each confirmed room function and request a label-free result. Set visualization_brief.preferred_providers exactly to ["Banana Pro", "Image 2"]. Prefer Banana Pro for source-referenced geometry-preserving image-to-image work and Image 2 for clean-plan generation or pre-generation fallback. Use only model-selection fields that the current image tool schema actually exposes; otherwise omit model and provider so ZooWork applies its configured route. Call image_generate exactly once with action="generate", image when supported, prompt, quality="high", filename="<home_id>_<request_id>_layout.png", and aspectRatio="4:3". Do not call action="list", action="status", or launch a retry after generation starts. After the background task starts, call sessions_yield exactly once and end that run with one brief waiting sentence. ZooWork will automatically start a continuation run when the attachment arrives. Only in that continuation, call media_materialize exactly once with the returned async attachment artifactId and path="/workspace/artifacts/<home_id>/<home_id>_<request_id>_layout.png", then inspect that materialized image once. If the materialized file is a readable raster image, always call artifact_publish exactly once with that same path. Geometry drift, changed room functions, incompatible fixtures, default_object_counts mismatches, missing furniture, styling weaknesses, and hallucinated or illegible text must be listed precisely in warnings but must not suppress publication. Return status="completed" with both diagnosis and visualization_brief populated after publication. Only a missing, corrupt, empty, or technically unreadable image may remain unpublished and return status="failed". Do not call any provider API or request another key.'
             : 'Return one JSON object only. It must validate exactly against the embedded contracts. Use the exact field names and enum values. Do not use Markdown fences.',
       request,
     };

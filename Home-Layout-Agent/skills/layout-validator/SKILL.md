@@ -16,8 +16,9 @@ Read [the validation gates](references/validation-gates.md).
 3. Function integrity: objects belong to the confirmed room function; a closet never receives bathroom fixtures.
 4. Count integrity: after explicit overrides, count every object named in `default_object_counts` per room and reject any value below `min_count` or above `max_count`.
 5. Primary fixture sanity: no duplicated beds, toilets, sinks, vanities, shower/tub zones, kitchen sinks, cooktops, refrigerators, sofas, TVs/media walls, dining tables, or desks unless the resolved count explicitly allows it.
-6. Relationship sanity: seating faces its media target; kitchen work elements form a coherent run; door swings and openings are not knowingly blocked.
-7. Exclusion integrity: no placement, finish, room program, or assessment target may reference an `excluded_region`.
-8. Output safety: room labels are not baked into generated pixels.
+6. Scale sanity: all placements use the same calibration and remain within their catalogued metric size range. Estimated door calibration is allowed for planning but must remain labelled estimated.
+7. Relationship sanity: seating faces its media target; kitchen work elements form a coherent run; no furniture intersects a door-opening, door-swing, entry-landing, or open-passage keep-out polygon.
+8. Exclusion integrity: no placement, finish, room program, or assessment target may reference an `excluded_region`.
+9. Output safety: room labels are not baked into generated pixels.
 
-Return concise blocking issues and warnings. The Runtime may render only when no blocking issue exists. Without confirmed scale, describe clearances qualitatively.
+Return concise blocking issues and warnings. Before generation, the Runtime removes or relocates an unsafe placement and then renders the remaining validated plan; it does not suppress the complete image because one item could not be placed. Post-generation quality findings remain warnings on the published readable raster. Without confirmed scale, describe clearances as estimated rather than certified.

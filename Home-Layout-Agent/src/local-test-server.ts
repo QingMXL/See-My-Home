@@ -17,6 +17,7 @@ import type {
 } from './contracts.js';
 import { projectRoot } from './paths.js';
 import { HomeLayoutRuntime, HomeLayoutTurnTimeoutError } from './runtime.js';
+import { buildLayoutRenderPlan, layoutPlanPrompt, type LayoutRenderPlan } from './layout-planning.js';
 import { assertHomeModel } from './validation.js';
 
 const envPath = resolve(projectRoot, '.env');
@@ -53,7 +54,7 @@ interface ProjectState {
   analyzedAssetId: string | null;
   analysisResult: Record<string, unknown> | null;
   analysisInFlight: Promise<Record<string, unknown>> | null;
-  renderPlan: Record<string, unknown> | null;
+  renderPlan: LayoutRenderPlan | null;
 }
 
 interface GenerateInput {
@@ -326,108 +327,9 @@ interface ConfirmedRoom {
   functionConfirmed: boolean;
 }
 
-type PlacementKind =
-  | 'sofa' | 'tv' | 'coffee_table' | 'dining_table' | 'bed' | 'wardrobe'
-  | 'desk' | 'bookshelf' | 'counter' | 'sink' | 'cooktop' | 'refrigerator'
-  | 'toilet' | 'vanity' | 'shower' | 'bathtub' | 'washer' | 'storage'
-  | 'outdoor_seating';
-
-interface LayoutPlacement {
-  id: string;
-  space_ref: string;
-  kind: PlacementKind;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  rotation_deg: number;
-}
-
 function primaryBedroomTwinBedsRequested(tags: string[], considerations: string): boolean {
   return tags.includes('Twin Beds in Primary Bedroom')
     || /(?:twin\s+beds?|two\s+beds?|双床|两张床)/i.test(considerations);
-}
-
-function buildRenderPlan(
-  rooms: ConfirmedRoom[],
-  tags: string[] = [],
-  considerations = '',
-  revision = 1,
-): Record<string, unknown> {
-  const issues: string[] = [];
-  const placements = rooms.flatMap((room): LayoutPlacement[] => {
-    if (room.polygon.length < 3) {
-      issues.push(`${room.id}: no confirmed polygon`);
-      return [];
-    }
-    const xs = room.polygon.map((point) => point[0] ?? 0);
-    const ys = room.polygon.map((point) => point[1] ?? 0);
-    const left = Math.min(...xs);
-    const top = Math.min(...ys);
-    const width = Math.max(...xs) - left;
-    const height = Math.max(...ys) - top;
-    if (width <= 0 || height <= 0) {
-      issues.push(`${room.id}: invalid polygon extent`);
-      return [];
-    }
-    const x = (ratio: number) => left + width * ratio;
-    const y = (ratio: number) => top + height * ratio;
-    const p = (kind: PlacementKind, px: number, py: number, pw: number, ph: number, rotation = 0, instance = ''): LayoutPlacement => ({
-      id: `placement_${room.id}_${kind}${instance ? `_${instance}` : ''}`,
-      space_ref: room.id,
-      kind,
-      x: x(px),
-      y: y(py),
-      width: Math.max(0.012, width * pw),
-      height: Math.max(0.012, height * ph),
-      rotation_deg: rotation,
-    });
-
-    switch (room.functionCode) {
-      case 'living_room': case 'family_room': case 'den':
-        return [p('sofa', 0.28, 0.55, 0.34, 0.22), p('tv', 0.82, 0.55, 0.06, 0.34), p('coffee_table', 0.53, 0.55, 0.18, 0.15)];
-      case 'dining_room':
-        return [p('dining_table', 0.5, 0.5, 0.42, 0.34)];
-      case 'kitchen':
-        return [p('counter', 0.5, 0.13, 0.76, 0.16), p('sink', 0.42, 0.13, 0.16, 0.12), p('cooktop', 0.68, 0.13, 0.14, 0.12), p('refrigerator', 0.14, 0.27, 0.16, 0.22)];
-      case 'primary_bedroom': {
-        if (primaryBedroomTwinBedsRequested(tags, considerations)) {
-          return [
-            p('bed', 0.3, 0.47, 0.28, 0.5, 0, 'left'),
-            p('bed', 0.7, 0.47, 0.28, 0.5, 0, 'right'),
-            p('wardrobe', 0.84, 0.5, 0.12, 0.62),
-          ];
-        }
-        return [p('bed', 0.5, 0.47, 0.42, 0.5), p('wardrobe', 0.84, 0.5, 0.12, 0.62)];
-      }
-      case 'guest_bedroom': case 'kids_room': case 'nursery':
-        return [p('bed', 0.42, 0.46, 0.38, 0.46), p('wardrobe', 0.84, 0.42, 0.12, 0.5)];
-      case 'home_office':
-        return [p('desk', 0.5, 0.22, 0.48, 0.18), p('bookshelf', 0.86, 0.55, 0.12, 0.62)];
-      case 'walk_in_closet':
-        return [p('wardrobe', 0.12, 0.5, 0.16, 0.72), p('wardrobe', 0.88, 0.5, 0.16, 0.72)];
-      case 'bathroom':
-        return [p('vanity', 0.25, 0.2, 0.3, 0.18), p('toilet', 0.23, 0.7, 0.18, 0.24), p('shower', 0.75, 0.65, 0.34, 0.42)];
-      case 'powder_room':
-        return [p('vanity', 0.28, 0.22, 0.32, 0.18), p('toilet', 0.6, 0.67, 0.2, 0.28)];
-      case 'laundry_room':
-        return [p('washer', 0.25, 0.25, 0.25, 0.28), p('storage', 0.72, 0.2, 0.38, 0.16)];
-      case 'pantry': case 'storage': case 'entry':
-        return [p('storage', 0.15, 0.5, 0.18, 0.72), p('storage', 0.85, 0.5, 0.18, 0.72)];
-      case 'balcony':
-        return [p('outdoor_seating', 0.5, 0.5, 0.5, 0.36)];
-      default:
-        return [];
-    }
-  });
-  return {
-    schema_version: '1.0',
-    geometry_revision: revision,
-    placement_revision: revision,
-    render_strategy: 'source_locked_svg_overlay',
-    placements,
-    qa: { status: issues.length === 0 ? 'passed' : 'needs_review', issues },
-  };
 }
 
 const roomFunctionCodes = new Set<RoomFunctionCode>([
@@ -630,8 +532,14 @@ function roomProgram(code: Exclude<RoomFunctionCode, 'unknown'>): DefaultRoomPro
   }
 }
 
-function buildConfirmedHomeModel(input: GenerateInput, state: ProjectState): { model: HomeModel; locale: SupportedLocale; tags: string[]; considerations: string; rooms: ConfirmedRoom[] } {
+function buildConfirmedHomeModel(input: GenerateInput, state: ProjectState): { model: HomeModel; locale: SupportedLocale; tags: string[]; considerations: string; rooms: ConfirmedRoom[]; renderPlan: LayoutRenderPlan } {
   const confirmed = confirmedInput(input);
+  const renderPlan = buildLayoutRenderPlan({
+    rooms: confirmed.rooms,
+    openings: state.roomMap?.openings ?? [],
+    tags: confirmed.tags,
+    considerations: confirmed.considerations,
+  });
   const sourceId = 'src_floor_plan_001';
   const confirmationSourceId = 'src_confirmation_001';
   const floorId = 'floor_main_001';
@@ -643,7 +551,18 @@ function buildConfirmedHomeModel(input: GenerateInput, state: ProjectState): { m
     locale: confirmed.locale,
     measurement_policy: { system: 'metric', linear_storage: 'mm', area_storage: 'm2', us_listing_area_display: 'sq_ft_secondary' },
     coordinate_system: { type: 'local_plan_2d', unit: 'mm', origin: 'floor_envelope_bottom_left', x_axis: 'right', y_axis: 'up', north_angle_deg: null },
-    scale: { status: 'unknown', millimeters_per_source_unit: null, source_ref: null },
+    scale: {
+      status: renderPlan.scale.status,
+      millimeters_per_source_unit: renderPlan.scale.millimeters_per_source_unit,
+      source_ref: renderPlan.scale.reference_entity_ref ? sourceId : null,
+      basis: renderPlan.scale.basis,
+      reference_entity_ref: renderPlan.scale.reference_entity_ref,
+      reference_length_mm: renderPlan.scale.reference_length_mm,
+      millimeters_per_source_x_unit: renderPlan.scale.millimeters_per_source_x_unit,
+      millimeters_per_source_y_unit: renderPlan.scale.millimeters_per_source_y_unit,
+      source_aspect_ratio: renderPlan.scale.source_aspect_ratio,
+      confidence: renderPlan.scale.confidence,
+    },
     sources: [
       { id: sourceId, kind: 'floor_plan', label: asset?.fileName ?? 'Sample floor plan', asset_ref: asset ? sourceUrl(asset) : null, provider_model: 'zoowork:imageModel', received_at: timestamp },
       { id: confirmationSourceId, kind: 'user_correction', label: 'User-confirmed room functions and boundaries', asset_ref: null, provider_model: null, received_at: timestamp },
@@ -703,27 +622,61 @@ function buildConfirmedHomeModel(input: GenerateInput, state: ProjectState): { m
     })),
     openings: (state.roomMap?.openings ?? []).map((opening) => ({
       id: opening.id, kind: opening.kind, connects_refs: opening.connects_space_ids,
-      geometry: { metric: null, source_geometries: [{ source_ref: sourceId, coordinate_space: 'image_normalized_0_1', kind: 'point', coordinates: [opening.position], confidence: opening.confidence }] },
-      width_mm: null, swing_or_orientation: null, state: 'inferred', confidence: opening.confidence, source_refs: [sourceId],
+      geometry: { metric: null, source_geometries: [{ source_ref: sourceId, coordinate_space: 'image_normalized_0_1', kind: opening.segment ? 'polyline' : 'point', coordinates: opening.segment ?? [opening.position], confidence: opening.confidence }] },
+      width_mm: opening.segment ? Math.round(Math.hypot(
+        (opening.segment[1][0] - opening.segment[0][0]) * renderPlan.scale.millimeters_per_source_x_unit,
+        (opening.segment[1][1] - opening.segment[0][1]) * renderPlan.scale.millimeters_per_source_y_unit,
+      )) : null,
+      swing_or_orientation: opening.swing ? `${opening.swing.direction}:${opening.swing.opens_into_space_id ?? 'unknown'}` : opening.door_type,
+      state: 'inferred', confidence: opening.confidence, source_refs: [sourceId],
     })),
-    objects: [], relationships: [],
+    objects: renderPlan.placements.map((placement) => ({
+      id: placement.id,
+      kind: ['sofa', 'coffee_table', 'dining_table', 'bed', 'desk', 'bookshelf', 'outdoor_seating'].includes(placement.kind) ? 'furniture'
+        : ['toilet', 'vanity', 'shower', 'bathtub', 'sink'].includes(placement.kind) ? 'fixture'
+          : ['cooktop', 'refrigerator', 'washer'].includes(placement.kind) ? 'appliance' : 'cabinetry',
+      label: `${placement.kind} ${placement.width_mm}x${placement.depth_mm} mm`,
+      space_ref: placement.space_ref,
+      geometry: {
+        metric: null,
+        source_geometries: [{
+          source_ref: sourceId, coordinate_space: 'image_normalized_0_1', kind: 'polygon', confidence: 0.82,
+          coordinates: [
+            [placement.x - placement.width / 2, placement.y - placement.height / 2],
+            [placement.x + placement.width / 2, placement.y - placement.height / 2],
+            [placement.x + placement.width / 2, placement.y + placement.height / 2],
+            [placement.x - placement.width / 2, placement.y + placement.height / 2],
+          ],
+        }],
+      },
+      retention: 'replaceable', fixed: 'no', state: 'inferred', confidence: 0.82,
+      source_refs: [sourceId, confirmationSourceId],
+    })), relationships: [],
     living_patterns: [
       ...confirmed.tags.map((tag, index) => ({ id: `pattern_priority_${index + 1}`, statement: tag, space_refs: [], frequency: 'unknown', priority: 'high', state: 'user_confirmed', confidence: 1, source_refs: [confirmationSourceId] })),
       ...(confirmed.considerations ? [{ id: 'pattern_special_considerations', statement: confirmed.considerations, space_refs: [], frequency: 'unknown', priority: 'high', state: 'user_confirmed', confidence: 1, source_refs: [confirmationSourceId] }] : []),
       ...confirmed.rooms.flatMap((room, index) => room.targetUse ? [{ id: `pattern_target_${index + 1}`, statement: `${room.label} target use: ${room.targetUse}`, space_refs: [room.id], frequency: 'daily', priority: 'high', state: 'user_confirmed', confidence: 1, source_refs: [confirmationSourceId] }] : []),
     ],
-    constraints: confirmed.excludedRegions.map((region, index) => ({
-      id: `constraint_excluded_${index + 1}`,
-      category: 'physical',
-      statement: `${region.label} is excluded from furnishing, finish changes, and room programming (${region.reason}).`,
-      strength: 'hard', status: 'active', state: 'user_confirmed', confidence: 1,
-      source_refs: [sourceId, confirmationSourceId],
-    })), problems: [], opportunities: [],
+    constraints: [
+      ...confirmed.excludedRegions.map((region, index) => ({
+        id: `constraint_excluded_${index + 1}`,
+        category: 'physical',
+        statement: `${region.label} is excluded from furnishing, finish changes, and room programming (${region.reason}).`,
+        strength: 'hard', status: 'active', state: 'user_confirmed', confidence: 1,
+        source_refs: [sourceId, confirmationSourceId],
+      })),
+      ...renderPlan.keepout_zones.map((zone, index) => ({
+        id: `constraint_opening_${index + 1}`, category: 'physical',
+        statement: `${zone.opening_ref} has a ${zone.reason} keep-out zone of ${zone.clearance_mm} mm; no furniture or cabinetry may overlap it.`,
+        strength: 'hard', status: 'active', state: 'inferred', confidence: renderPlan.scale.confidence,
+        source_refs: [sourceId],
+      })),
+    ], problems: [], opportunities: [],
     open_questions: (state.roomMap?.questions ?? []).map((question) => ({ ...question, status: 'open' })),
     change_log: [{ revision: 1, timestamp, summary: 'Committed the user-confirmed room map and excluded regions before layout generation.', changed_ids: [...confirmed.rooms.map((room) => room.id), ...confirmed.excludedRegions.map((region) => region.id)], source_refs: [sourceId, confirmationSourceId] }],
   };
   assertHomeModel(model);
-  return { model, locale: confirmed.locale, tags: confirmed.tags, considerations: confirmed.considerations, rooms: confirmed.rooms };
+  return { model, locale: confirmed.locale, tags: confirmed.tags, considerations: confirmed.considerations, rooms: confirmed.rooms, renderPlan };
 }
 
 async function runVisualization(
@@ -869,13 +822,13 @@ const server = createServer(async (request, response) => {
       if (state.analyzedAssetId && !state.roomMap) throw new Error('project.create must complete before agent.generate');
       const confirmation = buildConfirmedHomeModel(input, state);
       state.homeModel = confirmation.model;
-      state.renderPlan = buildRenderPlan(confirmation.rooms, confirmation.tags, confirmation.considerations);
+      state.renderPlan = confirmation.renderPlan;
       const generation = await runVisualization(
         state,
         confirmation.locale,
-        typeof input.user_message === 'string' && input.user_message.trim()
+        `${typeof input.user_message === 'string' && input.user_message.trim()
           ? input.user_message.trim()
-          : `Generate the layout design. Living priorities: ${confirmation.tags.join(', ') || 'none specified'}. Special considerations: ${confirmation.considerations || 'none specified'}.`,
+          : `Generate the layout design. Living priorities: ${confirmation.tags.join(', ') || 'none specified'}. Special considerations: ${confirmation.considerations || 'none specified'}.`}\n\n${layoutPlanPrompt(confirmation.renderPlan, confirmation.rooms)}`,
         'agent.generate',
       );
       const generatedImage = requireGeneratedImage(generation.result, confirmation.locale);

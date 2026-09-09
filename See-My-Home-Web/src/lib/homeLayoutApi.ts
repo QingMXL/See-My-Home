@@ -111,18 +111,31 @@ export interface LayoutPlacement {
   y: number;
   width: number;
   height: number;
+  width_mm?: number;
+  depth_mm?: number;
+  clearance_mm?: number;
+  scale_status?: "unknown" | "estimated" | "confirmed";
   rotation_deg: number;
 }
 
 export interface LayoutRenderPlan {
-  schema_version: "1.0";
+  schema_version: "1.0" | "1.1";
   geometry_revision: number;
   placement_revision: number;
   render_strategy: "source_locked_svg_overlay";
   placements: LayoutPlacement[];
+  scale?: Record<string, unknown>;
+  keepout_zones?: {
+    id: string;
+    reason: "door_opening" | "door_swing" | "entry_landing" | "open_passage";
+    opening_ref: string;
+    polygon: number[][];
+    clearance_mm: number;
+  }[];
   qa: {
     status: "passed" | "needs_review";
     issues: string[];
+    warnings?: string[];
   };
 }
 
@@ -157,7 +170,7 @@ export interface GenerateLayoutInput {
   source_kind: "sample_plan" | "uploaded_analyzed";
   file_name?: string;
   asset_id?: string;
-  analysis?: Pick<LayoutImageAnalysisResult, "boundaries" | "openings" | "questions" | "warnings">;
+  analysis?: Pick<LayoutImageAnalysisResult, "boundaries" | "openings" | "questions" | "warnings" | "source_aspect_ratio">;
 }
 
 export interface UploadedLayoutAsset {
@@ -198,6 +211,14 @@ export interface AnalyzedLayoutOpening {
   id: string;
   kind: "door" | "window" | "open_passage" | "unknown";
   position: [number, number];
+  segment?: [[number, number], [number, number]] | null;
+  boundary_ref?: string | null;
+  door_type?: "entry" | "interior" | "sliding" | "double" | "unknown" | null;
+  swing?: {
+    hinge_position: [number, number] | null;
+    opens_into_space_id: string | null;
+    direction: "clockwise" | "counterclockwise" | "sliding" | "unknown";
+  } | null;
   connects_space_ids: string[];
   confidence: number;
 }
@@ -217,6 +238,7 @@ export interface LayoutImageAnalysisResult {
   questions: AgentQuestion[];
   extracted_text: string[];
   warnings: string[];
+  source_aspect_ratio?: number;
 }
 
 async function readResponse<T>(response: Response): Promise<T> {

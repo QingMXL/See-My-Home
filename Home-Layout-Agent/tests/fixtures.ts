@@ -18,6 +18,9 @@ export function validRoomMapResponse(): RoomMapResponse {
     }],
     openings: [{
       id: 'opening_door_001', kind: 'door', position: [0.55, 0.65],
+      segment: [[0.55, 0.61], [0.55, 0.69]], boundary_ref: 'boundary_wall_001',
+      door_type: 'interior',
+      swing: { hinge_position: [0.55, 0.61], opens_into_space_id: 'space_living_001', direction: 'clockwise' },
       connects_space_ids: ['space_living_001'], confidence: 0.8,
     }],
     questions: [], warnings: [],

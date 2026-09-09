@@ -11,13 +11,15 @@ Read [the placement contract](references/placement-contract.md) before planning.
 
 ## Planning order
 
-1. Copy each confirmed `space_ref` and its polygon unchanged.
+1. Copy each confirmed `space_ref` and its polygon unchanged, then use `plan-scale-calibrator` to establish one shared plan scale.
 2. Omit every `excluded_region`; it receives no furniture, fixtures, finishes, or room program.
 3. Apply explicit user overrides first, then resolve the room program's `default_object_counts` to the final min/max target for this request.
 4. Add the room program's remaining baseline objects as sensible defaults, not hard requirements.
 5. Add conditional objects only when usable room depth and circulation allow them.
-6. Orient primary pairs coherently: sofa toward television, bed with bedside access, kitchen sink/cooktop/refrigerator along a workable run.
-7. Unless the user overrides it, keep exactly one bed per bedroom; exactly one toilet, one sink or vanity, and one shower or tub zone per full bathroom; and exactly one sink, one cooktop, and one refrigerator per kitchen.
-8. Give repeated allowed objects stable unique placement IDs and return normalized placement intent for validation. Do not render or generate an image.
+6. Select furniture from the metric dimension catalog before converting it to normalized source coordinates. Never size furniture as a percentage of its individual room. Keep the selected physical dimensions in the placement record.
+7. Build door-opening, door-swing, entry-landing, and open-passage keep-out polygons before placing furniture. No placement may intersect them.
+8. Orient primary pairs coherently: sofa toward television, bed with bedside access, kitchen sink/cooktop/refrigerator along a workable run.
+9. Unless the user overrides it, keep exactly one bed per bedroom; exactly one toilet, one sink or vanity, and one shower or tub zone per full bathroom; and exactly one sink, one cooktop, and one refrigerator per kitchen.
+10. Give repeated allowed objects stable unique placement IDs and return normalized placement intent for validation. Do not render or generate an image.
 
-Never introduce a space function absent from the Home Model. Never infer metric clearance without confirmed scale.
+Never introduce a space function absent from the Home Model. Estimated door-reference dimensions may guide consistent planning but must never be presented as measured or construction-ready.

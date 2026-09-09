@@ -9,7 +9,11 @@ Blocking:
 - Any room's resolved `default_object_counts` is violated after applying explicit user overrides.
 - A primary bed, toilet, sink/vanity, shower/tub zone, kitchen sink, cooktop, refrigerator, sofa, TV/media wall, dining table, or desk is duplicated without a resolved count that permits it.
 - A known door/opening is blocked.
+- A furniture footprint intersects a door-opening, visible swing, entry-landing, or open-passage keep-out polygon.
+- Furniture in different rooms was sized from different room-relative scales, or a footprint falls outside its catalogued metric range without an explicit user override.
 - A placement or assessment references an `excluded_region`.
+
+Resolve blocking placement issues before image generation by relocating, resizing within the catalogued range, or omitting that unsafe placement with a warning. A readable generated raster is still published; validation does not restore the retired all-or-nothing publication gate.
 
 Warnings:
 

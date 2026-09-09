@@ -121,11 +121,44 @@
     "opening": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "kind", "position", "connects_space_ids", "confidence"],
+      "required": ["id", "kind", "position", "segment", "boundary_ref", "door_type", "swing", "connects_space_ids", "confidence"],
       "properties": {
         "id": { "$ref": "#/$defs/id" },
         "kind": { "enum": ["door", "window", "open_passage", "unknown"] },
         "position": { "$ref": "#/$defs/point" },
+        "segment": {
+          "oneOf": [
+            {
+              "type": "array",
+              "prefixItems": [{ "$ref": "#/$defs/point" }, { "$ref": "#/$defs/point" }],
+              "minItems": 2,
+              "maxItems": 2
+            },
+            { "type": "null" }
+          ]
+        },
+        "boundary_ref": { "oneOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+        "door_type": {
+          "oneOf": [
+            { "enum": ["entry", "interior", "sliding", "double", "unknown"] },
+            { "type": "null" }
+          ]
+        },
+        "swing": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["hinge_position", "opens_into_space_id", "direction"],
+              "properties": {
+                "hinge_position": { "oneOf": [{ "$ref": "#/$defs/point" }, { "type": "null" }] },
+                "opens_into_space_id": { "oneOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+                "direction": { "enum": ["clockwise", "counterclockwise", "sliding", "unknown"] }
+              }
+            },
+            { "type": "null" }
+          ]
+        },
         "connects_space_ids": {
           "type": "array",
           "maxItems": 2,

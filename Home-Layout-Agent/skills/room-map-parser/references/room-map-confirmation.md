@@ -15,6 +15,7 @@ The room map is a visual proposal for human review, not measured architectural g
 
 - Use source-normalized polygons in image coordinates: origin at top-left, x to the right, y downward.
 - Boundaries express visible separation only. They do not imply that a wall is structural or removable.
+- Every visible opening keeps a center `position` for UI compatibility and, when defensible, a two-endpoint `segment` tracing the actual wall gap. The segment, containing `boundary_ref`, door type, and visible swing are planning evidence for keep-out geometry; null means unresolved, not absent.
 - Low-confidence boundaries remain editable and must not be silently promoted to confirmed geometry.
 - If a space has no defensible polygon, omit it from `spaces` and report the unresolved region instead of returning an empty polygon.
 - A dwelling envelope is not a room polygon. When interior partitions or clear functional zones are visible, return one polygon per defensible space rather than one bounding rectangle around the home.
@@ -22,6 +23,7 @@ The room map is a visual proposal for human review, not measured architectural g
 - Keep all corners needed to follow the source geometry. Do not simplify an L-shaped or recessed room into a rectangle that crosses walls.
 - A user edit may add or remove polygon vertices. User-edited topology supersedes the inferred topology once confirmed.
 - When the asset cannot be inspected, return no spaces. A zero-confidence full-frame rectangle is misleading and must never be used as a fallback room.
+- A clearly visible single door may later calibrate one estimated 850 mm planning unit. The room-map parser must not present that fallback as a measured source dimension.
 
 ## UI handoff
 

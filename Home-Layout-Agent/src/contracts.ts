@@ -158,6 +158,14 @@ export interface RoomMapOpening {
   id: string;
   kind: 'door' | 'window' | 'open_passage' | 'unknown';
   position: [number, number];
+  segment: [[number, number], [number, number]] | null;
+  boundary_ref: string | null;
+  door_type: 'entry' | 'interior' | 'sliding' | 'double' | 'unknown' | null;
+  swing: {
+    hinge_position: [number, number] | null;
+    opens_into_space_id: string | null;
+    direction: 'clockwise' | 'counterclockwise' | 'sliding' | 'unknown';
+  } | null;
   connects_space_ids: string[];
   confidence: number;
 }

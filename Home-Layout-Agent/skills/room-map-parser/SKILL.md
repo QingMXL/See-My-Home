@@ -12,7 +12,7 @@ Before processing, read [the room-map response schema](references/room-map-respo
 ## Execution
 
 1. Call the ZooWork `image` tool exactly once with the HTTPS `asset_ref`.
-2. Ask it to identify every enclosed or functionally distinct space, their normalized polygons, shared boundaries, visible doors/windows, and any non-plannable voids.
+2. Ask it to identify every enclosed or functionally distinct space, their normalized polygons, shared boundaries, visible doors/windows, and any non-plannable voids. Represent each visible opening with both a center point and a two-endpoint wall-gap segment. Classify an evident dwelling entrance separately from an interior door; record hinge and swing only when visible.
 3. Assign every space one canonical `suggested_function_code` plus a separate `planning_status`. Real balconies remain `included`, including when the home has more than one. Mark light wells, double-height openings, raised/open voids, service shafts, and regions outside the dwelling envelope as `excluded` with an `exclusion_reason`. Use `uncertain` rather than excluding a defensible room without evidence.
 4. Return one JSON object matching the response schema. Do not write files or call database, shell, subagent, history, generation, or publishing tools.
 
@@ -33,4 +33,5 @@ Before processing, read [the room-map response schema](references/room-map-respo
 - If the image cannot be fetched or inspected, return `status: insufficient_input` with an empty `spaces` array and one concise retry question. Never fabricate a full-frame placeholder room.
 - A room function inferred from symbols, furniture, or text remains a suggestion until the user confirms it.
 - Prefer `unknown` and a question over inventing a function, boundary, scale, or structural fact.
+- A door `position` is only a UI marker. Its `segment` is the planning geometry used for scale calibration and entry clearance. Use null when a segment cannot be defended visually.
 - Keep the response compact: spaces, boundaries, openings, at most three questions, and brief warnings. Do not inventory movable furniture or create a canonical Home Model in this phase.

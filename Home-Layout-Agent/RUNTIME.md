@@ -47,7 +47,7 @@ HOME_LAYOUT_PUBLIC_BASE_URL=https://your-backend-or-temporary-tunnel.example
    ```
 
 4. Set `ZOOWORK_MODEL_ID` to an exact returned `model` value.
-5. Package the five Skills with `pnpm package:skills`.
+5. Package the seven active Skills with `pnpm package:skills`.
 6. Only for an approved private write run, set `ZOOWORK_ALLOW_REMOTE_WRITE=true` and run:
 
    ```bash

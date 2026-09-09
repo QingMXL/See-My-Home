@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { ZooworkError } from '@zoowork-ai/sdk';
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import sharp from 'sharp';
 import type {
   AgentArtifact,
   EvidenceSource,
@@ -15,6 +16,12 @@ import type {
   UiAgentEvent,
 } from '../Home-Layout-Agent/src/contracts.js';
 import { HomeLayoutRuntime, HomeLayoutTurnTimeoutError } from '../Home-Layout-Agent/src/runtime.js';
+import {
+  buildLayoutRenderPlan,
+  layoutPlanPrompt,
+  type LayoutPlacementKind,
+  type LayoutRenderPlan,
+} from '../Home-Layout-Agent/src/layout-planning.js';
 import { assertHomeModel } from '../Home-Layout-Agent/src/validation.js';
 import {
   newId,
@@ -176,6 +183,7 @@ function confirmedInput(input: GenerateInput): {
   openings: RoomMapOpening[];
   questions: HomeAgentResponse['questions'];
   warnings: string[];
+  sourceAspectRatio: number;
 } {
   const homeId = requireString(input.home_id, 'home_id');
   const locale = parseLocale(input.locale);
@@ -232,7 +240,23 @@ function confirmedInput(input: GenerateInput): {
     openings: Array.isArray(analysis.openings) ? analysis.openings as RoomMapOpening[] : [],
     questions: Array.isArray(analysis.questions) ? analysis.questions as HomeAgentResponse['questions'] : [],
     warnings: Array.isArray(analysis.warnings) ? analysis.warnings.filter((item): item is string => typeof item === 'string') : [],
+    sourceAspectRatio: typeof analysis.source_aspect_ratio === 'number' && Number.isFinite(analysis.source_aspect_ratio) && analysis.source_aspect_ratio > 0
+      ? Math.max(0.25, Math.min(4, analysis.source_aspect_ratio))
+      : 1,
   };
+}
+
+async function readSourceAspectRatio(sourceUrl: string): Promise<number> {
+  try {
+    const source = await fetch(sourceUrl, { signal: AbortSignal.timeout(5_000) });
+    if (!source.ok) return 1;
+    const metadata = await sharp(Buffer.from(await source.arrayBuffer()), { pages: 1 }).metadata();
+    return metadata.width && metadata.height
+      ? Math.max(0.25, Math.min(4, metadata.width / metadata.height))
+      : 1;
+  } catch {
+    return 1;
+  }
 }
 
 function architecturalType(code: ConfirmedRoom['functionCode']): string {
@@ -266,7 +290,31 @@ function roomProgram(code: ConfirmedRoom['functionCode']): { baseline: string[];
   }
 }
 
-function buildHomeModel(value: ReturnType<typeof confirmedInput>): HomeModel {
+function plannedObjectKind(kind: LayoutPlacementKind): 'furniture' | 'fixture' | 'cabinetry' | 'appliance' | 'other' {
+  if (['sofa', 'coffee_table', 'dining_table', 'bed', 'desk', 'bookshelf', 'outdoor_seating'].includes(kind)) return 'furniture';
+  if (['toilet', 'vanity', 'shower', 'bathtub', 'sink'].includes(kind)) return 'fixture';
+  if (['wardrobe', 'counter', 'storage', 'tv'].includes(kind)) return 'cabinetry';
+  if (['cooktop', 'refrigerator', 'washer'].includes(kind)) return 'appliance';
+  return 'other';
+}
+
+function placementPolygon(placement: LayoutRenderPlan['placements'][number]): number[][] {
+  return [
+    [placement.x - placement.width / 2, placement.y - placement.height / 2],
+    [placement.x + placement.width / 2, placement.y - placement.height / 2],
+    [placement.x + placement.width / 2, placement.y + placement.height / 2],
+    [placement.x - placement.width / 2, placement.y + placement.height / 2],
+  ].map(([x, y]) => [Math.max(0, Math.min(1, x ?? 0)), Math.max(0, Math.min(1, y ?? 0))]);
+}
+
+function metricPlacementPolygon(placement: LayoutRenderPlan['placements'][number], plan: LayoutRenderPlan): number[][] {
+  return placementPolygon(placement).map(([x = 0, y = 0]) => [
+    Math.round(x * plan.scale.millimeters_per_source_x_unit),
+    Math.round((1 - y) * plan.scale.millimeters_per_source_y_unit),
+  ]);
+}
+
+function buildHomeModel(value: ReturnType<typeof confirmedInput>, plan: LayoutRenderPlan): HomeModel {
   const timestamp = new Date().toISOString();
   const sourceId = 'src_floor_plan_001';
   const confirmationId = 'src_confirmation_001';
@@ -275,7 +323,18 @@ function buildHomeModel(value: ReturnType<typeof confirmedInput>): HomeModel {
     schema_version: '2.0', home_id: value.homeId, model_revision: 1, status: 'confirmed_enough', locale: value.locale,
     measurement_policy: { system: 'metric', linear_storage: 'mm', area_storage: 'm2', us_listing_area_display: 'sq_ft_secondary' },
     coordinate_system: { type: 'local_plan_2d', unit: 'mm', origin: 'floor_envelope_bottom_left', x_axis: 'right', y_axis: 'up', north_angle_deg: null },
-    scale: { status: 'unknown', millimeters_per_source_unit: null, source_ref: null },
+    scale: {
+      status: plan.scale.status,
+      millimeters_per_source_unit: plan.scale.millimeters_per_source_unit,
+      source_ref: plan.scale.reference_entity_ref ? sourceId : null,
+      basis: plan.scale.basis,
+      reference_entity_ref: plan.scale.reference_entity_ref,
+      reference_length_mm: plan.scale.reference_length_mm,
+      millimeters_per_source_x_unit: plan.scale.millimeters_per_source_x_unit,
+      millimeters_per_source_y_unit: plan.scale.millimeters_per_source_y_unit,
+      source_aspect_ratio: plan.scale.source_aspect_ratio,
+      confidence: plan.scale.confidence,
+    },
     sources: [
       { id: sourceId, kind: 'floor_plan', label: value.fileName, asset_ref: value.sourceUrl, provider_model: 'zoowork:imageModel', received_at: timestamp },
       { id: confirmationId, kind: 'user_correction', label: 'User-confirmed room functions and boundaries', asset_ref: null, provider_model: null, received_at: timestamp },
@@ -285,28 +344,50 @@ function buildHomeModel(value: ReturnType<typeof confirmedInput>): HomeModel {
     excluded_regions: value.excluded.map((region) => ({ id: region.id, label: region.label, reason: region.reason, geometry: { metric: null, source_geometries: [{ source_ref: sourceId, coordinate_space: 'image_normalized_0_1', kind: 'polygon', coordinates: region.polygon, confidence: 1 }] }, state: 'user_confirmed', confidence: 1, source_refs: [sourceId, confirmationId] })),
     room_programs: value.rooms.map((room) => { const program = roomProgram(room.functionCode); return { space_ref: room.id, function_code: room.functionCode, baseline_objects: program.baseline, conditional_objects: program.conditional, default_object_counts: program.counts, user_overrides: { include_objects: [], exclude_objects: [], replace_objects: [] }, status: 'system_default', source_refs: [confirmationId] }; }),
     boundaries: value.boundaries.map((boundary) => ({ id: boundary.id, kind: boundary.kind === 'exterior' ? 'exterior_edge' : boundary.kind, between_refs: boundary.separates_space_ids, geometry: { metric: null, source_geometries: [{ source_ref: sourceId, coordinate_space: 'image_normalized_0_1', kind: 'polyline', coordinates: boundary.path, confidence: boundary.confidence }] }, structural_status: 'unknown', state: 'user_confirmed', confidence: boundary.confidence, source_refs: [sourceId, confirmationId] })),
-    openings: value.openings.map((opening) => ({ id: opening.id, kind: opening.kind, connects_refs: opening.connects_space_ids, geometry: { metric: null, source_geometries: [{ source_ref: sourceId, coordinate_space: 'image_normalized_0_1', kind: 'point', coordinates: [opening.position], confidence: opening.confidence }] }, width_mm: null, swing_or_orientation: null, state: 'inferred', confidence: opening.confidence, source_refs: [sourceId] })),
-    objects: [], relationships: [],
+    openings: value.openings.map((opening) => {
+      const sourceCoordinates = opening.segment ?? [opening.position];
+      const widthMm = opening.segment ? Math.round(Math.hypot(
+        (opening.segment[1][0] - opening.segment[0][0]) * plan.scale.millimeters_per_source_x_unit,
+        (opening.segment[1][1] - opening.segment[0][1]) * plan.scale.millimeters_per_source_y_unit,
+      )) : null;
+      return {
+        id: opening.id, kind: opening.kind, connects_refs: opening.connects_space_ids,
+        geometry: { metric: null, source_geometries: [{ source_ref: sourceId, coordinate_space: 'image_normalized_0_1', kind: opening.segment ? 'polyline' : 'point', coordinates: sourceCoordinates, confidence: opening.confidence }] },
+        width_mm: widthMm,
+        swing_or_orientation: opening.swing ? `${opening.swing.direction}:${opening.swing.opens_into_space_id ?? 'unknown'}` : opening.door_type,
+        state: 'inferred', confidence: opening.confidence, source_refs: [sourceId],
+      };
+    }),
+    objects: plan.placements.map((placement) => ({
+      id: placement.id,
+      kind: plannedObjectKind(placement.kind),
+      label: `${placement.kind} ${placement.width_mm}x${placement.depth_mm} mm`,
+      space_ref: placement.space_ref,
+      geometry: {
+        metric: plan.scale.status === 'unknown' ? null : {
+          kind: 'polygon', floor_ref: floorId, coordinate_space: 'local_plan_2d', unit: 'mm',
+          coordinates: metricPlacementPolygon(placement, plan), precision: 'estimated',
+        },
+        source_geometries: [{ source_ref: sourceId, coordinate_space: 'image_normalized_0_1', kind: 'polygon', coordinates: placementPolygon(placement), confidence: 0.82 }],
+      },
+      retention: 'replaceable', fixed: 'no', state: 'inferred', confidence: 0.82,
+      source_refs: [sourceId, confirmationId],
+    })), relationships: [],
     living_patterns: [
       ...value.tags.map((tag, index) => ({ id: `pattern_priority_${index + 1}`, statement: tag, space_refs: [], frequency: 'unknown', priority: 'high', state: 'user_confirmed', confidence: 1, source_refs: [confirmationId] })),
       ...(value.considerations ? [{ id: 'pattern_special_considerations', statement: value.considerations, space_refs: [], frequency: 'unknown', priority: 'high', state: 'user_confirmed', confidence: 1, source_refs: [confirmationId] }] : []),
       ...value.rooms.flatMap((room, index) => room.targetUse ? [{ id: `pattern_target_${index + 1}`, statement: `${room.label} target use: ${room.targetUse}`, space_refs: [room.id], frequency: 'daily', priority: 'high', state: 'user_confirmed', confidence: 1, source_refs: [confirmationId] }] : []),
     ],
-    constraints: value.excluded.map((region, index) => ({ id: `constraint_excluded_${index + 1}`, category: 'physical', statement: `${region.label} is excluded from furnishing and room programming (${region.reason}).`, strength: 'hard', status: 'active', state: 'user_confirmed', confidence: 1, source_refs: [sourceId, confirmationId] })),
+    constraints: [
+      ...value.excluded.map((region, index) => ({ id: `constraint_excluded_${index + 1}`, category: 'physical', statement: `${region.label} is excluded from furnishing and room programming (${region.reason}).`, strength: 'hard', status: 'active', state: 'user_confirmed', confidence: 1, source_refs: [sourceId, confirmationId] })),
+      ...plan.keepout_zones.map((zone, index) => ({ id: `constraint_opening_${index + 1}`, category: 'physical', statement: `${zone.opening_ref} has a ${zone.reason} keep-out zone of ${zone.clearance_mm} mm; no furniture or cabinetry may overlap it.`, strength: 'hard', status: 'active', state: 'inferred', confidence: plan.scale.confidence, source_refs: [sourceId] })),
+    ],
     problems: [], opportunities: [],
     open_questions: value.questions.map((question) => ({ ...question, status: 'open' })),
     change_log: [{ revision: 1, timestamp, summary: 'Committed user-confirmed room functions, polygons, openings, and excluded regions.', changed_ids: [...value.rooms.map((room) => room.id), ...value.excluded.map((region) => region.id)], source_refs: [sourceId, confirmationId] }],
   };
   assertHomeModel(model);
   return model;
-}
-
-function renderPlan(rooms: ConfirmedRoom[]): Record<string, unknown> {
-  return {
-    schema_version: '1.0', geometry_revision: 1, placement_revision: 1,
-    render_strategy: 'source_locked_svg_overlay', placements: [],
-    qa: { status: rooms.every((room) => room.polygon.length >= 3) ? 'passed' : 'needs_review', issues: [] },
-  };
 }
 
 function statementSource(message: string, suffix: string): EvidenceSource {
@@ -319,6 +400,7 @@ async function analyze(request: VercelRequest, response: VercelResponse): Promis
   const locale = parseLocale(input.locale);
   const blobUrl = privateBlobUrl(input.asset_id, 'layout', projectId);
   const sourceUrl = await temporaryBlobReadUrl(blobUrl);
+  const sourceAspectRatioPromise = readSourceAspectRatio(sourceUrl);
   const brief = typeof input.project_brief === 'string' && input.project_brief.trim()
     ? input.project_brief.trim()
     : locale === 'zh-CN' ? '请识别每个房间、精确边界、门窗以及需要排除的采光井、挑空、架空和管井。' : 'Identify every room, its exact boundary, openings, and any light wells, voids, double-height or service-shaft regions that should be excluded.';
@@ -331,21 +413,26 @@ async function analyze(request: VercelRequest, response: VercelResponse): Promis
     user_message: brief,
     evidence: [{ source_id: `src_visual_${requestId}`, kind: 'floor_plan', label: decodeURIComponent(new URL(sourceUrl).pathname.split('/').at(-1) ?? 'Floor plan'), asset_ref: sourceUrl, facts: [] }, statementSource(brief, requestId)],
   };
-  const result = await zoo.runRoomMapTurn(conversation, turn, { type: 'project.create', project_id: projectId });
+  const [result, sourceAspectRatio] = await Promise.all([
+    zoo.runRoomMapTurn(conversation, turn, { type: 'project.create', project_id: projectId }),
+    sourceAspectRatioPromise,
+  ]);
   sendJson(response, 200, {
     project_id: projectId, session_id: conversation.sessionId, event: 'project.create', asset_id: sourceUrl,
     image_processing_status: 'analyzed_by_agent', provider_model: 'zoowork:imageModel', summary: result.response.summary,
     rooms: result.response.spaces.filter((space) => space.planning_status !== 'excluded'),
     excluded_regions: result.response.spaces.filter((space) => space.planning_status === 'excluded'),
     boundaries: result.response.boundaries, openings: result.response.openings, questions: result.response.questions,
-    extracted_text: [], warnings: result.response.warnings,
+    extracted_text: [], warnings: result.response.warnings, source_aspect_ratio: sourceAspectRatio,
   });
 }
 
-function visualizationRequest(value: ReturnType<typeof confirmedInput>, model: HomeModel, message: string, type: 'agent.generate' | 'agent.refine', requestId = newId('req')): HomeTurnRequest {
+function visualizationRequest(value: ReturnType<typeof confirmedInput>, plan: LayoutRenderPlan, message: string, type: 'agent.generate' | 'agent.refine', requestId = newId('req')): HomeTurnRequest {
+  const renderPolicy = `Preserve every confirmed polygon, wall, column, door, opening, and window from the source plan. Keep excluded regions outside furnishing and finishes. Generate one new label-free colorized floor plan with realistic furniture, sanitary fixtures, appliances, flooring, and material textures. Use only Banana Pro and Image 2 through ZooWork; prefer Banana Pro for geometry-preserving image-to-image work and Image 2 as the clean-plan fallback. Follow each room_program as a sensible first draft, apply explicit user instructions with highest priority, and avoid duplicate primary furniture or fixtures. Assess only circulation, function, adjacency, privacy, daylight, storage demand, activity conflict, and underused space. Publish every readable raster even if it has quality warnings; only a missing, corrupt, empty, or unreadable image may remain unpublished. This is a ${type} turn.`;
+  const userMessage = `${message.trim().slice(0, 1_800)}\n\n${renderPolicy}\n\n${layoutPlanPrompt(plan, value.rooms)}`.slice(0, 8_000);
   return {
     schema_version: '1.0', request_id: requestId, home_id: value.homeId, operation: 'visualize', locale: value.locale,
-    user_message: `${message.trim()} Preserve every confirmed polygon, wall, column, door, opening, and window from the source plan. Keep excluded regions outside furnishing and finishes. Generate one new label-free colorized floor plan with realistic furniture, sanitary fixtures, appliances, flooring, and material textures. Use only Banana Pro and Image 2 through ZooWork; prefer Banana Pro for geometry-preserving image-to-image work and Image 2 as the clean-plan fallback. Follow each room_program as a sensible first draft, apply explicit user instructions with highest priority, and avoid duplicate beds, toilets, sinks, vanities, cooktops, refrigerators, sofas, televisions, dining tables, and desks. Assess only circulation, function, adjacency, privacy, daylight, storage demand, activity conflict, and underused space. Publish every readable raster even if it has quality warnings; only a missing, corrupt, empty, or unreadable image may remain unpublished. This is a ${type} turn.`,
+    user_message: userMessage,
     evidence: [],
     visualization_request: { mode: 'colorized_plan', selected_entity_refs: value.rooms.map((room) => room.id), style_direction: 'Source-referenced, geometry-locked, label-free colorized floor plan with realistic furniture and restrained material textures. Do not add text, labels, legends, dimensions, numbers, or pseudo-glyphs.' },
   };
@@ -375,12 +462,13 @@ async function generate(request: VercelRequest, response: VercelResponse, type: 
   const value = confirmedInput(source);
   if (job && (job.homeId !== value.homeId || job.type !== type)) throw new Error('job_token does not match this request');
   if (!job && value.sourceUrl) value.sourceUrl = await temporaryBlobReadUrl(value.sourceUrl);
-  const model = buildHomeModel(value);
+  const plan = buildLayoutRenderPlan({ rooms: value.rooms, openings: value.openings, tags: value.tags, considerations: value.considerations, sourceAspectRatio: value.sourceAspectRatio });
+  const model = buildHomeModel(value, plan);
   const defaultMessage = `Generate the layout. Priorities: ${value.tags.join(', ') || 'none specified'}. Special considerations: ${value.considerations || 'none specified'}.`;
   const message = typeof source.user_message === 'string' && source.user_message.trim() ? source.user_message.trim() : defaultMessage;
   const zoo = runtime();
   const requestId = job?.requestId ?? newId('req');
-  const turn = visualizationRequest(value, model, message, type, requestId);
+  const turn = visualizationRequest(value, plan, message, type, requestId);
   const event: UiAgentEvent = { type, project_id: value.homeId, mode: 'layout' };
   if (!job) {
     await zoo.ensureRunning();
@@ -418,7 +506,7 @@ async function generate(request: VercelRequest, response: VercelResponse, type: 
   const imageArtifact = result.artifacts.find((artifact) => artifact.status === 'ready' && (artifact.contentType?.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(artifact.fileName ?? '')));
   const generatedImage = await generatedPayload(zoo, imageArtifact, value, turn.request_id);
   if (value.sourceUrl) value.sourceUrl = await temporaryBlobReadUrl(privateBlobUrl(source.asset_id, 'layout', value.homeId));
-  const responseModel = buildHomeModel(value);
+  const responseModel = buildHomeModel(value, plan);
   const intake: HomeAgentResponse = {
     schema_version: '1.0', request_id: turn.request_id, home_id: value.homeId, operation: 'correct', status: 'completed', locale: value.locale,
     message: type === 'agent.refine' ? 'The confirmed geometry and room functions were preserved for this refinement.' : 'The confirmed room map was committed to the Home Model.',
@@ -437,7 +525,7 @@ async function generate(request: VercelRequest, response: VercelResponse, type: 
   sendJson(response, 200, {
     session_id: conversation.sessionId, image_processing_status: value.sourceUrl ? 'analyzed' : 'sample_geometry',
     intake, diagnosis: result.response, visualization: result.response, generated_image: generatedImage,
-    render_plan: renderPlan(value.rooms), event_trace: type === 'agent.refine' ? ['agent.refine'] : ['room_map.confirm', 'agent.generate'],
+    render_plan: plan, event_trace: type === 'agent.refine' ? ['agent.refine'] : ['room_map.confirm', 'agent.generate'],
     request_context: source,
   });
 }

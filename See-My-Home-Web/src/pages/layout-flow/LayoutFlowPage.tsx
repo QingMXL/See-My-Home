@@ -266,6 +266,9 @@ export function LayoutFlowPage() {
           openings: imageAnalysis.openings,
           questions: imageAnalysis.questions,
           warnings: imageAnalysis.warnings,
+          ...(typeof imageAnalysis.source_aspect_ratio === "number"
+            ? { source_aspect_ratio: imageAnalysis.source_aspect_ratio }
+            : {}),
         } : undefined,
       };
       const agentRun = isDemoPlan
