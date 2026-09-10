@@ -25,6 +25,8 @@ Home Layout Agent 管理平面图、房间功能和 Home Model；Home Style Agen
 - `home-style`
 - `home-furniture`
 
+在 Home Style 域内部，当前只有 `modern_east` 是可运行风格。两个后续风格只作为 UI 占位，不提前创建远端 Skill 或虚构内部 ID。新风格只有在知识源、生产投影、契约、QA 与 ZooWork smoke test 全部完成后，才进入服务端风格目录。
+
 ## 3. 知识库与 Agent 的职责
 
 知识库回答“Modern East 看起来是什么”：风格 DNA、材质、色彩、家具、灯光、房间配方和反模式。
@@ -47,8 +49,9 @@ Agent / Runtime 回答“这张图可以改什么、怎样调用模型、怎样�
 3. Runtime 分析原图，产生 `immutable_elements` 与 `editable_elements`。
 4. 服务端目录把 `modern_east` 解析成固定知识版本；客户端无权提供远端知识 ID。
 5. 只选择通用片段、对应房间片段、用户偏好与统一负向约束。
-6. ZooWork Agent 调用图像编辑/生成能力。
-7. QA 比较输入和输出的结构锚点；不合格结果失败关闭。
+6. ZooWork Agent 读取内置 Designer Skill，按其模型路由调用一次现有图片编辑流程。
+7. UI 使用服务端签名的短期 job token 轮询同一 ZooWork Session；轮询不会重复提交生图事件。
+8. QA 比较输入和输出的结构锚点；不合格结果失败关闭且不发布 artifact。
 
 ## 5. ZooWork 绑定策略
 
@@ -63,7 +66,7 @@ Agent / Runtime 回答“这张图可以改什么、怎样调用模型、怎样�
 
 ### 待验证方案：ZooWork Knowledge Base ID
 
-当前 SDK `0.5.0` 没有公开对应字段或方法。收到 ID 后需要同时确认至少一项：控制台功能名称、官方 API 路径、SDK 版本或一段官方接入示例。确认后将适配器放在服务端，并使用环境变量 `ZOOWORK_STYLE_KNOWLEDGE_BASE_ID`；不要把 ID 写进 UI、URL 查询参数或客户端持久化状态。
+当前 SDK `0.5.2` 没有公开对应字段或方法。收到 ID 后需要同时确认至少一项：控制台功能名称、官方 API 路径、SDK 版本或一段官方接入示例。确认后将适配器放在服务端，并使用环境变量 `ZOOWORK_STYLE_KNOWLEDGE_BASE_ID`；不要把 ID 写进 UI、URL 查询参数或客户端持久化状态。
 
 ## 6. 版本与回滚
 

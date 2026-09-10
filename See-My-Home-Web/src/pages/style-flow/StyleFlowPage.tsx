@@ -7,7 +7,7 @@ import { UploadGuide } from "../../components/ui/UploadGuide";
 import { RoomScene } from "../../components/visuals/RoomScene";
 import { TemplateArt } from "../../components/visuals/TemplateArt";
 import { STYLE_ROOM_TYPES, type StyleRoomType } from "../../data/rooms";
-import { STYLE_TEMPLATES } from "../../data/styleTemplates";
+import { STYLE_PLACEHOLDER_SLOTS, STYLE_TEMPLATES } from "../../data/styleTemplates";
 import { useI18n } from "../../i18n/LanguageContext";
 import type { MsgKey } from "../../i18n/translations";
 import { STYLE_GENERATION_STEPS } from "../../lib/agents";
@@ -203,6 +203,26 @@ export function StyleFlowPage() {
                 </button>
               );
             })}
+            {STYLE_PLACEHOLDER_SLOTS.map((slot, index) => (
+              <button
+                key={slot.id}
+                type="button"
+                role="option"
+                aria-selected="false"
+                aria-label={`${t("style.comingSoon")} ${index + 1}`}
+                className="style-card style-card--placeholder"
+                disabled
+              >
+                <span className="style-card__art style-card__placeholder-art" aria-hidden="true">
+                  <span className="style-card__placeholder-orbit" />
+                  <span className="style-card__placeholder-mark">+</span>
+                </span>
+                <span className="style-card__name">{t("style.comingSoon")}</span>
+                <span className="style-card__tags">
+                  <span className="chip">{t("style.inDevelopment")}</span>
+                </span>
+              </button>
+            ))}
           </div>
 
           <h3 className="template-panel__what">{t("style.whatGet")}</h3>

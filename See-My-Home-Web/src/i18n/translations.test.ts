@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { formatMessage, MESSAGES, TAG_ZH } from "./translations";
 import { LIFESTYLE_TAG_GROUPS, ROOM_TAG_LIBRARY, STYLE_ROOM_TYPES, roomFunctionFrom } from "../data/rooms";
-import { STYLE_TEMPLATES } from "../data/styleTemplates";
+import { STYLE_PLACEHOLDER_SLOTS, STYLE_TEMPLATES } from "../data/styleTemplates";
 
 describe("MESSAGES", () => {
   test("every key has non-empty English and Chinese text", () => {
@@ -61,6 +61,12 @@ describe("styleTemplates zh stories", () => {
       expect(template.storyZh.furniture, template.id).toBeTruthy();
       expect(template.storyZh.mood, template.id).toBeTruthy();
     }
+  });
+
+  test("reserves exactly two non-runnable style slots", () => {
+    expect(STYLE_PLACEHOLDER_SLOTS).toHaveLength(2);
+    expect(STYLE_PLACEHOLDER_SLOTS.map((slot) => slot.id)).toEqual(["style-slot-2", "style-slot-3"]);
+    expect(STYLE_PLACEHOLDER_SLOTS.every((slot) => !("styleId" in slot))).toBe(true);
   });
 });
 

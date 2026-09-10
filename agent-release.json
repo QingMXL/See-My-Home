@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "release_set": "2026-09-09.3",
+  "release_set": "2026-09-10.1",
   "agents": {
     "home-layout": {
       "directory": "Home-Layout-Agent",
@@ -14,7 +14,7 @@
     "home-style": {
       "directory": "Home-Style-Agent",
       "package": "@see-my-home/home-style-agent",
-      "package_version": "0.1.0",
+      "package_version": "0.1.1",
       "runtime_contract": "home-style-v1",
       "agent_id_env": "ZOOWORK_STYLE_AGENT_ID",
       "api_namespace": "/api/home-style",

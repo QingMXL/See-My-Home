@@ -69,13 +69,36 @@ function stableJson(value: unknown): string {
   return JSON.stringify(value);
 }
 
+export function styleAgentConfigUpdates(
+  current: Record<string, unknown>,
+  desired: Record<string, unknown>,
+): Record<string, unknown> {
+  const updates: Record<string, unknown> = {};
+  for (const key of ['name', 'model', 'persona', 'labels', 'sandbox'] as const) {
+    if (stableJson(current[key]) !== stableJson(desired[key])) updates[key] = desired[key];
+  }
+  // ZooWork does not publish a stable allow-list vocabulary for tool_policy.
+  // Clearing our former guessed policy restores the platform tool manifest,
+  // including the file reader that attached Skills need at runtime.
+  if (current.tool_policy !== undefined && stableJson(current.tool_policy) !== stableJson({})) {
+    updates.tool_policy = {};
+  }
+  return updates;
+}
+
+export function skillVersionFromReceipt(receipt: { version?: unknown; latest_version?: unknown; [key: string]: unknown }): number {
+  const version = Number(receipt.version ?? receipt.latest_version);
+  if (!Number.isInteger(version) || version < 1) throw new Error('Uploaded Skill version is invalid');
+  return version;
+}
+
 async function reconcileAgent(client: ZooworkClient, agent: AgentRecord, modelId: string): Promise<AgentRecord> {
   if (!agent.declared) return agent;
   const desired = createHomeStyleAgentResource(modelId);
-  const updates: Record<string, unknown> = {};
-  for (const key of ['name', 'model', 'persona', 'labels', 'tool_policy', 'sandbox'] as const) {
-    if (stableJson(agent.declared[key]) !== stableJson(desired[key])) updates[key] = desired[key];
-  }
+  const updates = styleAgentConfigUpdates(
+    agent.declared as unknown as Record<string, unknown>,
+    desired as unknown as Record<string, unknown>,
+  );
   return Object.keys(updates).length ? client.updateAgent(agent.agent_id, updates) : agent;
 }
 
@@ -121,7 +144,7 @@ export async function provisionPrivateStyleAgent(client: ZooworkClient, modelId:
   return state;
 }
 
-export async function syncStyleSkill(client: ZooworkClient): Promise<SkillRecord> {
+export async function syncStyleSkill(client: ZooworkClient) {
   requireRemoteWriteGuard();
   const matches = (await client.listSkills({ q: HOME_STYLE_SKILL }))
     .filter((skill) => skill.name === HOME_STYLE_SKILL && (skill.scope === 'org' || skill.scope === 'personal'));
@@ -135,9 +158,10 @@ export async function syncStyleSkill(client: ZooworkClient): Promise<SkillRecord
     idempotencyKey: `see-my-home:${HOME_STYLE_SKILL}:${digest}`,
   });
   const agentId = process.env.ZOOWORK_STYLE_AGENT_ID?.trim();
-  const version = Number(updated.latest_version);
+  // Published SDK 0.5.2 still types this receipt as SkillRecord/latest_version,
+  // while the current official source returns SkillVersionRecord/version.
+  const version = skillVersionFromReceipt(updated);
   if (!agentId) throw new Error('ZOOWORK_STYLE_AGENT_ID is required to advance the pinned Skill version');
-  if (!Number.isInteger(version) || version < 1) throw new Error('Uploaded Skill latest_version is invalid');
   await client.putAgentSkill(agentId, skill.skill_id, { enabled: true, versionPin: version });
   const verified = (await client.listAgentSkills(agentId, { verbose: true }))
     .find((item) => item.skill_id === skill.skill_id);

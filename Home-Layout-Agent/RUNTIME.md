@@ -1,6 +1,6 @@
 # Home Layout Agent — ZooWork Runtime
 
-This project is the server-side Runtime for the private Home Layout Agent. It uses `@zoowork-ai/sdk` 0.5.0 and keeps the ZooWork organization key out of the browser.
+This project is the server-side Runtime for the private Home Layout Agent. It uses `@zoowork-ai/sdk` 0.5.2 and keeps the ZooWork organization key out of the browser.
 
 ## Architecture
 
@@ -15,7 +15,7 @@ See My Home UI
 
 The UI only supplies controls and events. It uploads JPG, PNG, or PDF bytes to the application backend, which validates the file, stores it, and creates a time-limited HTTPS source URL. `project.create` gives that source to the Agent. The Agent performs visual parsing and returns the room map/Home Model. `room_map.confirm` applies user corrections. `agent.generate` makes the image inside ZooWork and publishes it as an artifact; the backend proxies that artifact to the UI.
 
-ZooWork SDK 0.5.0 does not expose production-wired Session file staging. The application backend therefore supplies an Agent-reachable source URL, but it does not analyze or generate the image. ZooWork injects `imageModel`, `imageGenerationModel`, built-in skills, and their credentials into the Agent. `ZOOWORK_API_KEY` is the only key this Runtime uses; never expose it to Vite or browser JavaScript.
+ZooWork SDK 0.5.2 does not expose production-wired Session file staging. The application backend therefore supplies an Agent-reachable source URL, but it does not analyze or generate the image. ZooWork injects `imageModel`, `imageGenerationModel`, built-in skills, and their credentials into the Agent. `ZOOWORK_API_KEY` is the only key this Runtime uses; never expose it to Vite or browser JavaScript.
 
 ## Local setup
 

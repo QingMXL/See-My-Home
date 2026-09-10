@@ -18,7 +18,7 @@ import type {
   StyleTurnResult,
 } from './contracts.js';
 import { responseSchemaPath } from './paths.js';
-import { assertStyleTurnRequest, extractJsonObject, parseStyleAgentResponse } from './validation.js';
+import { assertStyleTurnRequest, parseStyleAgentResponse } from './validation.js';
 
 const RESPONSE_SCHEMA = JSON.parse(readFileSync(responseSchemaPath, 'utf8')) as unknown;
 export const MODERN_EAST_KNOWLEDGE_VERSION = '0.1-research';
@@ -45,6 +45,14 @@ interface RawTurnResult {
   cursor?: string;
   runId?: string;
 }
+
+export interface StyleTurnStart {
+  postedSeq: number;
+}
+
+export type StyleTurnPoll =
+  | { status: 'processing'; postedSeq: number }
+  | { status: 'completed'; result: StyleTurnResult };
 
 export class HomeStyleRuntime {
   readonly agentId: string;
@@ -92,6 +100,34 @@ export class HomeStyleRuntime {
     assertStyleTurnRequest(request);
     if (conversation.agentId !== this.agentId) throw new Error('conversation belongs to a different Agent');
     const raw = await this.postAndRead(conversation.sessionId, this.buildEvents(request), request.request_id);
+    return this.styleResult(conversation.sessionId, request, raw);
+  }
+
+  async startStyleTurn(conversation: ConversationHandle, request: StyleTurnRequest): Promise<StyleTurnStart> {
+    assertStyleTurnRequest(request);
+    if (conversation.agentId !== this.agentId) throw new Error('conversation belongs to a different Agent');
+    const postedSeq = await this.postTurnEvents(conversation.sessionId, this.buildEvents(request));
+    return { postedSeq };
+  }
+
+  async pollStyleTurn(
+    conversation: ConversationHandle,
+    request: StyleTurnRequest,
+    postedSeq: number,
+  ): Promise<StyleTurnPoll> {
+    assertStyleTurnRequest(request);
+    if (conversation.agentId !== this.agentId) throw new Error('conversation belongs to a different Agent');
+    if (!Number.isSafeInteger(postedSeq) || postedSeq < 0) throw new Error('postedSeq is invalid');
+    const raw = await this.readDurableTurn(conversation.sessionId, postedSeq);
+    if (!raw) return { status: 'processing', postedSeq };
+    return { status: 'completed', result: await this.styleResult(conversation.sessionId, request, raw) };
+  }
+
+  private async styleResult(
+    sessionId: string,
+    request: StyleTurnRequest,
+    raw: RawTurnResult,
+  ): Promise<StyleTurnResult> {
     if (raw.outcome !== 'succeeded') throw new Error(`ZooWork run ended with status ${raw.outcome}`);
     const response = parseStyleAgentResponse(raw.text);
     if (response.request_id !== request.request_id) throw new Error('Style response request_id does not match request');
@@ -104,7 +140,7 @@ export class HomeStyleRuntime {
       && response.qa.style_passed
       && response.qa.publishable;
     const artifacts = response.status === 'completed' && passedQa
-      ? await this.artifactsForTurn(conversation.sessionId, raw.runId, raw.toolCalls, request.request_id)
+      ? await this.artifactsForTurn(sessionId, raw.runId, raw.toolCalls, request.request_id)
       : [];
     const result: StyleTurnResult = {
       response,
@@ -140,15 +176,16 @@ export class HomeStyleRuntime {
         contracts: { response_schema: RESPONSE_SCHEMA },
         request,
         output_requirement: [
-          'Use the modern-east-style Skill and no other aesthetic style.',
+          'Read and use the modern-east-style Skill as the only aesthetic source. Also read the Designer Skill and only the references it requires for the current image-edit model-routing decision.',
           'Inspect source_asset_ref once with the available ZooWork visual tool before composing the edit prompt.',
           'Treat the visible room envelope, walls, columns, beams, doors, windows, openings, ceiling outline and height, fixed service locations, camera position, lens perspective, and crop as immutable. User preferences never override these constraints.',
           'Change only the furnishing and finish categories permitted by renovation_scope. Keep the result a believable American residence at the source room scale.',
           'Build the English image-edit prompt from the Skill schema and room component. Do not include research sources, firm names, designer names, or unsupported weighting syntax.',
-          `Call image_generate exactly once with action="generate", the source image when the current tool schema supports its image input, the compiled prompt, quality="high", filename="${filename}", and the source aspect ratio when the tool exposes it. Omit any model or provider field not present in the current tool schema.`,
-          'Do not call image_generate list/status and do not start a second generation attempt.',
-          'After generation starts, call sessions_yield exactly once, end that run with a brief waiting sentence, and wait for ZooWork to start the continuation run.',
-          `In the continuation, call media_materialize exactly once for the returned attachment artifactId with path="/workspace/artifacts/${request.home_id}/${filename}". Inspect the materialized image once and compare it with the original structural anchors.`,
+          'The See My Home UI click is explicit authorization to generate one image now. Do not ask the user to choose a model, do not write Designer preferences, and do not pause for confirmation.',
+          'Use the Designer Skill existing-image workflow and its image_generation_cli.py. Do not call the generic image_generate tool. For this constraint-heavy edit, prioritize the Designer routing rule for strongest instruction fidelity and source adherence over lowest cost.',
+          'Pass source_asset_ref once through the Designer --images argument, pass the exact aspect ratio detected from the source through --aspect-ratio, request one image, and use the highest practical output quality supported by the selected Designer model. Run inline in this session; do not spawn a subagent and do not call sessions_yield.',
+          `Capture the single output path printed by the Designer CLI and copy it to "/workspace/artifacts/${request.home_id}/${filename}". An empty output path or failed command is a failed response.`,
+          'Inspect the copied output image once and compare it with the original at the level of crop, camera position, perspective, wall and ceiling boundaries, columns, beams, window and door count, opening size and position, and fixed service locations.',
           'If the raster is missing, corrupt, or any immutable structure or camera geometry changed, do not publish it. Return status="failed", qa.publishable=false, and precise warnings.',
           'If structure and camera are preserved and the style avoids all forbidden patterns, call artifact_publish exactly once. Return status="completed" and use the returned artifact id.',
           'Return one compact JSON object matching response_schema. Do not use Markdown fences and do not request another API key.',
@@ -158,12 +195,7 @@ export class HomeStyleRuntime {
   }
 
   private async postAndRead(sessionId: string, events: OutboundEvent[], requestId: string): Promise<RawTurnResult> {
-    const receipt = await this.client.postEvents(this.agentId, sessionId, events);
-    const rejected = receipt.events.find((event) => event.accepted !== true);
-    if (rejected) throw new Error(`ZooWork rejected outbound event ${rejected.type ?? 'unknown'}`);
-    const posted = receipt.events.find((event) => event.type === 'user.message');
-    const postedSeq = typeof posted?.seq === 'number' ? posted.seq : undefined;
-    if (postedSeq === undefined) throw new Error('ZooWork accepted the user turn without returning its sequence');
+    const postedSeq = await this.postTurnEvents(sessionId, events);
 
     const assistantBySeq = new Map<number, string>();
     const toolsBySeq = new Map<number, AgentToolTrace>();
@@ -191,7 +223,7 @@ export class HomeStyleRuntime {
       }
       if (isRunFinished(event)) {
         const outcome = runOutcome(event);
-        if (outcome !== 'succeeded' || (this.hasJson(assistantBySeq) && this.hasTerminalTool(toolsBySeq))) {
+        if (outcome !== 'succeeded' || this.hasTerminalResponse(assistantBySeq, toolsBySeq)) {
           finalOutcome = outcome;
           runId = event.runId ?? runId;
         }
@@ -249,17 +281,75 @@ export class HomeStyleRuntime {
     return result;
   }
 
-  private hasJson(messages: Map<number, string>): boolean {
-    const candidates = [...messages.entries()].sort(([a], [b]) => b - a).map(([, text]) => text);
-    return candidates.some((candidate) => {
-      try { extractJsonObject(candidate); return true; }
-      catch { return false; }
-    });
+  private async postTurnEvents(sessionId: string, events: OutboundEvent[]): Promise<number> {
+    const receipt = await this.client.postEvents(this.agentId, sessionId, events);
+    const rejected = receipt.events.find((event) => event.accepted !== true);
+    if (rejected) throw new Error(`ZooWork rejected outbound event ${rejected.type ?? 'unknown'}`);
+    const posted = receipt.events.find((event) => event.type === 'user.message');
+    if (typeof posted?.seq !== 'number') {
+      throw new Error('ZooWork accepted the user turn without returning its sequence');
+    }
+    return posted.seq;
   }
 
-  private hasTerminalTool(tools: Map<number, AgentToolTrace>): boolean {
-    return [...tools.values()].some((call) => call.phase === 'end'
-      && (call.toolName === 'artifact_publish' || call.toolName === 'media_materialize'));
+  private async readDurableTurn(sessionId: string, postedSeq: number): Promise<RawTurnResult | null> {
+    const events = await this.client.listAllEvents(this.agentId, sessionId, {
+      types: ['run.started', 'run.finished', 'agent.assistant', 'agent.tool'],
+    });
+    const assistantBySeq = new Map<number, string>();
+    const toolsBySeq = new Map<number, AgentToolTrace>();
+    let cursor: string | undefined;
+    let runId: string | undefined;
+    let finalOutcome: RawTurnResult['outcome'] | undefined;
+
+    for (const event of [...events].sort((left, right) => left.seq - right.seq)) {
+      if (event.seq <= postedSeq) continue;
+      cursor = event.cursor ?? cursor;
+      if (event.eventType === 'run.started') runId = event.runId;
+      const message = assistantText(event);
+      if (message) assistantBySeq.set(event.seq, message);
+      const call = toolCall(event);
+      if (call) {
+        toolsBySeq.set(event.seq, {
+          phase: call.phase,
+          ...(call.toolName ? { toolName: call.toolName } : {}),
+          ...(call.toolCallId ? { toolCallId: call.toolCallId } : {}),
+          ...(call.isError !== undefined ? { isError: call.isError } : {}),
+          ...(call.resultPreview ? { resultPreview: call.resultPreview } : {}),
+        });
+      }
+      if (!isRunFinished(event)) continue;
+      const outcome = runOutcome(event);
+      if (!outcome) continue;
+      if (outcome !== 'succeeded' || this.hasTerminalResponse(assistantBySeq, toolsBySeq)) {
+        finalOutcome = outcome;
+        runId = event.runId ?? runId;
+        break;
+      }
+    }
+
+    if (!finalOutcome) return null;
+    const result: RawTurnResult = {
+      text: [...assistantBySeq.entries()].sort(([a], [b]) => a - b).map(([, text]) => text).join(''),
+      outcome: finalOutcome,
+      toolCalls: [...toolsBySeq.entries()].sort(([a], [b]) => a - b).map(([, call]) => call),
+    };
+    if (cursor !== undefined) result.cursor = cursor;
+    if (runId !== undefined) result.runId = runId;
+    return result;
+  }
+
+  private hasTerminalResponse(messages: Map<number, string>, tools: Map<number, AgentToolTrace>): boolean {
+    const candidates = [...messages.entries()].sort(([a], [b]) => b - a).map(([, text]) => text);
+    const published = [...tools.values()].some((call) => call.phase === 'end' && call.toolName === 'artifact_publish');
+    return candidates.some((candidate) => {
+      try {
+        const response = parseStyleAgentResponse(candidate);
+        return response.status === 'failed' || (response.status === 'completed' && published);
+      } catch {
+        return false;
+      }
+    });
   }
 
   private async artifactsForTurn(

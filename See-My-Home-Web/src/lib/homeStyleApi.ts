@@ -1,3 +1,5 @@
+import { upload } from "@vercel/blob/client";
+
 export type StyleRoomCode =
   | "living_room"
   | "primary_bedroom"
@@ -65,8 +67,25 @@ export interface StyleGenerateInput {
   preferences?: string[];
 }
 
+interface StyleGenerationPending {
+  status: "processing";
+  job_token: string;
+  poll_after_ms: number;
+}
+
 async function readResponse<T>(response: Response): Promise<T> {
-  const data = (await response.json()) as T & { error?: string };
+  const raw = await response.text();
+  let data: T & { error?: string };
+  try {
+    data = JSON.parse(raw) as T & { error?: string };
+  } catch {
+    const detail = raw.trim().replace(/\s+/g, " ").slice(0, 240);
+    throw new Error(
+      response.ok
+        ? "The Home Style Agent returned an invalid server response."
+        : `Home Style Agent request failed (${response.status})${detail ? `: ${detail}` : ""}`,
+    );
+  }
   if (!response.ok) throw new Error(data.error ?? `Home Style Agent request failed (${response.status})`);
   return data;
 }
@@ -118,21 +137,47 @@ export async function uploadStylePhoto(file: File, locale: "en-US" | "zh-CN"): P
 }
 
 export async function generateStyle(input: StyleGenerateInput): Promise<StyleGenerationResult> {
-  const response = await fetchWithTimeout("/api/home-style/events/agent.generate", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  }, 720_000, input.locale === "zh-CN" ? "Home Style Agent 处理超时，请重试。" : "The Home Style Agent timed out. Please try again.");
-  return readResponse<StyleGenerationResult>(response);
+  return runStyleGeneration(
+    "/api/home-style/events/agent.generate",
+    input,
+    input.locale === "zh-CN" ? "Home Style Agent 处理超时，请重试。" : "The Home Style Agent timed out. Please try again.",
+  );
 }
 
 export async function refineStyle(baseInput: StyleGenerateInput, locale: "en-US" | "zh-CN", refinement: string): Promise<StyleGenerationResult> {
-  const response = await fetchWithTimeout("/api/home-style/events/agent.refine", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ base_input: baseInput, locale, refinement }),
-  }, 720_000, locale === "zh-CN" ? "Home Style Agent 调整超时，请重试。" : "The Home Style Agent refinement timed out. Please try again.");
-  return readResponse<StyleGenerationResult>(response);
+  return runStyleGeneration(
+    "/api/home-style/events/agent.refine",
+    { base_input: baseInput, locale, refinement },
+    locale === "zh-CN" ? "Home Style Agent 调整超时，请重试。" : "The Home Style Agent refinement timed out. Please try again.",
+  );
+}
+
+async function runStyleGeneration(
+  endpoint: string,
+  input: object,
+  timeoutMessage: string,
+): Promise<StyleGenerationResult> {
+  const deadline = Date.now() + 900_000;
+  let jobToken: string | undefined;
+  while (Date.now() < deadline) {
+    const response = await fetchWithTimeout(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...input, ...(jobToken ? { job_token: jobToken } : {}) }),
+    }, import.meta.env.DEV ? 900_000 : 60_000, timeoutMessage);
+    const result = await readResponse<StyleGenerationResult | StyleGenerationPending>(response);
+    if (result && "status" in result && result.status === "processing") {
+      if (typeof result.job_token !== "string" || !result.job_token) {
+        throw new Error("The Home Style Agent returned an invalid processing ticket.");
+      }
+      jobToken = result.job_token;
+      const delayMs = Math.min(10_000, Math.max(500, result.poll_after_ms || 3_000));
+      await new Promise((resolveDelay) => window.setTimeout(resolveDelay, delayMs));
+      continue;
+    }
+    return result as StyleGenerationResult;
+  }
+  throw new Error(timeoutMessage);
 }
 
 export function roomTypeToCode(room: string): StyleRoomCode {
@@ -146,4 +191,3 @@ export function roomTypeToCode(room: string): StyleRoomCode {
   };
   return values[room] ?? "other";
 }
-import { upload } from "@vercel/blob/client";

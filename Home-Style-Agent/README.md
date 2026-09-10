@@ -4,6 +4,8 @@ Home Style Agent 是 See My Home 的独立审美渲染 Agent。它读取用户�
 
 当前首个风格：`Modern East｜摩登东方`。
 
+当前产品只把 Modern East 标记为可运行风格。UI 另外保留两个禁用的 `Coming Soon` 展示位；它们没有 `style_id`、Skill、知识绑定或 API 权限，直到对应风格完成研究、测试和版本发布。
+
 ## 目录职责
 
 - `knowledge/modern-east/`：Modern East 的版本化知识源，包括设计规则、Prompt 组件、结构化 schema、研究出处和内部参考图。
@@ -21,7 +23,7 @@ See My Home UI
         -> server-side style registry
         -> selected style knowledge
         -> prompt compilation
-        -> ZooWork Home Style Agent + image generation model
+        -> ZooWork Home Style Agent + built-in Designer Skill
         -> structural QA + style QA
      -> published result
 ```
@@ -30,7 +32,7 @@ See My Home UI
 
 ## ZooWork 知识接入现状
 
-本项目当前使用的 `@zoowork-ai/sdk` 版本为 `0.5.0`。已检查本地 SDK 类型和项目保存的 ZooWork 官方文档快照：这个版本没有公开的 Knowledge Base / RAG resource、知识库挂载字段或按 ID 检索接口。
+本项目当前使用的 `@zoowork-ai/sdk` 版本为 `0.5.2`。已检查本地 SDK 类型和 ZooWork 官方说明：这个版本没有公开的 Knowledge Base / RAG resource、知识库挂载字段或按 ID 检索接口。
 
 因此当前可验证的部署方式是：
 
@@ -42,5 +44,7 @@ See My Home UI
 如果 ZooWork 控制台已经提供一个独立的知识库 ID，需要先确认它对应的产品/API 契约，再增加适配器。可以把该 ID 提供给项目，但不要提供 API key；ID 最终只保存在服务端环境变量或密钥配置中。
 
 当前 UI 接入已使用独立的 `/api/home-style` 路由，因此可以和已有 `/api/home-layout` 同时运行而不共享 Agent Session。
+
+线上生成使用短期签名 `job_token`：第一次 UI 请求创建 ZooWork Session、读取 Modern East 与 Designer Skill 并启动一张图；后续请求只轮询同一 Session 的 durable events。这样 Designer 的长耗时编辑不会依赖一条持续数分钟的 Vercel HTTP 连接，也不会因轮询而重复生图。
 
 详见 [ARCHITECTURE.md](ARCHITECTURE.md) 和 [RUNTIME.md](RUNTIME.md)。

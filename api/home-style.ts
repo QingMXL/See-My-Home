@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { ZooworkError } from '@zoowork-ai/sdk';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { ModernEastProfile, RenovationScope, StyleRoomType, StyleTurnRequest } from '../Home-Style-Agent/src/contracts.js';
 import { HomeStyleRuntime, HomeStyleTurnTimeoutError, MODERN_EAST_KNOWLEDGE_VERSION } from '../Home-Style-Agent/src/runtime.js';
 import { newId, objectBody, parseLocale, persistGeneratedImage, privateBlobUrl, requestPath, requireString, sendJson, temporaryBlobReadUrl } from './_lib/common.js';
@@ -11,10 +12,59 @@ const roomTypes = new Set<StyleRoomType>(['living_room', 'primary_bedroom', 'kit
 const profiles = new Set<ModernEastProfile>(['quiet-poise', 'urban-elegance', 'sculptural-luxe', 'warm-residence']);
 const scopes = new Set<RenovationScope>(['soft_furnishing_only', 'finishes_and_furnishing', 'limited_hard_finish']);
 
+interface StyleJob {
+  version: 1;
+  sessionId: string;
+  postedSeq: number;
+  requestId: string;
+  projectId: string;
+  type: 'agent.generate' | 'agent.refine';
+  expiresAt: number;
+}
+
 function runtime(): HomeStyleRuntime {
   const agentId = process.env.ZOOWORK_STYLE_AGENT_ID?.trim();
   if (!agentId) throw new Error('ZOOWORK_STYLE_AGENT_ID is not configured on Vercel');
   return HomeStyleRuntime.fromEnvironment({ agentId, turnTimeoutMs: 760_000 });
+}
+
+function jobSecret(): string {
+  const value = process.env.ZOOWORK_API_KEY?.trim();
+  if (!value) throw new Error('ZOOWORK_API_KEY is not configured on Vercel');
+  return value;
+}
+
+function signJob(job: StyleJob): string {
+  const payload = Buffer.from(JSON.stringify(job), 'utf8').toString('base64url');
+  const signature = createHmac('sha256', jobSecret()).update(payload).digest('base64url');
+  return `${payload}.${signature}`;
+}
+
+function verifyJob(value: unknown): StyleJob | null {
+  if (value === undefined) return null;
+  if (typeof value !== 'string' || value.length < 20 || value.length > 4096) throw new Error('job_token is invalid');
+  const parts = value.split('.');
+  if (parts.length !== 2 || !parts[0] || !parts[1]) throw new Error('job_token is invalid');
+  const expected = createHmac('sha256', jobSecret()).update(parts[0]).digest();
+  let actual: Buffer;
+  try { actual = Buffer.from(parts[1], 'base64url'); } catch { throw new Error('job_token is invalid'); }
+  if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) throw new Error('job_token is invalid');
+  let parsed: unknown;
+  try { parsed = JSON.parse(Buffer.from(parts[0], 'base64url').toString('utf8')); } catch { throw new Error('job_token is invalid'); }
+  const job = objectBody(parsed);
+  if (
+    job.version !== 1
+    || typeof job.sessionId !== 'string'
+    || typeof job.postedSeq !== 'number'
+    || !Number.isSafeInteger(job.postedSeq)
+    || job.postedSeq < 0
+    || typeof job.requestId !== 'string'
+    || typeof job.projectId !== 'string'
+    || (job.type !== 'agent.generate' && job.type !== 'agent.refine')
+    || typeof job.expiresAt !== 'number'
+    || job.expiresAt < Date.now()
+  ) throw new Error('job_token is invalid or expired');
+  return job as unknown as StyleJob;
 }
 
 async function uploadToken(request: VercelRequest, response: VercelResponse): Promise<void> {
@@ -58,6 +108,8 @@ function stringArray(value: unknown): string[] {
 
 async function generate(request: VercelRequest, response: VercelResponse, refine: boolean): Promise<void> {
   const body = objectBody(request.body);
+  const type = refine ? 'agent.refine' : 'agent.generate';
+  const job = verifyJob(body.job_token);
   const input = (refine ? objectBody(body.base_input) : body) as StyleInput;
   const locale = parseLocale(refine ? body.locale : input.locale);
   const projectId = requireString(input.project_id, 'project_id');
@@ -73,15 +125,46 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
   const preferences = stringArray(input.preferences);
   if (refine) preferences.push(requireString(body.refinement, 'refinement'));
   const zoo = runtime();
-  await zoo.ensureRunning();
-  const conversation = await zoo.createConversation(projectId, newId(`style_${refine ? 'refine' : 'generate'}_${projectId}`));
+  if (job && (job.projectId !== projectId || job.type !== type)) throw new Error('job_token does not match this request');
+  const requestId = job?.requestId ?? newId('req');
   const turn: StyleTurnRequest = {
-    contract_version: 'home-style-v1', request_id: newId('req'), home_id: projectId,
+    contract_version: 'home-style-v1', request_id: requestId, home_id: projectId,
     source_asset_ref: sourceUrl, room_type: roomType, style_id: 'modern_east', style_profile: profile,
     renovation_scope: scope, user_preferences: preferences.slice(-20),
     known_immutable_elements: ['room envelope', 'walls', 'columns', 'beams', 'doors', 'windows', 'openings', 'ceiling geometry', 'fixed service locations', 'camera position', 'lens perspective', 'crop'],
   };
-  const result = await zoo.runStyleTurn(conversation, turn);
+  if (!job) {
+    await zoo.ensureRunning();
+    const conversation = await zoo.createConversation(projectId, newId(`style_${refine ? 'refine' : 'generate'}_${projectId}`));
+    const started = await zoo.startStyleTurn(conversation, turn);
+    sendJson(response, 202, {
+      status: 'processing',
+      job_token: signJob({
+        version: 1,
+        sessionId: conversation.sessionId,
+        postedSeq: started.postedSeq,
+        requestId,
+        projectId,
+        type,
+        expiresAt: Date.now() + 30 * 60 * 1000,
+      }),
+      poll_after_ms: 3_000,
+    });
+    return;
+  }
+
+  const conversation = { agentId: zoo.agentId, sessionId: job.sessionId };
+  const polled = await zoo.pollStyleTurn(conversation, turn, job.postedSeq);
+  if (polled.status === 'processing') {
+    sendJson(response, 202, {
+      status: 'processing',
+      job_token: signJob({ ...job, postedSeq: polled.postedSeq }),
+      poll_after_ms: 3_000,
+    });
+    return;
+  }
+
+  const result = polled.result;
   const artifact = result.artifacts.find((candidate) => candidate.status === 'ready' && (candidate.contentType?.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(candidate.fileName ?? '')));
   if (!artifact) throw new Error(result.response.warnings?.join(' ') || 'Home Style Agent completed without a readable published image artifact');
   const signedUrl = await zoo.resolveArtifactUrl(artifact.artifactId);
@@ -90,7 +173,7 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
     session_id: conversation.sessionId, request_id: turn.request_id, project_id: projectId,
     style_id: 'modern_east', style_profile: profile, knowledge_version: MODERN_EAST_KNOWLEDGE_VERSION,
     response: result.response,
-    generated_image: { ...stored, provider_model: 'ZooWork imageGenerationModel' },
+    generated_image: { ...stored, provider_model: 'ZooWork Designer Skill' },
     request_context: {
       project_id: projectId, asset_id: blobUrl, locale, room_type: roomType, style_id: 'modern_east',
       style_profile: profile, renovation_scope: scope, preferences: preferences.slice(-20),

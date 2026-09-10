@@ -59,3 +59,14 @@ pnpm runtime
 Then start `See-My-Home-Web`. Its Vite proxy maps `/api/home-style` to this Runtime. The existing `/api/home-layout` mapping remains separate.
 
 Uploaded photos are stored under `.runtime/uploads/` and served through a random access token. Generated ZooWork artifacts are proxied to the browser; signed artifact URLs are not persisted in the UI.
+
+## Hosted generation lifecycle
+
+The Vercel adapter uses a durable two-phase request instead of waiting synchronously:
+
+1. `POST /api/home-style/events/agent.generate` starts one ZooWork turn and returns HTTP `202` with a signed, 30-minute `job_token`.
+2. The UI resends the same input plus that token every few seconds. Polls read durable ZooWork events and never post another generation event.
+3. A structurally valid render is published once and copied to private Blob storage before the API returns HTTP `200`.
+4. A failed structure/camera QA returns an error and remains unpublished.
+
+Inside ZooWork the Agent reads both `modern-east-style` and the built-in `designer` Skill. The Designer CLI performs the single existing-image edit; the generic `image_generate` tool is not used by this Runtime contract.
