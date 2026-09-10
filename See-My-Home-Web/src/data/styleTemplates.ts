@@ -17,6 +17,12 @@ export interface StyleStory {
   mood: string;
 }
 
+/** Reserved UI capacity only. Placeholder slots intentionally have no style ID or runtime binding. */
+export const STYLE_PLACEHOLDER_SLOTS = [
+  { id: "style-slot-2" },
+  { id: "style-slot-3" },
+] as const;
+
 /** Production-ready styles only. Research-source firm names never appear in the UI. */
 export const STYLE_TEMPLATES: StyleTemplate[] = [
   {

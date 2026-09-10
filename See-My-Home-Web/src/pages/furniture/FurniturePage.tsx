@@ -571,34 +571,34 @@ export function FurniturePage() {
       )}
 
       {stage === "input" && !showDemoPreview && (
-        <section className="card card--pad furniture-intake" aria-labelledby="furniture-intake-title">
-          <header className="furniture-intake__head">
-            <div>
-              <h2 id="furniture-intake-title">{copy("Collect your inspiration", "收集你的灵感")}</h2>
-              <p>{copy("Upload either image or both. When both are present, choose which one should lead.", "手绘草图和灵感图可以二选一，也可以同时上传；两张都有时再决定更接近哪一张。")}</p>
+        <>
+          <section className="card card--pad furniture-intake" aria-labelledby="furniture-intake-title">
+            <header className="furniture-intake__head">
+              <div>
+                <h2 id="furniture-intake-title">{copy("Collect your inspiration", "收集你的灵感")}</h2>
+                <p>{copy("Upload either image or both. When both are present, choose which one should lead.", "手绘草图和灵感图可以二选一，也可以同时上传；两张都有时再决定更接近哪一张。")}</p>
+              </div>
+              <Button variant="secondary" onClick={() => void openDemoPreview()}>{copy("View Furniture Example", "看看家具示例")}</Button>
+            </header>
+            <div className="furniture-source-grid">
+              <div className="furniture-upload-shell">
+                <button type="button" className="furniture-upload furniture-upload--large" disabled={Boolean(uploading)} onClick={() => sketchInputRef.current?.click()}>
+                  {furniture.sketchUrl ? <img src={furniture.sketchUrl} alt={furniture.sketchName ?? t("furn.sketch")} /> : <span className="furniture-upload__plus">+</span>}
+                  <span><strong>{t("furn.sketch")}</strong><small>{copy("Defines form and structure", "决定造型与结构")}</small></span>
+                  <em className={furniture.sketchAsset ? "furniture-upload__status--success" : undefined} aria-live="polite">{uploading === "sketch" ? copy("Uploading…", "上传中…") : furniture.sketchAsset ? `✓ ${copy("Uploaded", "上传成功")} · ${furniture.sketchName ?? furniture.sketchAsset.file_name}` : copy("Choose image", "选择图片")}</em>
+                </button>
+                {(furniture.sketchUrl || furniture.sketchAsset) && <button type="button" className="furniture-upload__remove" aria-label={copy("Remove sketch", "删除手绘草图")} disabled={Boolean(uploading)} onClick={() => onRemoveSource("sketch")}><X size={15} /></button>}
+              </div>
+              <div className="furniture-upload-shell">
+                <button type="button" className="furniture-upload furniture-upload--large" disabled={Boolean(uploading)} onClick={() => inspirationInputRef.current?.click()}>
+                  {furniture.inspirationUrl ? <img src={furniture.inspirationUrl} alt={furniture.inspirationName ?? t("furn.inspiration")} /> : <span className="furniture-upload__plus">+</span>}
+                  <span><strong>{t("furn.inspiration")}</strong><small>{copy("Defines style and material", "决定风格与材质")}</small></span>
+                  <em className={furniture.inspirationAsset ? "furniture-upload__status--success" : undefined} aria-live="polite">{uploading === "inspiration" ? copy("Uploading…", "上传中…") : furniture.inspirationAsset ? `✓ ${copy("Uploaded", "上传成功")} · ${furniture.inspirationName ?? furniture.inspirationAsset.file_name}` : copy("Choose image", "选择图片")}</em>
+                </button>
+                {(furniture.inspirationUrl || furniture.inspirationAsset) && <button type="button" className="furniture-upload__remove" aria-label={copy("Remove inspiration", "删除灵感图")} disabled={Boolean(uploading)} onClick={() => onRemoveSource("inspiration")}><X size={15} /></button>}
+              </div>
             </div>
-            <Button variant="secondary" onClick={() => void openDemoPreview()}>{copy("View Furniture Example", "看看家具示例")}</Button>
-          </header>
-          <div className="furniture-source-grid">
-            <div className="furniture-upload-shell">
-              <button type="button" className="furniture-upload furniture-upload--large" disabled={Boolean(uploading)} onClick={() => sketchInputRef.current?.click()}>
-                {furniture.sketchUrl ? <img src={furniture.sketchUrl} alt={furniture.sketchName ?? t("furn.sketch")} /> : <span className="furniture-upload__plus">+</span>}
-                <span><strong>{t("furn.sketch")}</strong><small>{copy("Defines form and structure", "决定造型与结构")}</small></span>
-                <em className={furniture.sketchAsset ? "furniture-upload__status--success" : undefined} aria-live="polite">{uploading === "sketch" ? copy("Uploading…", "上传中…") : furniture.sketchAsset ? `✓ ${copy("Uploaded", "上传成功")} · ${furniture.sketchName ?? furniture.sketchAsset.file_name}` : copy("Choose image", "选择图片")}</em>
-              </button>
-              {(furniture.sketchUrl || furniture.sketchAsset) && <button type="button" className="furniture-upload__remove" aria-label={copy("Remove sketch", "删除手绘草图")} disabled={Boolean(uploading)} onClick={() => onRemoveSource("sketch")}><X size={15} /></button>}
-            </div>
-            <div className="furniture-upload-shell">
-              <button type="button" className="furniture-upload furniture-upload--large" disabled={Boolean(uploading)} onClick={() => inspirationInputRef.current?.click()}>
-                {furniture.inspirationUrl ? <img src={furniture.inspirationUrl} alt={furniture.inspirationName ?? t("furn.inspiration")} /> : <span className="furniture-upload__plus">+</span>}
-                <span><strong>{t("furn.inspiration")}</strong><small>{copy("Defines style and material", "决定风格与材质")}</small></span>
-                <em className={furniture.inspirationAsset ? "furniture-upload__status--success" : undefined} aria-live="polite">{uploading === "inspiration" ? copy("Uploading…", "上传中…") : furniture.inspirationAsset ? `✓ ${copy("Uploaded", "上传成功")} · ${furniture.inspirationName ?? furniture.inspirationAsset.file_name}` : copy("Choose image", "选择图片")}</em>
-              </button>
-              {(furniture.inspirationUrl || furniture.inspirationAsset) && <button type="button" className="furniture-upload__remove" aria-label={copy("Remove inspiration", "删除灵感图")} disabled={Boolean(uploading)} onClick={() => onRemoveSource("inspiration")}><X size={15} /></button>}
-            </div>
-          </div>
-          <UploadGuide kind="furniture" compact />
-          <div className={`source-mix source-mix--intake${hasBothImages ? "" : " source-mix--disabled"}`}>
+            <div className={`source-mix source-mix--intake${hasBothImages ? "" : " source-mix--disabled"}`}>
             <div className="source-mix__labels" aria-hidden="true">
               <span><strong>{copy("Sketch", "草图")}</strong><small>{visibleSketchWeight}%</small></span>
               <span><small>{visibleInspirationWeight}%</small><strong>{copy("Inspiration", "灵感")}</strong></span>
@@ -614,8 +614,8 @@ export function FurniturePage() {
               value={hasBothImages ? 100 - sketchWeight : hasSketch ? 5 : hasInspiration ? 95 : 20}
               onChange={(event) => setFurnitureSketchWeight(100 - Number(event.target.value))}
             />
-          </div>
-          <div className="furniture-type-field">
+            </div>
+            <div className="furniture-type-field">
             <label htmlFor="furniture-intake-type" className="tag-group__name">{copy("Furniture type", "家具类型")}</label>
             <select id="furniture-intake-type" value={furniture.tableType} onChange={(event) => onFurnitureTypeChange(event.target.value as FurnitureItemType)}>
               {TYPE_GROUPS.map((group) => (
@@ -624,14 +624,18 @@ export function FurniturePage() {
                 </optgroup>
               ))}
             </select>
-          </div>
-          <div className="input-panel__prompt">
+            </div>
+            <div className="input-panel__prompt">
             <label htmlFor="furniture-prompt" className="tag-group__name">{t("furn.prompt")}</label>
             <textarea id="furniture-prompt" rows={5} value={furniture.prompt} onChange={(event) => setFurniturePrompt(event.target.value)} placeholder={promptExample}/>
+            </div>
+            <Button full size="lg" onClick={() => onGenerate(false)} disabled={!canGenerate || furniture.phase === "generating"}><Sparkle />{t("furn.generate")}</Button>
+            {furniture.agentError && <p className="furniture-error" role="alert">{furniture.agentError}</p>}
+          </section>
+          <div className="furniture-intake-guide">
+            <UploadGuide kind="furniture" />
           </div>
-          <Button full size="lg" onClick={() => onGenerate(false)} disabled={!canGenerate || furniture.phase === "generating"}><Sparkle />{t("furn.generate")}</Button>
-          {furniture.agentError && <p className="furniture-error" role="alert">{furniture.agentError}</p>}
-        </section>
+        </>
       )}
 
       {stage === "render" && (

@@ -320,6 +320,8 @@ export const MESSAGES = {
   "style.replace": { en: "↻ Replace photo", zh: "↻ 更换照片" },
   "style.tips": { en: "💡 Tips: bright, straight-on photos work best", zh: "💡 提示:明亮、正对拍摄的照片效果最佳" },
   "style.choose": { en: "Choose a design template", zh: "选择设计模板" },
+  "style.comingSoon": { en: "Coming Soon", zh: "即将推出" },
+  "style.inDevelopment": { en: "In development", zh: "设计中" },
   "style.whatGet": { en: "What you'll get", zh: "你将获得" },
   "style.get1.title": { en: "1 high-quality render", zh: "1 张高清效果图" },
   "style.get1.text": { en: "A photorealistic redesign of your room.", zh: "你的房间的写实化重新设计。" },
