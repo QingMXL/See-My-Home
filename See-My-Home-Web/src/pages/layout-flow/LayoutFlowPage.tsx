@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Breadcrumbs, Stepper } from "../../components/layout/Breadcrumbs";
 import { Button, Sparkle } from "../../components/ui/Button";
+import { UploadGuide } from "../../components/ui/UploadGuide";
 import { GeneratingOverlay } from "../../components/ui/GeneratingOverlay";
 import { Tag } from "../../components/ui/Tag";
 import { RoomMapOverlay } from "../../components/visuals/RoomMapOverlay";
@@ -356,29 +357,32 @@ export function LayoutFlowPage() {
       </div>
 
       {stage === "empty" && (
-        <section className="card upload-zone" aria-label={t("upload.title")}>
-          <svg width="56" height="56" viewBox="0 0 56 56" fill="none" aria-hidden="true">
-            <circle cx="28" cy="28" r="27" stroke="var(--color-line-strong)" strokeWidth="1.5" strokeDasharray="5 6" />
-            <path d="M28 36V20m0 0-7 7m7-7 7 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <h2>{t("upload.title")}</h2>
-          <p>{t("upload.desc")}</p>
-          <div className="upload-zone__actions">
-            <Button onClick={() => fileInputRef.current?.click()}>{t("upload.choose")}</Button>
-            <Button variant="secondary" onClick={() => void openDemoPreview()}>
-              {t("upload.sample")}
-            </Button>
-          </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".jpg,.jpeg,.png,.pdf"
-            className="visually-hidden"
-            onChange={(e) => onFileChosen(e.target.files?.[0])}
-          />
-          <p className="upload-zone__note">{t("upload.note")}</p>
-          {layout.agentError && <p className="layout-agent-error" role="alert">{layout.agentError}</p>}
-        </section>
+        <>
+          <section className="card upload-zone" aria-label={t("upload.title")}>
+            <svg width="56" height="56" viewBox="0 0 56 56" fill="none" aria-hidden="true">
+              <circle cx="28" cy="28" r="27" stroke="var(--color-line-strong)" strokeWidth="1.5" strokeDasharray="5 6" />
+              <path d="M28 36V20m0 0-7 7m7-7 7 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <h2>{t("upload.title")}</h2>
+            <p>{t("upload.desc")}</p>
+            <div className="upload-zone__actions">
+              <Button onClick={() => fileInputRef.current?.click()}>{t("upload.choose")}</Button>
+              <Button variant="secondary" onClick={() => void openDemoPreview()}>
+                {t("upload.sample")}
+              </Button>
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".jpg,.jpeg,.png,.pdf"
+              className="visually-hidden"
+              onChange={(e) => onFileChosen(e.target.files?.[0])}
+            />
+            <p className="upload-zone__note">{t("upload.note")}</p>
+            {layout.agentError && <p className="layout-agent-error" role="alert">{layout.agentError}</p>}
+          </section>
+          <UploadGuide kind="layout" />
+        </>
       )}
 
       {stage === "sample-preview" && (

@@ -20,7 +20,7 @@ export const MESSAGES = {
     zh: "在动工之前,先看懂布局、看见风格,或者把一件家具的想法变成真实的样子。",
   },
   "home.seeHow": { en: "See How It Works", zh: "了解使用流程" },
-  "home.trust": { en: "Trusted by homeowners across the U.S.", zh: "备受业主信赖" },
+  "home.trust": { en: "Built for homeowners planning what comes next.", zh: "为正在规划下一步的业主而设计。" },
   "home.whatSee": { en: "What would you like to see?", zh: "你想先看到什么?" },
   "home.layout.title": { en: "See My Layout", zh: "看懂我的布局" },
   "home.layout.text": {
@@ -81,7 +81,7 @@ export const MESSAGES = {
   "samplePreview.back": { en: "Back", zh: "返回" },
   "samplePreview.confirm": { en: "Confirm Upload", zh: "确认上传" },
   "samplePreview.missing": { en: "The bundled sample image is unavailable.", zh: "内置示例原图暂时无法读取。" },
-  "upload.note": { en: "🔒 Your floor plan is private and secure.", zh: "🔒 你的户型图将被私密、安全地保存。" },
+  "upload.note": { en: "🔒 Remove sensitive details before uploading.", zh: "🔒 上传前请先移除敏感信息。" },
   "detecting.title": { en: "Reading your floor plan…", zh: "正在读取你的户型图…" },
   "detecting.sub": { en: "Detecting rooms, doors, and windows.", zh: "正在识别房间、门和窗。" },
   "uploading.title": { en: "Uploading your original file…", zh: "正在上传原始文件…" },

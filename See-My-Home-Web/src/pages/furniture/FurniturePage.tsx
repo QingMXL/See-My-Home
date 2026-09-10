@@ -3,6 +3,7 @@ import { Download, X } from "lucide-react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Breadcrumbs, Stepper } from "../../components/layout/Breadcrumbs";
 import { Button, Sparkle } from "../../components/ui/Button";
+import { UploadGuide } from "../../components/ui/UploadGuide";
 import { GeneratingOverlay } from "../../components/ui/GeneratingOverlay";
 import {
   createDemoFurnitureOrthographicResult,
@@ -596,6 +597,7 @@ export function FurniturePage() {
               {(furniture.inspirationUrl || furniture.inspirationAsset) && <button type="button" className="furniture-upload__remove" aria-label={copy("Remove inspiration", "删除灵感图")} disabled={Boolean(uploading)} onClick={() => onRemoveSource("inspiration")}><X size={15} /></button>}
             </div>
           </div>
+          <UploadGuide kind="furniture" compact />
           <div className={`source-mix source-mix--intake${hasBothImages ? "" : " source-mix--disabled"}`}>
             <div className="source-mix__labels" aria-hidden="true">
               <span><strong>{copy("Sketch", "草图")}</strong><small>{visibleSketchWeight}%</small></span>

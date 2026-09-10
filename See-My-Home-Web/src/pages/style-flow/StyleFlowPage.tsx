@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Breadcrumbs } from "../../components/layout/Breadcrumbs";
 import { Button, Sparkle } from "../../components/ui/Button";
 import { GeneratingOverlay } from "../../components/ui/GeneratingOverlay";
+import { UploadGuide } from "../../components/ui/UploadGuide";
 import { RoomScene } from "../../components/visuals/RoomScene";
 import { TemplateArt } from "../../components/visuals/TemplateArt";
 import { STYLE_ROOM_TYPES, type StyleRoomType } from "../../data/rooms";
@@ -164,6 +165,7 @@ export function StyleFlowPage() {
             className="visually-hidden"
             onChange={(e) => onFileChosen(e.target.files?.[0])}
           />
+          <UploadGuide kind="style" compact />
         </section>
 
         <section className="card card--pad template-panel" aria-label={t("style.choose")}>

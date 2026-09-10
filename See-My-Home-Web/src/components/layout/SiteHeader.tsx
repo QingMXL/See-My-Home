@@ -6,8 +6,6 @@ import "./chrome.css";
 
 const NAV_ITEMS: { to: string; labelKey: MsgKey }[] = [
   { to: "/designs", labelKey: "nav.myDesigns" },
-  { to: "/explore", labelKey: "nav.explore" },
-  { to: "/pricing", labelKey: "nav.pricing" },
   { to: "/help", labelKey: "nav.help" },
 ];
 
@@ -43,11 +41,12 @@ export function SiteHeader() {
         </nav>
 
         <div className="site-header__actions">
-          <div className="lang-toggle" role="group" aria-label="Language / 语言">
+          <div className="lang-toggle" role="radiogroup" aria-label="Language / 语言">
             <button
               type="button"
               className="lang-toggle__option"
-              aria-pressed={lang === "en"}
+              role="radio"
+              aria-checked={lang === "en"}
               onClick={() => setLang("en")}
             >
               EN
@@ -55,16 +54,14 @@ export function SiteHeader() {
             <button
               type="button"
               className="lang-toggle__option"
-              aria-pressed={lang === "zh"}
+              role="radio"
+              aria-checked={lang === "zh"}
               onClick={() => setLang("zh")}
               lang="zh-CN"
             >
               中文
             </button>
           </div>
-          <button type="button" className="site-header__link">
-            {t("nav.signIn")}
-          </button>
           <Link to="/#templates">
             <Button>{t("nav.start")}</Button>
           </Link>
