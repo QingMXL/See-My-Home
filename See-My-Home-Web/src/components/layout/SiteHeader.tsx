@@ -5,7 +5,9 @@ import { Button } from "../ui/Button";
 import "./chrome.css";
 
 const NAV_ITEMS: { to: string; labelKey: MsgKey }[] = [
-  { to: "/designs", labelKey: "nav.myDesigns" },
+  { to: "/layout", labelKey: "nav.layout" },
+  { to: "/style", labelKey: "nav.style" },
+  { to: "/furniture", labelKey: "nav.furniture" },
   { to: "/help", labelKey: "nav.help" },
 ];
 
