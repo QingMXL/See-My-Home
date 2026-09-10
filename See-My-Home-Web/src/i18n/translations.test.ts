@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { formatMessage, MESSAGES, TAG_ZH } from "./translations";
 import { LIFESTYLE_TAG_GROUPS, ROOM_TAG_LIBRARY, STYLE_ROOM_TYPES, roomFunctionFrom } from "../data/rooms";
-import { STYLE_PLACEHOLDER_SLOTS, STYLE_TEMPLATES } from "../data/styleTemplates";
+import { STYLE_TEMPLATES } from "../data/styleTemplates";
 
 describe("MESSAGES", () => {
   test("every key has non-empty English and Chinese text", () => {
@@ -63,10 +63,21 @@ describe("styleTemplates zh stories", () => {
     }
   });
 
-  test("reserves exactly two non-runnable style slots", () => {
-    expect(STYLE_PLACEHOLDER_SLOTS).toHaveLength(2);
-    expect(STYLE_PLACEHOLDER_SLOTS.map((slot) => slot.id)).toEqual(["style-slot-2", "style-slot-3"]);
-    expect(STYLE_PLACEHOLDER_SLOTS.every((slot) => !("styleId" in slot))).toBe(true);
+  test("provides three visual presets while keeping live runtime bindings explicit", () => {
+    expect(STYLE_TEMPLATES.map((template) => template.name)).toEqual([
+      "Modern Oriental",
+      "California Modern",
+      "Maximal Luxe",
+    ]);
+    expect(STYLE_TEMPLATES.map((template) => template.nameZh)).toEqual([
+      "现代东方",
+      "加州现代",
+      "极繁奢华",
+    ]);
+    expect(STYLE_TEMPLATES.filter((template) => template.styleId).map((template) => template.styleId)).toEqual([
+      "modern_east",
+    ]);
+    expect(new Set(STYLE_TEMPLATES.map((template) => template.previewUrl)).size).toBe(3);
   });
 });
 

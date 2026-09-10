@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { Breadcrumbs } from "../../components/layout/Breadcrumbs";
 import { Button, Sparkle } from "../../components/ui/Button";
 import { GeneratingOverlay } from "../../components/ui/GeneratingOverlay";
@@ -24,6 +24,7 @@ const STORY_SECTIONS: { key: keyof Omit<StyleStory, "direction">; labelKey: MsgK
 ];
 
 export function StyleResultPage() {
+  const navigate = useNavigate();
   const { t, tTag, lang } = useI18n();
   const style = useDesignStore((s) => s.style);
   const { setStylePhase, setStyleAgentRun, setStyleAgentError, saveDesign } = useDesignStore();
@@ -37,11 +38,13 @@ export function StyleResultPage() {
     () => STYLE_TEMPLATES.find((tpl) => tpl.id === style.templateId) ?? STYLE_TEMPLATES[0],
     [style.templateId],
   );
+  const templateName = lang === "zh" ? template.nameZh : template.name;
   const story = lang === "zh" ? template.storyZh : template.story;
 
   if (style.phase !== "done" && style.phase !== "generating") return <Navigate to="/style" replace />;
 
   const history = style.renderHistory ?? (style.agentRun ? [style.agentRun] : []);
+  const isDemoResult = history.at(-1)?.generated_image.provider_model === "Pre-rendered demo";
   const frames = history.map((_, index) => index === 0 ? t("styleResult.current") : t("styleResult.refinementN", { n: index }));
   const showOriginal = selectedFrame === -2;
   const selectedRun = selectedFrame === -1 ? history.at(-1) : history[selectedFrame];
@@ -53,6 +56,7 @@ export function StyleResultPage() {
   };
 
   const onRefine = async (text?: string) => {
+    if (isDemoResult) return;
     const ask = (text ?? request).trim();
     if (!ask) return;
     if (!style.agentRun) return;
@@ -78,7 +82,7 @@ export function StyleResultPage() {
   const onSave = () => {
     saveDesign({
       project: "My Home",
-      title: `${style.roomType} · ${template.name}`,
+      title: `${style.roomType} · ${templateName}`,
       kind: "Style",
       detail: `${style.refinements.length} refinements`,
     });
@@ -111,7 +115,7 @@ export function StyleResultPage() {
             {displayedImageUrl ? (
               <img
                 src={displayedImageUrl}
-                alt={showOriginal ? t("styleResult.original") : `${template.name} ${tTag(style.roomType)}`}
+                alt={showOriginal ? t("styleResult.original") : `${templateName} ${tTag(style.roomType)}`}
                 className="render-canvas__image"
               />
             ) : (
@@ -144,9 +148,13 @@ export function StyleResultPage() {
           </ul>
 
           <div className="style-actions">
-            <Button onClick={() => onRefine()} disabled={!request.trim()}>
-              <Sparkle /> {t("styleResult.refine")}
-            </Button>
+            {isDemoResult ? (
+              <Button onClick={() => navigate("/style")}><Sparkle />{lang === "zh" ? "试试你的房间" : "Try your room"}</Button>
+            ) : (
+              <Button onClick={() => onRefine()} disabled={!request.trim()}>
+                <Sparkle /> {t("styleResult.refine")}
+              </Button>
+            )}
             <Button variant="secondary" onClick={onSave}>
               {t("result.save")}
             </Button>
@@ -172,7 +180,7 @@ export function StyleResultPage() {
         <aside className="style-side" aria-label={t("styleResult.story")}>
           <section className="card card--pad story">
             <span className="story__kicker">{t("styleResult.story")}</span>
-            <h2 className="story__name">{template.name}</h2>
+            <h2 className="story__name">{templateName}</h2>
             <p className="story__direction">{story.direction}</p>
             <ul className="story__list">
               {STORY_SECTIONS.map((s) => (
@@ -184,31 +192,41 @@ export function StyleResultPage() {
             </ul>
           </section>
 
-          <section className="card card--pad refine-box">
-            <h2 className="refine-box__title">{t("styleResult.whatChange")}</h2>
-            <textarea
-              rows={3}
-              placeholder={t("styleResult.placeholder")}
-              value={request}
-              onChange={(e) => setRequest(e.target.value)}
-              aria-label={t("styleResult.whatChange")}
-            />
-            <div className="refine-box__suggestions">
-              <span className="tag-group__name">{t("styleResult.suggestions")}</span>
-              <div className="tag-grid">
-                {SUGGESTIONS.map((s) => (
-                  <button key={s} type="button" className="tag" onClick={() => onRefine(s)}>
-                    {tTag(s)}
-                  </button>
-                ))}
+          {isDemoResult ? (
+            <section className="card card--pad style-demo-result-note">
+              <span>{lang === "zh" ? "风格案例" : "Style Example"}</span>
+              <h2>{lang === "zh" ? "这是预先准备的案例效果" : "This is a prepared example result"}</h2>
+              <p>{lang === "zh"
+                ? "你可以返回风格页切换另外两个主题，或上传自己的房间照片。"
+                : "Return to the Style page to explore the other themes or upload a photo of your own room."}</p>
+            </section>
+          ) : (
+            <section className="card card--pad refine-box">
+              <h2 className="refine-box__title">{t("styleResult.whatChange")}</h2>
+              <textarea
+                rows={3}
+                placeholder={t("styleResult.placeholder")}
+                value={request}
+                onChange={(e) => setRequest(e.target.value)}
+                aria-label={t("styleResult.whatChange")}
+              />
+              <div className="refine-box__suggestions">
+                <span className="tag-group__name">{t("styleResult.suggestions")}</span>
+                <div className="tag-grid">
+                  {SUGGESTIONS.map((s) => (
+                    <button key={s} type="button" className="tag" onClick={() => onRefine(s)}>
+                      {tTag(s)}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-            {replyKey && (
-              <p className="refine-box__reply" role="status">
-                <Sparkle size={14} /> {t(replyKey)}
-              </p>
-            )}
-          </section>
+              {replyKey && (
+                <p className="refine-box__reply" role="status">
+                  <Sparkle size={14} /> {t(replyKey)}
+                </p>
+              )}
+            </section>
+          )}
         </aside>
       </div>
 

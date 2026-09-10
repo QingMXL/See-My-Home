@@ -155,7 +155,7 @@ const initialStyle: StyleFlowState = {
   photoUrl: null,
   photoName: null,
   roomType: "Living Room",
-  templateId: STYLE_TEMPLATES[0]?.id ?? "modern-east",
+  templateId: STYLE_TEMPLATES[0]?.id ?? "modern-oriental",
   phase: "idle",
   stepIndex: 0,
   refinements: [],
@@ -324,7 +324,18 @@ export const useDesignStore = create<DesignStore>()(
       },
     })),
   setStyleRoomType: (roomType) => set((s) => ({ style: { ...s.style, roomType } })),
-  setStyleTemplate: (templateId) => set((s) => ({ style: { ...s.style, templateId } })),
+  setStyleTemplate: (templateId) => set((s) => ({
+    style: {
+      ...s.style,
+      templateId,
+      phase: "idle",
+      stepIndex: 0,
+      refinements: [],
+      agentRun: null,
+      renderHistory: [],
+      agentError: null,
+    },
+  })),
   setStylePhase: (phase, stepIndex) =>
     set((s) => ({ style: { ...s.style, phase, stepIndex: stepIndex ?? s.style.stepIndex } })),
   addRefinement: (request) =>
@@ -461,6 +472,7 @@ export const useDesignStore = create<DesignStore>()(
       // in-flight upload adapters, and transient Agent errors are session-only.
       partialize: (s): Pick<DesignStore, "saved" | "layout" | "style" | "furniture"> => {
         const demoFurniture = s.furniture.agentRun?.generated_image.provider_model === "Pre-rendered demo";
+        const demoStyle = s.style.agentRun?.generated_image.provider_model === "Pre-rendered demo";
         return {
           saved: s.saved,
           layout: {
@@ -477,6 +489,8 @@ export const useDesignStore = create<DesignStore>()(
           style: {
             ...initialStyle,
             photoName: s.style.photoName,
+            photoUrl: demoStyle ? s.style.photoUrl : null,
+            uploadedAsset: demoStyle ? s.style.uploadedAsset : null,
             roomType: s.style.roomType,
             templateId: s.style.templateId,
             phase: s.style.phase === "done" ? "done" : "idle",

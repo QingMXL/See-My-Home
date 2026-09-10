@@ -165,3 +165,27 @@
   padding: var(--space-3);
   color: var(--color-ink);
 }
+
+.style-demo-result-note {
+  display: grid;
+  gap: var(--space-3);
+  background: var(--color-surface-warm);
+}
+
+.style-demo-result-note > span {
+  color: var(--color-ink-faint);
+  font-size: var(--text-xs);
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.style-demo-result-note h2 {
+  font-size: var(--text-base);
+}
+
+.style-demo-result-note p {
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}

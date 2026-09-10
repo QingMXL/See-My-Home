@@ -1,54 +1,62 @@
-# Furniture flow design QA
+# My Style image integration · Design QA
 
-- source drawing reference: `/var/folders/vn/hhys4cq15dj9cnnlskknp5jm0000gn/T/codex-clipboard-39f6b832-7b19-4bc5-82b9-1deb8093f37a.png`
-- source pixels: 1448 × 1086
-- failed production drawing captured before this fix: `/tmp/furniture-production-1.png`
-- implementation drawing fixture: `/tmp/furniture-shop-drawing-vector-font-qa.png`
-- implementation pixels: 3840 × 2160
-- browser verification: Codex in-app browser tab 16 at the local `/furniture` route
-- browser state: English, light theme, empty intake
+## Evidence
 
-## Comparison
+- Source visual truth:
+  - `See-My-Home-Web/public/demo/home-style/source-room.png`
+  - `See-My-Home-Web/public/demo/home-style/result-modern-oriental.png`
+  - `See-My-Home-Web/public/demo/home-style/result-california-modern.png`
+  - `See-My-Home-Web/public/demo/home-style/result-maximal-luxe.png`
+- Source asset pixels: 1586 × 992 each, approximately 8:5.
+- Browser-rendered implementation screenshot: Codex in-app browser capture, tab 17, `http://127.0.0.1:4173/style` and `http://127.0.0.1:4173/style/result`.
+- Implementation capture pixels: 1406 × 791.
+- CSS viewport: 1422 × 800; reported device pixel ratio: 1.8. The in-app capture was normalized by the browser surface, so comparison used the visible crop rather than raw device-density dimensions.
+- State: desktop, light theme; empty upload, example selected, Modern Oriental result, Maximal Luxe result, and live English/Chinese switching on both `/style` and `/style/result`.
 
-The source image is used only as layout, typography, and line-weight direction. Its sample measurements are not treated as product data. The implementation uses the confirmed furniture specification for all final numbers.
+## Full-view comparison evidence
 
-The failed production artifact confirmed that the dimensions were present in the SVG source but the Vercel runtime rendered every font glyph as a tofu box. The compositor no longer sends SVG `<text>` to Sharp. It now loads the bundled Liberation Sans font and converts every view title, number, and unit into SVG outline paths before rasterization, so the output cannot depend on an installed system font.
+The newly supplied Modern Oriental and Maximal Luxe assets were each emitted together with their browser-rendered result page in one comparison input. Both replacements appear in the correct preset positions, with their brighter exposure, room palette, and composition preserved. The three-card overview was also checked after rebuilding; California Modern remains unchanged.
 
-The generated sheet follows the reference hierarchy: a large front elevation in the upper-left, a side elevation in the upper-right, and a top view below. It uses a pure white 4K landscape canvas, a fine perimeter border, clear black object lines, thinner extension and dimension lines, filled arrowheads, readable 68 px primary dimensions, 62 px view labels, lowercase `mm` units, and a bottom-right unit note. Width, depth, height, and confirmed top thickness are visibly present in the rendered QA fixture with real numerals rather than placeholder boxes.
+## Focused-region comparison evidence
 
-The three geometry panels use one scale derived from the confirmed dimensions. This keeps front/top widths, front/side heights, and side/top depths visually coordinated. The fixture intentionally used simple stand-in geometry to validate composition; production geometry continues to come from three independent ZooWork Agent image-generation turns based on the confirmed render.
+Focused checks covered the Modern Oriental and Maximal Luxe result-image regions and their corresponding preset thumbnails. Both 1586 × 992 sources remain sharp, use the existing 8:5 frame without stretching, and retain the principal seating and window-wall focal areas. No additional crop treatment was needed.
 
-## Top-view projection hardening
+## Required fidelity surfaces
 
-The latest production sheet at `/tmp/furniture-latest-orthographic.png` exposed a top-plan failure: lower supports and legs were shown through or outside an opaque tabletop even though the front and side elevations did not support that projection. The top-specific generation contract now requires a camera axis perpendicular to the tabletop, a tabletop plane parallel to the image plane, parallel projection without adjacent-face leakage, and visible surfaces only. Opaque upper surfaces must hide the apron, base, stretchers, shelves, drawers, and legs below them; dashed hidden structure is not allowed in this concept plan.
+- Fonts and typography: Existing product type tokens and hierarchy are preserved. Three preset names remain readable without truncation at the tested desktop viewport.
+- Spacing and layout rhythm: The three cards fill the right panel evenly; the two upload/example actions fit within the left empty state; example preview controls remain inside the card.
+- Colors and visual tokens: Existing surface, border, selected, and muted-help tokens are unchanged. The imagery supplies the intended differentiation without adding competing UI colors.
+- Image quality and asset fidelity: The two replacement JPEGs were converted losslessly into valid PNG container files at their existing asset paths. Both remain 1586 × 992, render sharply at their consuming sizes, and use `object-fit: cover` only for bounded preview crops. The visibly brighter Modern Oriental and Maximal Luxe images replace the previous darker versions without changing the California Modern asset.
+- Copy and content: English preset names remain Modern Oriental, California Modern, and Maximal Luxe. Chinese mode now consistently renders 现代东方、加州现代、极繁奢华 in template cards, image alternatives, availability messaging, saved titles, and the result-side design story. The case entry remains `View Style Example / 看看风格案例`; no `内置` wording is used.
 
-Every orthographic response must now explicitly pass both projection correctness and visible-surface correctness. Missing or false flags prevent the generated artifact from entering the final compositor and trigger the existing targeted retry path. Minor raster ratio drift is accepted only after those two gates pass.
+## Findings
 
-## UI and interaction checks
+- No actionable P0, P1, or P2 findings.
+- P3: Card thumbnails necessarily show a tighter crop than the result view. This is acceptable because all three use the same crop rule and the full result remains available after selection.
 
-- The English intake starts with an empty value and a localized example placeholder.
-- Furniture prompt and refinement drafts are no longer persisted across reloads; completed Agent output remains persisted.
-- The render summary falls back to the immutable request context after a reload.
-- The refine card and all nested grid, fieldset, details, list, and select elements are width-constrained.
-- The refine body allows vertical scrolling only. Material choices reflow to the available width instead of creating horizontal overflow.
-- The middle render card remains the dominant desktop column; the existing two-column and one-column breakpoints remain intact.
+## Interaction and runtime checks
 
-## Accessibility and fidelity
+- Tested View Style Example → Back / Use this example.
+- Tested selecting Modern Oriental and Maximal Luxe and opening each prepared result.
+- Tested original/current thumbnails and the return-to-upload action.
+- Tested English/Chinese switching and confirmed the Chinese case wording.
+- Browser console: no errors observed.
+- Production build passed; 12 test files / 71 tests passed; lint completed with two pre-existing Fast Refresh warnings and no errors.
 
-- Existing semantic labels, native controls, focus behavior, and keyboard interaction are unchanged.
-- Long English helper text can wrap; select controls remain within their card.
-- No new fake UI assets or placeholder product imagery were introduced.
-- The final drawing is still explicitly concept-level, not a fabrication-ready CAD file.
+## Comparison history
 
-## Verification
+- Initial integration pass: no P0/P1/P2 visual issues found.
+- Replacement pass (2026-09-10): the two darker source assets were replaced with the user's brighter versions. Post-fix evidence shows the new Modern Oriental and Maximal Luxe files in both thumbnail and full-result contexts, with no crop, scale, readability, or layout regressions.
+- Localization pass (2026-09-10): English and Chinese captures of the same template-card and result-page states were emitted together. The Chinese names fit without wrapping or shifting the cards, the result heading changes to 极繁奢华, and switching back restores Maximal Luxe. No P0/P1/P2 localization or layout issues remain.
 
-- Web tests: 56 passed.
-- Furniture Agent tests: 18 passed.
-- API and all Agent TypeScript checks: passed.
-- Production web build: passed.
-- 4K raster composition was regenerated with the bundled-font path renderer and visually inspected against both the reference and the failed production artifact.
-- The font-independent SVG regression asserts that no `<text>` or `font-family` dependency remains and that every published label contains non-empty vector path data.
+## Implementation checklist
 
-No actionable P0, P1, or P2 findings remain. Actual product-line fidelity still depends on the ZooWork image model and is guarded by the stricter single-view publishing checks.
+- [x] Replace three preset placeholders with supplied images.
+- [x] Add the source-room example inside the left upload card.
+- [x] Provide an honest pre-rendered example path without calling unsupported live styles.
+- [x] Preserve the existing upload path and Modern Oriental runtime binding.
+- [x] Verify localized copy and the complete example journey.
+- [x] Replace Modern Oriental and Maximal Luxe with the brighter user-supplied versions while leaving California Modern unchanged.
+- [x] Localize all three visible style names consistently across the card and result flows.
 
 final result: passed
