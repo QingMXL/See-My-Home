@@ -18,6 +18,11 @@
   gap: var(--space-5);
 }
 
+.furniture-intake-guide {
+  width: min(52rem, 100%);
+  margin-inline: auto;
+}
+
 .furniture-intake__head {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
