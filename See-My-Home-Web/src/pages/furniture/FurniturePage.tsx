@@ -717,8 +717,8 @@ export function FurniturePage() {
               </details>
             </div>
             <div className="refine-panel__actions">
-              <Button full size="lg" disabled={!generated || Boolean(uploading) || furniture.phase === "generating"} onClick={() => onGenerate(true)}><Sparkle />{copy("Apply Changes", "应用调整")}</Button>
-              <Button full size="lg" variant="secondary" disabled={!generated || furniture.phase === "generating" || generatingOrthographic || generated.response.status === "failed"} onClick={() => void onConfirm()}>{t("furn.thisIsIt")}</Button>
+              <Button full size="lg" variant="secondary" disabled={!generated || Boolean(uploading) || furniture.phase === "generating"} onClick={() => onGenerate(true)}>{copy("Apply Changes", "应用调整")}</Button>
+              <Button full size="lg" disabled={!generated || furniture.phase === "generating" || generatingOrthographic || generated.response.status === "failed"} onClick={() => void onConfirm()}><Sparkle />{t("furn.thisIsIt")}</Button>
             </div>
             {orthographicError && (
               <div className="render-panel__orthographic-error" role="alert">
