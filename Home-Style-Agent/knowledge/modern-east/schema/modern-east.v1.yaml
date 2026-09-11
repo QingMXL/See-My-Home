@@ -55,6 +55,7 @@ style_dna:
     - quiet_material_contrast
     - nature_through_light_and_framing
     - art_integrated_with_daily_life
+    - three_family_identity_anchor
   preferred:
     - one_primary_focal_point
     - balanced_asymmetry
@@ -63,6 +64,8 @@ style_dna:
   forbidden:
     - literal_historical_theme
     - japanese_room_language
+    - generic_beige_contemporary
+    - generic_warm_minimalism
     - monumental_hospitality_scale
     - material_overload
     - architecture_change_without_explicit_scope
@@ -201,6 +204,13 @@ anti_patterns:
 
 immutable_semantics:
   always_preserve:
+    - source_aspect_ratio
+    - crop
+    - framing
+    - camera_position
+    - camera_height
+    - focal_length_feel
+    - vanishing_points
     - room_envelope
     - walls
     - columns
@@ -209,9 +219,7 @@ immutable_semantics:
     - doors
     - windows
     - openings
-    - camera_position
-    - lens_perspective
-    - crop
+    - door_and_window_panel_divisions
   preserve_by_default:
     - fixed_cabinet_boundaries
     - kitchen_service_locations
@@ -267,14 +275,21 @@ style_evaluation:
     - differentiation_from_adjacent_styles
   hard_fail:
     - immutable_architecture_changed
+    - source_aspect_ratio_changed
+    - crop_or_camera_shift_reported
     - traditional_symbol_theme
     - japanese_room_language
     - hospitality_or_showroom_conversion
     - impossible_kitchen_or_bathroom_services
     - blocked_circulation
+  identity_gate:
+    minimum_families_present: 3
+    families:
+      spatial_order: [calibrated_negative_space, balanced_asymmetry, dark_linear_datum, framed_sightline]
+      material_contrast: [mineral_or_honed_stone, matte_dark_timber, tactile_neutral_textile]
+      cultural_abstraction: [ink_like_abstract_art, paper_or_silk_diffused_light, handcrafted_ceramic_and_branch]
 
 retrieval:
   required_keys: [style_id, profile, room_type, renovation_level]
   optional_keys: [room_size_band, daylight_level]
   retrieve_entire_knowledge_base: false
-

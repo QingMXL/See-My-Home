@@ -188,9 +188,11 @@ Modern East 是一种以现代主义空间和家具语言承载东方审美意�
 ### 4.4 空间约束标签（Agent每次必须编译）
 
 ```text
+preserve the exact source aspect ratio, crop and framing
+preserve the exact camera position, camera height, focal-length feel, vanishing points and perspective
 preserve the exact room geometry
 preserve every wall, column, beam, door, window and opening
-preserve the original camera position, perspective and crop
+preserve the exact count, dimensions, position and panel divisions of all doors and windows
 preserve fixed kitchen and bathroom service locations unless explicitly editable
 maintain believable residential dimensions and circulation
 change finishes, furniture, lighting and decor only within the editable scope

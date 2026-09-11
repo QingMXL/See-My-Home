@@ -1,0 +1,143 @@
+schema_version: "1.0"
+knowledge_base_version: "0.1-research"
+style:
+  id: maximal_luxe
+  display_name: Maximal Luxe
+  display_name_zh: 极繁奢华
+  market: en-US
+  status: research
+  tagline: Curated drama, rich color, and livable glamour.
+  definition: >-
+    A bold but edited residential language using saturated color, sculptural
+    furniture, layered pattern, art, tactile textiles, and controlled reflective
+    accents to create expressive luxury without theatrical clutter.
+
+provenance:
+  mood_case_study:
+    work: Why Women Kill season 1
+    timeline: 1984 Simone Grove
+    role: intensity_and_color_case_study_only
+    production_prompt_allowed: false
+  research_anchors:
+    - {organization: Kelly Wearstler Studio, role: material_tension_and_sculptural_residential_composition}
+    - {organization: Jonathan Adler Design Studio, role: modern_american_glamour_and_livable_wit}
+    - {organization: Martyn Lawrence Bullard Design, role: hollywood_glamour_vintage_statement_and_comfort}
+    - {vocabulary: Hollywood Regency, role: historical_glamour_reference}
+  production_prompt_uses_names: false
+  reference_images_internal_only: true
+
+profiles:
+  edited-glamour:
+    default: true
+    intensity: medium
+    suitable_for: [apartment, condo, townhouse, single_family_home, living_room, bedroom, dining_room]
+    cues: [one_jewel_tone_field, sculptural_seating, tactile_textile, satin_brass, confident_art]
+  eighties-socialite:
+    default: false
+    intensity: high
+    gates: [explicit_user_intensity_choice]
+    cues: [deep_aubergine, plum, controlled_polished_brass, smoked_glass, antiqued_mirror]
+  regency-modern:
+    default: false
+    intensity: medium_high
+    cues: [cream_and_soft_black, lacquer, satin_brass, sculptural_curves, graphic_note]
+  collector-color:
+    default: false
+    intensity: medium
+    cues: [art_led_palette, vintage_statement_piece, dark_wood, grouped_objects, restrained_metal]
+
+style_dna:
+  required: [edited_abundance, one_dominant_scene, clear_color_hierarchy, material_tension, sculptural_comfort, collected_identity, residential_editing]
+  preferred: [one_statement_light, art_led_focal_point, vintage_contemporary_mix, calm_surface_in_each_view]
+  forbidden: [palace_replica, nightclub_or_stage_set, random_clutter, fake_luxury_showroom, architecture_change_without_explicit_scope]
+
+composition:
+  target_visual_density: "60-75%"
+  minimum_visual_rest: "25-40%"
+  maximum_pattern_families_per_view: 2
+  maximum_primary_focal_points_per_view: 1
+  color_formula: [one_dominant_field_color, one_supporting_jewel_tone, one_neutral_breathing_color, one_metal_finish]
+  material_formula: [one_deep_matte_or_lacquered_envelope, one_expressive_stone_or_dark_timber_anchor, one_plush_textile_family, one_reflective_accent_family, one_art_or_collectible_focal_layer]
+
+vocabulary:
+  space: [layered_residential_interior, edited_abundance, dramatic_focal_point, intimate_entertaining, clear_circulation]
+  form: [sculptural_curves, bold_silhouettes, graphic_geometry, controlled_symmetry, jewel_like_details]
+  material: [lacquered_wood, dark_walnut, expressive_honed_marble, velvet, smoked_glass, antiqued_mirror, satin_brass]
+  color: [aubergine, plum, oxblood, emerald, teal, ink_black, cream, warm_blush, brass]
+  furnishing: [curved_sofa, channel_tufted_upholstery, statement_lounge_chair, layered_rug, large_scale_art]
+  lighting: [statement_chandelier, jewel_like_sconces, warm_pools_of_light, picture_lighting, controlled_sparkle]
+
+materials:
+  primary:
+    - {id: lacquered_wood, finish: controlled_gloss, maximum_role: one_primary_family}
+    - {id: dark_walnut_or_ebonized_oak, finish: matte_or_satin, avoid: [glossy_red_antique_set]}
+    - {id: expressive_marble, finish: honed_or_soft_polish, maximum_focal_surfaces_per_view: 1}
+    - {id: velvet_or_mohair, finish: rich_low_sheen, avoid: [cheap_reflective_velvet, all_over_tufting]}
+    - {id: smoked_glass_or_antiqued_mirror, maximum_focal_surfaces_per_view: 1, avoid: [mirror_ceiling, full_bright_mirror_wall]}
+    - {id: satin_or_polished_brass, maximum_share: "approximately 5-10%", polished_requires_profile: eighties-socialite}
+  secondary: [silk_blend, jacquard, ceramic, colored_glass, graphic_wallpaper, dark_leather]
+
+color_system:
+  dominant: {target_share: "approximately 40-50%", colors: [cream, warm_taupe, soft_black, single_deep_field_color]}
+  secondary: {target_share: "approximately 25-30%", colors: [aubergine, plum, emerald, teal, oxblood], maximum_distinct_jewel_tones: 2}
+  material_and_pattern: {target_share: "approximately 15-20%", colors: [dark_wood, expressive_stone, coordinated_pattern]}
+  reflective_accent: {maximum_share: "approximately 5-10%", colors: [brass, mirror, glass]}
+  forbidden: [purple_gold_black_on_every_surface, red_gold_palace_palette, black_gold_nightclub_palette, silver_crystal_wedding_hall_palette, five_or_more_competing_jewel_tones]
+
+anti_patterns:
+  palace_replica: [versailles, royal_palace, baroque_carving, rococo_set, gilding_everywhere, cherub_ornament]
+  nightlife_drift: [nightclub, disco_ballroom, casino, stage_set, runway, mirror_ceiling, colored_club_light]
+  fake_glamour: [plastic_gold, chrome_overload, crystal_everywhere, matching_tufted_set, fake_luxury_showroom]
+  clutter_failure: [random_clutter, every_wall_patterned, animal_print_overload, competing_marbles, souvenir_collage]
+  period_cosplay: [full_1980s_replica, dynasty_set, gatsby_theme, memphis_primary_color_room]
+
+immutable_semantics:
+  always_preserve: [source_aspect_ratio, crop, framing, camera_position, camera_height, focal_length_feel, vanishing_points, room_envelope, walls, columns, beams, ceiling_height, doors, windows, openings, door_and_window_panel_divisions]
+  preserve_by_default: [fixed_cabinet_boundaries, kitchen_service_locations, bathroom_service_locations, fireplace]
+  note: >-
+    Semantic requirements only. The agent must enforce them with masks,
+    spatial conditioning, generation controls, and post-generation validation.
+
+renovation_levels:
+  furnish:
+    editable: [movable_furniture, rugs, curtains, freestanding_lighting, art, decor]
+  refresh:
+    editable: [paint, wallpaper, wall_finish, floor_finish, cabinet_front_finish, movable_furniture, lighting, textiles, art, decor]
+  light-remodel:
+    editable: [explicitly_masked_non_structural_built_ins]
+    requires_explicit_mask: true
+
+room_recipes:
+  living_room:
+    required: [one_conversation_group, one_dramatic_focal_point, correctly_sized_rug, clear_circulation]
+    preferred: [sculptural_comfortable_seating, one_art_strategy, one_primary_pattern_surface]
+    avoid: [ballroom_layout, maximum_art_and_pattern_simultaneously, blocked_openings]
+  primary_bedroom:
+    required: [restful_cocooning_mood, functional_bedside_surfaces, warm_low_glare_light]
+    preferred: [one_saturated_envelope_or_patterned_wall, sculptural_headboard, rich_solid_bedding]
+    avoid: [hotel_suite_staging, palace_furniture, competing_bed_wall_rug_patterns]
+  kitchen_dining:
+    required: [preserved_services, realistic_clearances, practical_storage]
+    preferred: [one_or_two_glamour_moves_in_kitchen, stronger_dining_room_focal_point]
+    avoid: [nightclub_bar, oversized_wine_wall, fantasy_mansion_island]
+  bathroom:
+    required: [preserved_fixture_locations, plausible_wet_zone, maintainable_surfaces]
+    preferred: [single_expressive_stone_or_deep_vanity, sculptural_mirror, warm_face_level_light]
+    avoid: [mirror_ceiling, crystal_overload, palace_bathtub, fantasy_wet_room]
+
+raw_shell_rules:
+  immutable: [visible_walls, slab_edges, beams, columns, ceiling_planes, door_openings, window_openings]
+  add: [plausible_finishes, justified_cabinetry, practical_lighting, furniture, controlled_art_pattern_and_reflection]
+  never_invent: [new_arches, new_columns, new_windows, new_doors, fireplace, stairs, mezzanine, grand_foyer]
+  service_assumption: conservative
+
+style_evaluation:
+  scoring_range_per_dimension: [0, 4]
+  publish_threshold: 22
+  dimensions: [dramatic_focal_hierarchy, controlled_color_richness, pattern_scale_coordination, material_tension_and_quality, residential_comfort, collected_identity_without_clutter, differentiation_from_palace_nightclub_and_stage_set]
+  hard_fail: [immutable_architecture_changed, camera_or_crop_changed, palace_nightclub_or_stage_set_dominates, no_visual_rest, impossible_kitchen_or_bathroom_services, blocked_circulation]
+
+retrieval:
+  required_keys: [style_id, profile, room_type, renovation_level]
+  optional_keys: [room_size_band, style_intensity]
+  retrieve_entire_knowledge_base: false

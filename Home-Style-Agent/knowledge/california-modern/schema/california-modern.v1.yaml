@@ -1,0 +1,141 @@
+schema_version: "1.0"
+knowledge_base_version: "0.1-research"
+style:
+  id: california_modern
+  display_name: California Modern
+  display_name_zh: 加州现代
+  market: en-US
+  status: research
+  tagline: Sunlit, natural, relaxed modern living.
+  definition: >-
+    A contemporary residential language rooted in natural light, indoor-outdoor
+    continuity, warm tactile materials, comfortable proportions, and an edited
+    mix of modern, vintage-inspired, and handcrafted pieces.
+
+provenance:
+  research_anchors:
+    - organization: Marmol Radziner
+      role: california_modernism_and_indoor_outdoor_continuity
+    - organization: Amber Interiors
+      role: livable_eclectic_layering
+    - organization: Studio Shamshiri
+      role: architectural_respect_and_refined_material_tension
+    - organization: Commune Design
+      role: residential_craft_and_context
+  production_prompt_uses_names: false
+  reference_images_internal_only: true
+
+profiles:
+  sunlit-casual:
+    default: true
+    intensity: relaxed
+    suitable_for: [apartment, condo, townhouse, single_family_home, living_room, bedroom]
+    cues: [sun_washed_warm_white, honey_oak, linen, softly_worn_wool, restrained_charcoal]
+  ranch-modern:
+    default: false
+    intensity: grounded
+    gates: [source_architecture_supports_ranch_character]
+    cues: [warm_plaster, existing_timber, terracotta, grounded_stone, refined_modern_furniture]
+  coastal-modern:
+    default: false
+    intensity: airy
+    cues: [pale_sand, lightly_bleached_wood, quiet_limestone, muted_blue_gray]
+  desert-warm:
+    default: false
+    intensity: earthy
+    cues: [warm_mineral_plaster, clay, tobacco_leather, dry_climate_plant]
+
+style_dna:
+  required: [light_leads, indoor_outdoor_or_contextual_continuity, warm_modern_envelope, lived_in_curation, comfort_before_display, edited_naturalism]
+  preferred: [relaxed_asymmetry, low_horizontal_lines, vintage_contemporary_mix, handcrafted_accents]
+  forbidden: [farmhouse_theme, nautical_coastal_theme, boho_overload, all_pale_wood_japandi, architecture_change_without_explicit_scope]
+
+composition:
+  target_visual_density: "35-50%"
+  visual_rest_target: "50-65%"
+  maximum_pattern_families_per_view: 2
+  maximum_primary_focal_points_per_view: 1
+  plant_count_guidance: "1-3 realistically scaled plants"
+  material_formula: [one_warm_mineral_envelope, one_dominant_natural_wood, one_grounded_stone_or_terracotta_surface, two_tactile_textiles, one_restrained_dark_or_aged_metal_accent]
+
+vocabulary:
+  space: [sunlit, open_yet_grounded, indoor_outdoor_continuity, unforced_zoning, residential_scale]
+  form: [clean_planes, softened_geometry, low_horizontal_lines, relaxed_asymmetry, simple_built_ins]
+  material: [limewash, warm_white_oak, aged_oak, honed_limestone, terracotta, linen, wool]
+  color: [sun_washed_white, sand, oatmeal, warm_greige, honey_wood, sage, clay, charcoal_accent]
+  furnishing: [deep_comfortable_sofa, vintage_accent_chair, hand_knotted_rug, casual_drapery, collected_ceramics]
+  lighting: [abundant_natural_light, warm_ambient_light, soft_wall_wash, simple_sculptural_pendant, low_glare]
+
+materials:
+  primary:
+    - {id: limewash_or_mineral_plaster, finish: warm_low_reflection, avoid: [cave_texture, dirty_mottling]}
+    - {id: warm_white_oak, finish: matte_visible_grain, avoid: [gray_wash, orange_gloss]}
+    - {id: aged_oak, finish: authentic_light_patina, maximum_role: accent_or_single_furniture_family}
+    - {id: honed_limestone_or_travertine, finish: quiet_honed, maximum_focal_surfaces_per_view: 1}
+    - {id: terracotta_or_saltillo, finish: matte_warm_earth, gates: [profile_or_source_context_supports]}
+  secondary: [walnut, handmade_tile, linen, wool, boucle, saddle_leather, aged_brass, blackened_metal]
+
+color_system:
+  dominant: {target_share: "approximately 60%", colors: [sun_washed_white, warm_ivory, sand, light_greige]}
+  secondary: {target_share: "approximately 25-30%", colors: [honey_oak, aged_oak, oatmeal, warm_stone]}
+  accent: {maximum_share: "approximately 10-15%", colors: [sage, olive, clay, tobacco, muted_blue_gray, charcoal]}
+  forbidden: [cold_blue_white_and_gloss_black, navy_white_nautical_theme, saturated_southwestern_palette, all_gray_flip_palette]
+
+anti_patterns:
+  farmhouse: [barn_door, farmhouse_sign, distressed_white_furniture, industrial_cage_pendant]
+  coastal_cliche: [nautical_stripes, anchors, shells, rope_decor, beach_sign]
+  boho_overload: [macrame_overload, rattan_everywhere, dense_global_prints, plant_jungle]
+  showroom_drift: [sterile_all_white, matching_furniture_set, cold_gray_laminate, empty_staging]
+  hospitality_drift: [hotel_lobby, monumental_chandelier, double_height_fantasy, formal_lobby_symmetry]
+
+immutable_semantics:
+  always_preserve: [source_aspect_ratio, crop, framing, camera_position, camera_height, focal_length_feel, vanishing_points, room_envelope, walls, columns, beams, ceiling_height, doors, windows, openings, door_and_window_panel_divisions]
+  preserve_by_default: [fixed_cabinet_boundaries, kitchen_service_locations, bathroom_service_locations, fireplace]
+  note: >-
+    Semantic requirements only. The agent must enforce them with masks,
+    spatial conditioning, generation controls, and post-generation validation.
+
+renovation_levels:
+  furnish:
+    editable: [movable_furniture, rugs, curtains, freestanding_lighting, art, plants, decor]
+  refresh:
+    editable: [paint, wall_finish, floor_finish, cabinet_front_finish, movable_furniture, lighting, textiles, decor]
+  light-remodel:
+    editable: [explicitly_masked_non_structural_built_ins]
+    requires_explicit_mask: true
+
+room_recipes:
+  living_room:
+    required: [deep_comfortable_sofa, non_matching_accent_seating, correctly_sized_rug, clear_circulation]
+    preferred: [existing_view_or_art_as_focal_point, restrained_ceramics, one_realistic_plant]
+    avoid: [invented_fireplace, matching_set, blocked_window, lobby_layout]
+  primary_bedroom:
+    required: [calm_layering, functional_bedside_surfaces, breathable_bedding, warm_low_glare_light]
+    preferred: [simple_upholstered_or_timber_bed, relaxed_drapery]
+    avoid: [hotel_suite_staging, rigid_symmetry, excessive_decor]
+  kitchen_dining:
+    required: [preserved_services, realistic_clearances, practical_storage]
+    preferred: [warm_timber_or_warm_white_cabinetry, quiet_stone, informal_sociable_dining]
+    avoid: [display_kitchen_theater, overloaded_open_shelves, fantasy_island]
+  bathroom:
+    required: [preserved_fixture_locations, plausible_wet_zone, maintainable_surfaces]
+    preferred: [warm_honed_stone, pale_timber, soft_face_level_light]
+    avoid: [cave_spa, plant_jungle, all_over_microcement, fantasy_wet_room]
+
+raw_shell_rules:
+  immutable: [visible_walls, slab_edges, beams, columns, ceiling_planes, door_openings, window_openings]
+  add: [plausible_finishes, justified_cabinetry, practical_lighting, furniture, textiles, restrained_decor]
+  never_invent: [new_windows, new_doors, fireplace, arches, beams, stairs, mezzanine, vaulted_ceiling]
+  daylight_assumption: conservative
+  service_assumption: conservative
+
+style_evaluation:
+  scoring_range_per_dimension: [0, 4]
+  publish_threshold: 22
+  dimensions: [natural_light_response, contextual_continuity, warm_material_authenticity, residential_comfort, curated_old_new_layering, visual_edit_discipline, differentiation_from_adjacent_styles]
+  hard_fail: [immutable_architecture_changed, camera_or_crop_changed, invented_architecture, farmhouse_coastal_or_boho_theme, impossible_kitchen_or_bathroom_services, blocked_circulation]
+
+retrieval:
+  required_keys: [style_id, profile, room_type, renovation_level]
+  optional_keys: [room_size_band, daylight_level]
+  retrieve_entire_knowledge_base: false

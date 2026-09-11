@@ -188,7 +188,7 @@ export class HomeStyleRuntime {
           'Inspect the copied output image once and compare it with the original at the level of crop, camera position, perspective, wall and ceiling boundaries, columns, beams, window and door count, opening size and position, and fixed service locations.',
           'If the raster is missing, corrupt, or any immutable structure or camera geometry changed, do not publish it. Return status="failed", qa.publishable=false, and precise warnings.',
           'If structure and camera are preserved and the style avoids all forbidden patterns, call artifact_publish exactly once. Return status="completed" and use the returned artifact id.',
-          'Return one compact JSON object matching response_schema. Do not use Markdown fences and do not request another API key.',
+          'Return one compact JSON object matching response_schema immediately after the publish-or-withhold decision. Keep style_summary under 700 characters and every warning under 280 characters. Do not use Markdown fences, append an artifact link or filename after the JSON, or request another API key.',
         ].join(' '),
       }),
     }];
@@ -223,10 +223,8 @@ export class HomeStyleRuntime {
       }
       if (isRunFinished(event)) {
         const outcome = runOutcome(event);
-        if (outcome !== 'succeeded' || this.hasTerminalResponse(assistantBySeq, toolsBySeq)) {
-          finalOutcome = outcome;
-          runId = event.runId ?? runId;
-        }
+        finalOutcome = outcome;
+        runId = event.runId ?? runId;
       }
     };
 
@@ -321,11 +319,9 @@ export class HomeStyleRuntime {
       if (!isRunFinished(event)) continue;
       const outcome = runOutcome(event);
       if (!outcome) continue;
-      if (outcome !== 'succeeded' || this.hasTerminalResponse(assistantBySeq, toolsBySeq)) {
-        finalOutcome = outcome;
-        runId = event.runId ?? runId;
-        break;
-      }
+      finalOutcome = outcome;
+      runId = event.runId ?? runId;
+      break;
     }
 
     if (!finalOutcome) return null;
@@ -337,19 +333,6 @@ export class HomeStyleRuntime {
     if (cursor !== undefined) result.cursor = cursor;
     if (runId !== undefined) result.runId = runId;
     return result;
-  }
-
-  private hasTerminalResponse(messages: Map<number, string>, tools: Map<number, AgentToolTrace>): boolean {
-    const candidates = [...messages.entries()].sort(([a], [b]) => b - a).map(([, text]) => text);
-    const published = [...tools.values()].some((call) => call.phase === 'end' && call.toolName === 'artifact_publish');
-    return candidates.some((candidate) => {
-      try {
-        const response = parseStyleAgentResponse(candidate);
-        return response.status === 'failed' || (response.status === 'completed' && published);
-      } catch {
-        return false;
-      }
-    });
   }
 
   private async artifactsForTurn(
