@@ -12,6 +12,13 @@ const validRequest = {
   request_id: 'req_1',
   home_id: 'home_1',
   source_asset_ref: 'https://example.com/source.png',
+  source_raster: {
+    width_px: 1536,
+    height_px: 1024,
+    aspect_ratio: '3:2',
+    orientation: 'landscape',
+    designer_size: '1536x1024',
+  },
   room_type: 'living_room',
   style_id: 'modern_east',
   style_profile: 'quiet-poise',

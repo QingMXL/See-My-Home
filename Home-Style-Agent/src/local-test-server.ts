@@ -14,6 +14,7 @@ import type {
 } from './contracts.js';
 import { projectRoot } from './paths.js';
 import { HomeStyleRuntime, HomeStyleTurnTimeoutError, MODERN_EAST_KNOWLEDGE_VERSION } from './runtime.js';
+import { inspectSourceRaster } from './source-raster.js';
 
 const envPath = resolve(projectRoot, '.env');
 if (existsSync(envPath)) loadEnvFile(envPath);
@@ -243,11 +244,13 @@ function imageMime(contentType: string | null, fileName: string | null): 'image/
 }
 
 async function runGeneration(state: ProjectState, selectedLocale: SupportedLocale) {
+  const sourceRaster = await inspectSourceRaster(readFileSync(state.asset.path));
   const request: StyleTurnRequest = {
     contract_version: 'home-style-v1',
     request_id: newId('req'),
     home_id: state.projectId,
     source_asset_ref: sourceUrl(state.asset),
+    source_raster: sourceRaster,
     ...(state.referenceAsset ? { style_reference_asset_ref: sourceUrl(state.referenceAsset) } : {}),
     room_type: state.roomType,
     style_id: 'modern_east',

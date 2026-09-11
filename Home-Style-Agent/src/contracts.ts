@@ -10,11 +10,20 @@ export type StyleRoomType =
 export type ModernEastProfile = 'quiet-poise' | 'urban-elegance' | 'sculptural-luxe' | 'warm-residence';
 export type RenovationScope = 'soft_furnishing_only' | 'finishes_and_furnishing' | 'limited_hard_finish';
 
+export interface SourceRaster {
+  width_px: number;
+  height_px: number;
+  aspect_ratio: string;
+  orientation: 'landscape' | 'portrait' | 'square';
+  designer_size: string;
+}
+
 export interface StyleTurnRequest {
   contract_version: 'home-style-v1';
   request_id: string;
   home_id: string;
   source_asset_ref: string;
+  source_raster: SourceRaster;
   style_reference_asset_ref?: string;
   room_type: StyleRoomType;
   style_id: 'modern_east';

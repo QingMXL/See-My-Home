@@ -95,6 +95,9 @@ importers:
       ajv-formats:
         specifier: 3.0.1
         version: 3.0.1(ajv@8.17.1)
+      sharp:
+        specifier: ^0.35.4
+        version: 0.35.4(@types/node@24.3.0)
     devDependencies:
       '@types/node':
         specifier: 24.3.0

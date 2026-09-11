@@ -20,7 +20,8 @@
   "dependencies": {
     "@zoowork-ai/sdk": "0.5.2",
     "ajv": "8.17.1",
-    "ajv-formats": "3.0.1"
+    "ajv-formats": "3.0.1",
+    "sharp": "^0.35.4"
   },
   "devDependencies": {
     "@types/node": "24.3.0",

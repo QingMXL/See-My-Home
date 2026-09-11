@@ -19,6 +19,8 @@ test('creates a session-scoped Home Style Agent resource', () => {
   assert.match(persona, /\/skills\/designer\/SKILL\.md/);
   assert.match(persona, /image_generation_cli\.py/);
   assert.match(persona, /artifact_publish/);
+  assert.match(persona, /--size "WIDTHxHEIGHT"/);
+  assert.match(persona, /Never print, inspect, echo, or expose environment variables or credentials/);
 });
 
 test('requires an exact ZooWork model id', () => {

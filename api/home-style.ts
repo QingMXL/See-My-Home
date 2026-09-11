@@ -2,8 +2,9 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { ZooworkError } from '@zoowork-ai/sdk';
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import type { ModernEastProfile, RenovationScope, StyleRoomType, StyleTurnRequest } from '../Home-Style-Agent/src/contracts.js';
+import type { ModernEastProfile, RenovationScope, SourceRaster, StyleRoomType, StyleTurnRequest } from '../Home-Style-Agent/src/contracts.js';
 import { HomeStyleRuntime, HomeStyleTurnTimeoutError, MODERN_EAST_KNOWLEDGE_VERSION } from '../Home-Style-Agent/src/runtime.js';
+import { inspectSourceRasterUrl } from '../Home-Style-Agent/src/source-raster.js';
 import { newId, objectBody, parseLocale, persistGeneratedImage, privateBlobUrl, requestPath, requireString, sendJson, temporaryBlobReadUrl } from './_lib/common.js';
 
 export const config = { maxDuration: 300 };
@@ -20,6 +21,7 @@ interface StyleJob {
   projectId: string;
   type: 'agent.generate' | 'agent.refine';
   expiresAt: number;
+  sourceRaster?: SourceRaster;
 }
 
 function runtime(): HomeStyleRuntime {
@@ -52,6 +54,7 @@ function verifyJob(value: unknown): StyleJob | null {
   let parsed: unknown;
   try { parsed = JSON.parse(Buffer.from(parts[0], 'base64url').toString('utf8')); } catch { throw new Error('job_token is invalid'); }
   const job = objectBody(parsed);
+  const sourceRaster = job.sourceRaster === undefined ? undefined : objectBody(job.sourceRaster);
   if (
     job.version !== 1
     || typeof job.sessionId !== 'string'
@@ -63,6 +66,13 @@ function verifyJob(value: unknown): StyleJob | null {
     || (job.type !== 'agent.generate' && job.type !== 'agent.refine')
     || typeof job.expiresAt !== 'number'
     || job.expiresAt < Date.now()
+    || (sourceRaster !== undefined && (
+      typeof sourceRaster.width_px !== 'number'
+      || typeof sourceRaster.height_px !== 'number'
+      || typeof sourceRaster.aspect_ratio !== 'string'
+      || (sourceRaster.orientation !== 'landscape' && sourceRaster.orientation !== 'portrait' && sourceRaster.orientation !== 'square')
+      || typeof sourceRaster.designer_size !== 'string'
+    ))
   ) throw new Error('job_token is invalid or expired');
   return job as unknown as StyleJob;
 }
@@ -116,6 +126,7 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
   const projectId = requireString(input.project_id, 'project_id');
   const blobUrl = privateBlobUrl(input.asset_id, 'style', projectId);
   const sourceUrl = await temporaryBlobReadUrl(blobUrl);
+  const sourceRaster = job?.sourceRaster ?? await inspectSourceRasterUrl(sourceUrl);
   const referenceBlobUrl = input.reference_asset_id === undefined
     ? undefined
     : privateBlobUrl(input.reference_asset_id, 'style', projectId);
@@ -134,7 +145,7 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
   const requestId = job?.requestId ?? newId('req');
   const turn: StyleTurnRequest = {
     contract_version: 'home-style-v1', request_id: requestId, home_id: projectId,
-    source_asset_ref: sourceUrl, room_type: roomType, style_id: 'modern_east', style_profile: profile,
+    source_asset_ref: sourceUrl, source_raster: sourceRaster, room_type: roomType, style_id: 'modern_east', style_profile: profile,
     renovation_scope: scope, user_preferences: preferences.slice(-20),
     ...(styleReferenceUrl ? { style_reference_asset_ref: styleReferenceUrl } : {}),
     known_immutable_elements: ['room envelope', 'walls', 'columns', 'beams', 'doors', 'windows', 'openings', 'ceiling geometry', 'fixed service locations', 'camera position', 'lens perspective', 'crop'],
@@ -153,6 +164,7 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
         projectId,
         type,
         expiresAt: Date.now() + 30 * 60 * 1000,
+        sourceRaster,
       }),
       poll_after_ms: 3_000,
     });
@@ -182,7 +194,7 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
     generated_image: { ...stored, provider_model: 'ZooWork Designer Skill' },
     request_context: {
       project_id: projectId, asset_id: blobUrl, locale, room_type: roomType, style_id: 'modern_east',
-      style_profile: profile, renovation_scope: scope, preferences: preferences.slice(-20),
+      style_profile: profile, renovation_scope: scope, preferences: preferences.slice(-20), source_raster: sourceRaster,
       ...(referenceBlobUrl ? { reference_asset_id: referenceBlobUrl } : {}),
     },
   });
