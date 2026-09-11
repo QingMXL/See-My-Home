@@ -39,6 +39,13 @@ test('accepts a valid Modern East request', () => {
   assert.doesNotThrow(() => assertStyleTurnRequest(validRequest));
 });
 
+test('accepts a user-provided style reference as an optional second image', () => {
+  assert.doesNotThrow(() => assertStyleTurnRequest({
+    ...validRequest,
+    style_reference_asset_ref: 'https://example.com/reference.png',
+  }));
+});
+
 test('rejects an unsupported style id', () => {
   assert.throws(
     () => assertStyleTurnRequest({ ...validRequest, style_id: 'japandi' }),

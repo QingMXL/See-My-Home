@@ -48,6 +48,11 @@ interface StyleFlowState {
   phase: GenerationPhase;
   stepIndex: number;
   refinements: string[];
+  customRequirements: string;
+  styleSource: "template" | "reference";
+  referenceName: string | null;
+  referenceUrl: string | null;
+  referenceAsset: UploadedStyleAsset | null;
   uploadedAsset: UploadedStyleAsset | null;
   agentRun: StyleGenerationResult | null;
   renderHistory: StyleGenerationResult[];
@@ -109,6 +114,10 @@ interface DesignStore {
   setStylePhoto: (name: string | null, url: string | null) => void;
   setStyleRoomType: (roomType: StyleRoomType) => void;
   setStyleTemplate: (templateId: string) => void;
+  setStyleCustomRequirements: (value: string) => void;
+  setStyleSource: (source: "template" | "reference") => void;
+  setStyleReference: (name: string | null, url: string | null) => void;
+  setStyleReferenceAsset: (asset: UploadedStyleAsset | null) => void;
   setStylePhase: (phase: GenerationPhase, stepIndex?: number) => void;
   addRefinement: (request: string) => void;
   setStyleUploadedAsset: (asset: UploadedStyleAsset | null) => void;
@@ -159,6 +168,11 @@ const initialStyle: StyleFlowState = {
   phase: "idle",
   stepIndex: 0,
   refinements: [],
+  customRequirements: "",
+  styleSource: "template",
+  referenceName: null,
+  referenceUrl: null,
+  referenceAsset: null,
   uploadedAsset: null,
   agentRun: null,
   renderHistory: [],
@@ -328,6 +342,7 @@ export const useDesignStore = create<DesignStore>()(
     style: {
       ...s.style,
       templateId,
+      styleSource: "template",
       phase: "idle",
       stepIndex: 0,
       refinements: [],
@@ -336,6 +351,30 @@ export const useDesignStore = create<DesignStore>()(
       agentError: null,
     },
   })),
+  setStyleCustomRequirements: (customRequirements) =>
+    set((s) => ({ style: { ...s.style, customRequirements } })),
+  setStyleSource: (styleSource) =>
+    set((s) => ({ style: { ...s.style, styleSource, agentError: null } })),
+  setStyleReference: (referenceName, referenceUrl) =>
+    set((s) => ({
+      style: {
+        ...s.style,
+        referenceName,
+        referenceUrl,
+        referenceAsset: null,
+        styleSource: referenceUrl ? s.style.styleSource : "template",
+        agentError: null,
+      },
+    })),
+  setStyleReferenceAsset: (referenceAsset) =>
+    set((s) => ({
+      style: {
+        ...s.style,
+        referenceAsset,
+        styleSource: referenceAsset ? "reference" : "template",
+        agentError: null,
+      },
+    })),
   setStylePhase: (phase, stepIndex) =>
     set((s) => ({ style: { ...s.style, phase, stepIndex: stepIndex ?? s.style.stepIndex } })),
   addRefinement: (request) =>
@@ -497,6 +536,8 @@ export const useDesignStore = create<DesignStore>()(
             agentRun: s.style.agentRun,
             renderHistory: s.style.renderHistory,
             refinements: s.style.refinements,
+            customRequirements: s.style.customRequirements ?? "",
+            styleSource: "template",
             agentError: null,
           },
           furniture: {
@@ -530,7 +571,7 @@ export const useDesignStore = create<DesignStore>()(
           },
         };
       },
-      version: 5,
+      version: 7,
       migrate: (persistedState, version) => {
         const state = persistedState as Partial<Pick<DesignStore, "saved" | "layout" | "style" | "furniture">>;
         if (!state.furniture) {
@@ -539,6 +580,16 @@ export const useDesignStore = create<DesignStore>()(
         const demoFurniture = state.furniture.agentRun?.generated_image.provider_model === "Pre-rendered demo";
         return {
           ...state,
+          style: state.style ? {
+            ...state.style,
+            ...(version < 6 ? { customRequirements: "" } : {}),
+            ...(version < 7 ? {
+              styleSource: "template" as const,
+              referenceName: null,
+              referenceUrl: null,
+              referenceAsset: null,
+            } : {}),
+          } : state.style,
           furniture: {
             ...state.furniture,
             ...(version < 2 ? {

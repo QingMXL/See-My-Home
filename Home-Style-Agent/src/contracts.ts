@@ -15,6 +15,7 @@ export interface StyleTurnRequest {
   request_id: string;
   home_id: string;
   source_asset_ref: string;
+  style_reference_asset_ref?: string;
   room_type: StyleRoomType;
   style_id: 'modern_east';
   style_profile?: ModernEastProfile;

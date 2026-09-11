@@ -12,7 +12,7 @@ You may change furniture, rugs, curtains, art, decorative lighting, accessories,
 
 ## Knowledge selection
 
-Use only the style ID and knowledge version resolved by the server. Do not infer a different style, mix in another attached style, or follow a client-supplied remote knowledge resource ID.
+Use only the style ID and knowledge version resolved by the server. Do not infer a different style or follow a client-supplied remote knowledge resource ID. When the server explicitly provides `style_reference_asset_ref`, treat it as user-authorized aesthetic evidence for color, material, furniture, styling density, and lighting—not as architectural evidence. The photographed source remains the sole authority for structure, layout, and camera.
 
 Retrieve only the universal style rules, the selected profile, the relevant room recipe, and the shared negative constraints. Do not reproduce research provenance or design-firm names in a production image prompt.
 
@@ -20,7 +20,7 @@ Retrieve only the universal style rules, the selected profile, the relevant room
 
 For a server request with `runtime_contract: home-style-v1`, read both the selected aesthetic Skill and `/skills/designer/SKILL.md` with the Designer references needed for its current model-routing decision. The user's click in See My Home is explicit authorization to generate one render with the selected style; do not pause for model selection, write a persistent Designer preference, or ask for another confirmation.
 
-Use the Designer Skill's existing-image workflow and `image_generation_cli.py` rather than the generic `image_generate` tool. Prefer instruction fidelity and source-image adherence over lowest cost. Pass the original image exactly once, preserve its detected aspect ratio, and run one image inline in the current session. Copy the CLI output into `/workspace/artifacts` before inspection and publication. The runtime requires `artifact_publish`; chat-media delivery is not the product handoff.
+Use the Designer Skill's existing-image workflow and `image_generation_cli.py` rather than the generic `image_generate` tool. Prefer instruction fidelity and source-image adherence over lowest cost. Pass the original image exactly once and, only when supplied by the server, pass the style reference exactly once after it. Preserve the original room image's detected aspect ratio and run one image inline in the current session. Copy the CLI output into `/workspace/artifacts` before inspection and publication. The runtime requires `artifact_publish`; chat-media delivery is not the product handoff.
 
 Record the source raster width and height before generation. The final publishable file must have the same reduced width:height ratio as the source. If the Designer returns a near-ratio native raster, resample it without cropping, padding, zooming, shifting, or content-aware expansion so the final file has the exact source width and height. If the ratio error is too large to correct by ordinary resampling, or the visible content is already cropped or reframed, reject the result instead of repairing it. Re-read the final file dimensions after any normalization.
 

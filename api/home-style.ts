@@ -90,6 +90,7 @@ async function uploadToken(request: VercelRequest, response: VercelResponse): Pr
 interface StyleInput extends Record<string, unknown> {
   project_id?: unknown;
   asset_id?: unknown;
+  reference_asset_id?: unknown;
   locale?: unknown;
   room_type?: unknown;
   style_id?: unknown;
@@ -115,6 +116,10 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
   const projectId = requireString(input.project_id, 'project_id');
   const blobUrl = privateBlobUrl(input.asset_id, 'style', projectId);
   const sourceUrl = await temporaryBlobReadUrl(blobUrl);
+  const referenceBlobUrl = input.reference_asset_id === undefined
+    ? undefined
+    : privateBlobUrl(input.reference_asset_id, 'style', projectId);
+  const styleReferenceUrl = referenceBlobUrl ? await temporaryBlobReadUrl(referenceBlobUrl) : undefined;
   const roomType = requireString(input.room_type, 'room_type') as StyleRoomType;
   if (!roomTypes.has(roomType)) throw new Error('room_type is unsupported');
   if (input.style_id !== 'modern_east') throw new Error('Only modern_east is currently deployed');
@@ -131,6 +136,7 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
     contract_version: 'home-style-v1', request_id: requestId, home_id: projectId,
     source_asset_ref: sourceUrl, room_type: roomType, style_id: 'modern_east', style_profile: profile,
     renovation_scope: scope, user_preferences: preferences.slice(-20),
+    ...(styleReferenceUrl ? { style_reference_asset_ref: styleReferenceUrl } : {}),
     known_immutable_elements: ['room envelope', 'walls', 'columns', 'beams', 'doors', 'windows', 'openings', 'ceiling geometry', 'fixed service locations', 'camera position', 'lens perspective', 'crop'],
   };
   if (!job) {
@@ -177,6 +183,7 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
     request_context: {
       project_id: projectId, asset_id: blobUrl, locale, room_type: roomType, style_id: 'modern_east',
       style_profile: profile, renovation_scope: scope, preferences: preferences.slice(-20),
+      ...(referenceBlobUrl ? { reference_asset_id: referenceBlobUrl } : {}),
     },
   });
 }

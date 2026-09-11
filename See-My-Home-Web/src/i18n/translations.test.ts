@@ -33,14 +33,9 @@ describe("TAG_ZH coverage", () => {
     }
   });
 
-  test("covers all style room types and template tags", () => {
+  test("covers all style room types", () => {
     for (const type of STYLE_ROOM_TYPES) {
       expect(TAG_ZH[type], type).toBeTruthy();
-    }
-    for (const template of STYLE_TEMPLATES) {
-      for (const tag of template.tags) {
-        expect(TAG_ZH[tag], `${template.id}:${tag}`).toBeTruthy();
-      }
     }
   });
 });
@@ -55,6 +50,8 @@ describe("room function normalization", () => {
 describe("styleTemplates zh stories", () => {
   test("every template has a complete Chinese story", () => {
     for (const template of STYLE_TEMPLATES) {
+      expect(template.tagline).toBeTruthy();
+      expect(template.taglineZh).toBeTruthy();
       expect(template.storyZh.direction, template.id).toBeTruthy();
       expect(template.storyZh.material, template.id).toBeTruthy();
       expect(template.storyZh.light, template.id).toBeTruthy();
@@ -65,12 +62,12 @@ describe("styleTemplates zh stories", () => {
 
   test("provides three visual presets while keeping live runtime bindings explicit", () => {
     expect(STYLE_TEMPLATES.map((template) => template.name)).toEqual([
-      "Modern Oriental",
+      "Modern East",
       "California Modern",
       "Maximal Luxe",
     ]);
     expect(STYLE_TEMPLATES.map((template) => template.nameZh)).toEqual([
-      "现代东方",
+      "摩登东方",
       "加州现代",
       "极繁奢华",
     ]);

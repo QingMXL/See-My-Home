@@ -162,6 +162,16 @@ export class HomeStyleRuntime {
 
   private buildEvents(request: StyleTurnRequest): OutboundEvent[] {
     const filename = `${request.home_id}_${request.request_id}_style.png`;
+    const hasStyleReference = Boolean(request.style_reference_asset_ref);
+    const aestheticSourceInstruction = hasStyleReference
+      ? 'Read the modern-east-style Skill for residential quality, structural safety, and negative constraints. Treat style_reference_asset_ref as the user-selected primary aesthetic evidence for colors, material character, furniture language, styling density, and lighting only; do not copy its room architecture, layout, camera, text, artwork, or identifiable objects.'
+      : 'Read and use the modern-east-style Skill as the only aesthetic source.';
+    const inspectInstruction = hasStyleReference
+      ? 'Inspect source_asset_ref and style_reference_asset_ref once each with the available ZooWork visual tool before composing the edit prompt. Record which visual facts belong to structure versus style.'
+      : 'Inspect source_asset_ref once with the available ZooWork visual tool before composing the edit prompt.';
+    const designerImagesInstruction = hasStyleReference
+      ? 'Pass exactly two images through the Designer --images argument in this order: source_asset_ref first as the immutable room and style_reference_asset_ref second as aesthetic reference only. Pass the exact aspect ratio detected from source_asset_ref through --aspect-ratio, request one image, and use the highest practical output quality supported by the selected Designer model. Run inline in this session; do not spawn a subagent and do not call sessions_yield.'
+      : 'Pass source_asset_ref once through the Designer --images argument, pass the exact aspect ratio detected from the source through --aspect-ratio, request one image, and use the highest practical output quality supported by the selected Designer model. Run inline in this session; do not spawn a subagent and do not call sessions_yield.';
     return [{
       type: 'user.message',
       idempotency_key: `${request.request_id}:style`,
@@ -176,14 +186,14 @@ export class HomeStyleRuntime {
         contracts: { response_schema: RESPONSE_SCHEMA },
         request,
         output_requirement: [
-          'Read and use the modern-east-style Skill as the only aesthetic source. Also read the Designer Skill and only the references it requires for the current image-edit model-routing decision.',
-          'Inspect source_asset_ref once with the available ZooWork visual tool before composing the edit prompt.',
+          `${aestheticSourceInstruction} Also read the Designer Skill and only the references it requires for the current image-edit model-routing decision.`,
+          inspectInstruction,
           'Treat the visible room envelope, walls, columns, beams, doors, windows, openings, ceiling outline and height, fixed service locations, camera position, lens perspective, and crop as immutable. User preferences never override these constraints.',
           'Change only the furnishing and finish categories permitted by renovation_scope. Keep the result a believable American residence at the source room scale.',
           'Build the English image-edit prompt from the Skill schema and room component. Do not include research sources, firm names, designer names, or unsupported weighting syntax.',
           'The See My Home UI click is explicit authorization to generate one image now. Do not ask the user to choose a model, do not write Designer preferences, and do not pause for confirmation.',
           'Use the Designer Skill existing-image workflow and its image_generation_cli.py. Do not call the generic image_generate tool. For this constraint-heavy edit, prioritize the Designer routing rule for strongest instruction fidelity and source adherence over lowest cost.',
-          'Pass source_asset_ref once through the Designer --images argument, pass the exact aspect ratio detected from the source through --aspect-ratio, request one image, and use the highest practical output quality supported by the selected Designer model. Run inline in this session; do not spawn a subagent and do not call sessions_yield.',
+          designerImagesInstruction,
           `Capture the single output path printed by the Designer CLI and copy it to "/workspace/artifacts/${request.home_id}/${filename}". An empty output path or failed command is a failed response.`,
           'Inspect the copied output image once and compare it with the original at the level of crop, camera position, perspective, wall and ceiling boundaries, columns, beams, window and door count, opening size and position, and fixed service locations.',
           'If the raster is missing, corrupt, or any immutable structure or camera geometry changed, do not publish it. Return status="failed", qa.publishable=false, and precise warnings.',

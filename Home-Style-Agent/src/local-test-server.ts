@@ -41,6 +41,7 @@ interface UploadedAsset {
 interface ProjectState {
   projectId: string;
   asset: UploadedAsset;
+  referenceAsset: UploadedAsset | undefined;
   conversation: ConversationHandle;
   roomType: StyleRoomType;
   profile: ModernEastProfile;
@@ -125,6 +126,14 @@ function decodeFileName(value: string | undefined): string {
   return decoded;
 }
 
+function requestedProjectId(value: string | string[] | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  if (Array.isArray(value)) throw new Error('X-Upload-Project-Id must have one value');
+  const projectId = value.trim();
+  if (!/^[a-zA-Z0-9_-]{1,160}$/.test(projectId)) throw new Error('X-Upload-Project-Id is invalid');
+  return projectId;
+}
+
 async function receiveUpload(request: IncomingMessage): Promise<UploadedAsset> {
   const fileName = decodeFileName(request.headers['x-upload-file-name'] as string | undefined);
   const mimeType = parseMime(request.headers['content-type']);
@@ -132,7 +141,7 @@ async function receiveUpload(request: IncomingMessage): Promise<UploadedAsset> {
   if (!signatureMatches(bytes, mimeType)) throw new Error('File bytes do not match the declared MIME type');
   const sha256 = createHash('sha256').update(bytes).digest('hex');
   const assetId = `asset_${sha256.slice(0, 20)}_${randomBytes(4).toString('hex')}`;
-  const projectId = newId('style');
+  const projectId = requestedProjectId(request.headers['x-upload-project-id']) ?? newId('style');
   const extension = mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
   mkdirSync(uploadDirectory, { recursive: true, mode: 0o700 });
   const path = resolve(uploadDirectory, `${assetId}.${extension}`);
@@ -179,23 +188,39 @@ async function createState(input: Record<string, unknown>): Promise<ProjectState
   const projectId = requireString(input.project_id, 'project_id');
   const asset = assets.get(requireString(input.asset_id, 'asset_id'));
   if (!asset || asset.projectId !== projectId) throw new Error('asset_id does not belong to project_id');
-  const existing = projects.get(projectId);
-  if (existing) return existing;
+  const referenceAsset = input.reference_asset_id === undefined
+    ? undefined
+    : assets.get(requireString(input.reference_asset_id, 'reference_asset_id'));
+  if (input.reference_asset_id !== undefined && (!referenceAsset || referenceAsset.projectId !== projectId)) {
+    throw new Error('reference_asset_id does not belong to project_id');
+  }
   const roomType = input.room_type as StyleRoomType;
   if (!roomTypes.has(roomType)) throw new Error('room_type is unsupported');
   const profile = (input.style_profile ?? 'quiet-poise') as ModernEastProfile;
   if (!profiles.has(profile)) throw new Error('style_profile is unsupported');
   const renovationScope = (input.renovation_scope ?? 'finishes_and_furnishing') as RenovationScope;
   if (!scopes.has(renovationScope)) throw new Error('renovation_scope is unsupported');
+  const preferences = stringArray(input.preferences, 12);
+  const existing = projects.get(projectId);
+  if (existing) {
+    existing.asset = asset;
+    existing.referenceAsset = referenceAsset;
+    existing.roomType = roomType;
+    existing.profile = profile;
+    existing.renovationScope = renovationScope;
+    existing.preferences = preferences;
+    return existing;
+  }
   const conversation = await runtime.createConversation(projectId, newId(`style_${projectId}`));
   const state: ProjectState = {
     projectId,
     asset,
+    referenceAsset,
     conversation,
     roomType,
     profile,
     renovationScope,
-    preferences: stringArray(input.preferences, 12),
+    preferences,
     artifactIds: new Set(),
   };
   projects.set(projectId, state);
@@ -223,6 +248,7 @@ async function runGeneration(state: ProjectState, selectedLocale: SupportedLocal
     request_id: newId('req'),
     home_id: state.projectId,
     source_asset_ref: sourceUrl(state.asset),
+    ...(state.referenceAsset ? { style_reference_asset_ref: sourceUrl(state.referenceAsset) } : {}),
     room_type: state.roomType,
     style_id: 'modern_east',
     style_profile: state.profile,

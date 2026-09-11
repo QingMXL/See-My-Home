@@ -38,8 +38,25 @@ export function StyleResultPage() {
     () => STYLE_TEMPLATES.find((tpl) => tpl.id === style.templateId) ?? STYLE_TEMPLATES[0],
     [style.templateId],
   );
-  const templateName = lang === "zh" ? template.nameZh : template.name;
-  const story = lang === "zh" ? template.storyZh : template.story;
+  const usesUploadedReference = Boolean(style.agentRun?.request_context?.reference_asset_id);
+  const templateName = usesUploadedReference
+    ? (lang === "zh" ? "我的风格参考" : "My Style Reference")
+    : (lang === "zh" ? template.nameZh : template.name);
+  const story: StyleStory = usesUploadedReference
+    ? (lang === "zh" ? {
+        direction: "保留原房间结构，以你上传的参考图定义整体审美方向。",
+        material: "从参考图提取材质质感与搭配逻辑。",
+        light: "借鉴参考图的光线层次与氛围。",
+        furniture: "转译家具的轮廓、比例与陈设密度，不复制具体单品。",
+        mood: "延续参考图的色彩关系与空间情绪。",
+      } : {
+        direction: "The original room stays intact while your uploaded reference sets the aesthetic direction.",
+        material: "Material character and combinations are interpreted from your reference.",
+        light: "Lighting layers and atmosphere follow the reference image.",
+        furniture: "Furniture silhouettes, proportions, and styling density are translated without copying exact pieces.",
+        mood: "Color relationships and spatial mood carry through from your reference.",
+      })
+    : (lang === "zh" ? template.storyZh : template.story);
 
   if (style.phase !== "done" && style.phase !== "generating") return <Navigate to="/style" replace />;
 

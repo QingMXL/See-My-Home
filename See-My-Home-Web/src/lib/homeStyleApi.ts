@@ -59,6 +59,7 @@ export interface StyleGenerationResult {
 export interface StyleGenerateInput {
   project_id: string;
   asset_id: string;
+  reference_asset_id?: string;
   locale: "en-US" | "zh-CN";
   room_type: StyleRoomCode;
   style_id: "modern_east";
@@ -100,14 +101,19 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, tim
   } finally { window.clearTimeout(timer); }
 }
 
-export async function uploadStylePhoto(file: File, locale: "en-US" | "zh-CN"): Promise<UploadedStyleAsset> {
+export async function uploadStylePhoto(
+  file: File,
+  locale: "en-US" | "zh-CN",
+  existingProjectId?: string,
+  sourceKind: "room" | "reference" = "room",
+): Promise<UploadedStyleAsset> {
   if (!import.meta.env.DEV) {
-    const projectId = `style_${crypto.randomUUID()}`;
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "room-photo";
-    const blob = await upload(`uploads/style/${projectId}/${safeName}`, file, {
+    const projectId = existingProjectId ?? `style_${crypto.randomUUID()}`;
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || `${sourceKind}-photo`;
+    const blob = await upload(`uploads/style/${projectId}/${sourceKind}/${safeName}`, file, {
       access: "private",
       handleUploadUrl: "/api/home-style/upload",
-      clientPayload: JSON.stringify({ project_id: projectId }),
+      clientPayload: JSON.stringify({ project_id: projectId, source_kind: sourceKind }),
       contentType: file.type || "application/octet-stream",
       multipart: file.size > 4 * 1024 * 1024,
     });
@@ -130,9 +136,13 @@ export async function uploadStylePhoto(file: File, locale: "en-US" | "zh-CN"): P
     headers: {
       "Content-Type": file.type || "application/octet-stream",
       "X-Upload-File-Name": encodeURIComponent(file.name),
+      ...(existingProjectId ? { "X-Upload-Project-Id": existingProjectId } : {}),
+      "X-Upload-Source-Kind": sourceKind,
     },
     body: file,
-  }, 60_000, locale === "zh-CN" ? "房间照片上传超时，请重试。" : "The room photo upload timed out. Please try again.");
+  }, 60_000, locale === "zh-CN"
+    ? `${sourceKind === "reference" ? "风格参考图" : "房间照片"}上传超时，请重试。`
+    : `The ${sourceKind === "reference" ? "style reference" : "room photo"} upload timed out. Please try again.`);
   return readResponse<UploadedStyleAsset>(response);
 }
 

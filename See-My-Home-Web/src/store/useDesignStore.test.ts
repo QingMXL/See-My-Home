@@ -27,6 +27,7 @@ describe("useDesignStore", () => {
   beforeEach(() => {
     useDesignStore.getState().resetLayout();
     useDesignStore.getState().resetFurniture();
+    useDesignStore.getState().setStylePhoto(null, null);
     useDesignStore.getState().setLayoutRooms([{
       id: "test-room",
       label: "Guest Bedroom",
@@ -86,6 +87,29 @@ describe("useDesignStore", () => {
   test("stores free-form special considerations", () => {
     useDesignStore.getState().setSpecialConsiderations("Keep the existing sofa.");
     expect(useDesignStore.getState().layout.specialConsiderations).toBe("Keep the existing sofa.");
+  });
+
+  test("stores custom Home Style requirements", () => {
+    useDesignStore.getState().setStyleCustomRequirements("Add a black gaming chair and a full-height bookcase.");
+    expect(useDesignStore.getState().style.customRequirements).toBe("Add a black gaming chair and a full-height bookcase.");
+  });
+
+  test("selects an uploaded reference as the style source and switches back to a preset", () => {
+    useDesignStore.getState().setStyleReference("reference.png", "blob:reference");
+    useDesignStore.getState().setStyleReferenceAsset({
+      project_id: "style_test",
+      asset_id: "asset_reference",
+      file_name: "reference.png",
+      mime_type: "image/png",
+      size_bytes: 128,
+      sha256: "0".repeat(64),
+      storage: "application_backend",
+      image_processing_status: "uploaded",
+    });
+
+    expect(useDesignStore.getState().style.styleSource).toBe("reference");
+    useDesignStore.getState().setStyleTemplate("california-modern");
+    expect(useDesignStore.getState().style.styleSource).toBe("template");
   });
 
   test("excludes a mistaken room from planning and can restore it", () => {

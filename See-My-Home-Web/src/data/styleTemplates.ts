@@ -7,7 +7,8 @@ export interface StyleTemplate {
   styleProfile: StyleGenerationResult["style_profile"];
   name: string;
   nameZh: string;
-  tags: [string, string, string];
+  tagline: string;
+  taglineZh: string;
   previewUrl: string;
   demoResultUrl: string;
   palette: { from: string; to: string; accent: string; line: string };
@@ -32,10 +33,11 @@ export const STYLE_TEMPLATES: StyleTemplate[] = [
     id: "modern-oriental",
     styleId: "modern_east",
     styleProfile: "quiet-poise",
-    name: "Modern Oriental",
-    nameZh: "现代东方",
-    tags: ["Refined", "Warm", "Serene"],
-    previewUrl: "/demo/home-style/result-modern-oriental.png",
+    name: "Modern East",
+    nameZh: "摩登东方",
+    tagline: "Quiet grandeur, sculptural forms, and refined Eastern restraint.",
+    taglineZh: "东方意境、雕塑感与克制静奢。",
+    previewUrl: "/demo/home-style/preview-modern-oriental.png",
     demoResultUrl: "/demo/home-style/result-modern-oriental.png",
     palette: { from: "#eee9df", to: "#7b6754", accent: "#755e48", line: "#302c28" },
     story: {
@@ -58,7 +60,8 @@ export const STYLE_TEMPLATES: StyleTemplate[] = [
     styleProfile: "warm-residence",
     name: "California Modern",
     nameZh: "加州现代",
-    tags: ["Warm", "Natural", "Timeless"],
+    tagline: "Sunlit California minimalism with a relaxed gallery feel.",
+    taglineZh: "阳光、松弛，带有画廊感的加州简约。",
     previewUrl: "/demo/home-style/result-california-modern.png",
     demoResultUrl: "/demo/home-style/result-california-modern.png",
     palette: { from: "#f3eee4", to: "#cbb89d", accent: "#9b7d57", line: "#55483a" },
@@ -82,8 +85,9 @@ export const STYLE_TEMPLATES: StyleTemplate[] = [
     styleProfile: "sculptural-luxe",
     name: "Maximal Luxe",
     nameZh: "极繁奢华",
-    tags: ["Sculptural", "Refined", "Architectural"],
-    previewUrl: "/demo/home-style/result-maximal-luxe.png",
+    tagline: "High-glamour layering with bold color and artistic drama.",
+    taglineZh: "高奢层次、浓郁色彩与戏剧化艺术感。",
+    previewUrl: "/demo/home-style/preview-maximal-luxe.png",
     demoResultUrl: "/demo/home-style/result-maximal-luxe.png",
     palette: { from: "#6f1f2c", to: "#1f1816", accent: "#b88a46", line: "#261713" },
     story: {
