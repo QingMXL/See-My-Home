@@ -6,6 +6,7 @@ import type { ModernEastProfile, RenovationScope, SourceRaster, StyleRoomType, S
 import { HomeStyleRuntime, HomeStyleTurnTimeoutError, MODERN_EAST_KNOWLEDGE_VERSION } from '../Home-Style-Agent/src/runtime.js';
 import { inspectSourceRasterUrl } from '../Home-Style-Agent/src/source-raster.js';
 import { newId, objectBody, parseLocale, persistGeneratedImage, privateBlobUrl, requestPath, requireString, sendJson, temporaryBlobReadUrl } from './_lib/common.js';
+import { createStyleSourceAlias, deleteStyleSourceAliases, requestOrigin, serveStyleSourceAlias } from './_lib/style-source-proxy.js';
 
 export const config = { maxDuration: 300 };
 
@@ -22,6 +23,10 @@ interface StyleJob {
   type: 'agent.generate' | 'agent.refine';
   expiresAt: number;
   sourceRaster?: SourceRaster;
+  sourceAssetRef?: string;
+  styleReferenceAssetRef?: string;
+  sourceAliasToken?: string;
+  styleReferenceAliasToken?: string;
 }
 
 function runtime(): HomeStyleRuntime {
@@ -66,6 +71,10 @@ function verifyJob(value: unknown): StyleJob | null {
     || (job.type !== 'agent.generate' && job.type !== 'agent.refine')
     || typeof job.expiresAt !== 'number'
     || job.expiresAt < Date.now()
+    || (job.sourceAssetRef !== undefined && typeof job.sourceAssetRef !== 'string')
+    || (job.styleReferenceAssetRef !== undefined && typeof job.styleReferenceAssetRef !== 'string')
+    || (job.sourceAliasToken !== undefined && typeof job.sourceAliasToken !== 'string')
+    || (job.styleReferenceAliasToken !== undefined && typeof job.styleReferenceAliasToken !== 'string')
     || (sourceRaster !== undefined && (
       typeof sourceRaster.width_px !== 'number'
       || typeof sourceRaster.height_px !== 'number'
@@ -125,12 +134,9 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
   const locale = parseLocale(refine ? body.locale : input.locale);
   const projectId = requireString(input.project_id, 'project_id');
   const blobUrl = privateBlobUrl(input.asset_id, 'style', projectId);
-  const sourceUrl = await temporaryBlobReadUrl(blobUrl);
-  const sourceRaster = job?.sourceRaster ?? await inspectSourceRasterUrl(sourceUrl);
   const referenceBlobUrl = input.reference_asset_id === undefined
     ? undefined
     : privateBlobUrl(input.reference_asset_id, 'style', projectId);
-  const styleReferenceUrl = referenceBlobUrl ? await temporaryBlobReadUrl(referenceBlobUrl) : undefined;
   const roomType = requireString(input.room_type, 'room_type') as StyleRoomType;
   if (!roomTypes.has(roomType)) throw new Error('room_type is unsupported');
   if (input.style_id !== 'modern_east') throw new Error('Only modern_east is currently deployed');
@@ -143,17 +149,57 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
   const zoo = runtime();
   if (job && (job.projectId !== projectId || job.type !== type)) throw new Error('job_token does not match this request');
   const requestId = job?.requestId ?? newId('req');
+  const sourceRaster = job?.sourceRaster ?? await inspectSourceRasterUrl(await temporaryBlobReadUrl(blobUrl));
+  const expiresAt = job?.expiresAt ?? Date.now() + 30 * 60 * 1000;
+  let sourceAssetRef = job?.sourceAssetRef;
+  let styleReferenceAssetRef = job?.styleReferenceAssetRef;
+  let sourceAliasToken = job?.sourceAliasToken;
+  let styleReferenceAliasToken = job?.styleReferenceAliasToken;
+
+  if (!job) {
+    await zoo.ensureRunning();
+    const origin = requestOrigin(request);
+    try {
+      const sourceAlias = await createStyleSourceAlias({
+        origin, blobUrl, projectId, sourceKind: 'room', expiresAt,
+      });
+      sourceAssetRef = sourceAlias.url;
+      sourceAliasToken = sourceAlias.token;
+      if (referenceBlobUrl) {
+        const referenceAlias = await createStyleSourceAlias({
+          origin, blobUrl: referenceBlobUrl, projectId, sourceKind: 'reference', expiresAt,
+        });
+        styleReferenceAssetRef = referenceAlias.url;
+        styleReferenceAliasToken = referenceAlias.token;
+      }
+    } catch (error) {
+      await deleteStyleSourceAliases([sourceAliasToken, styleReferenceAliasToken]).catch(() => undefined);
+      throw error;
+    }
+  }
+
+  // Older in-flight job tokens may not include the proxy reference. New turns always do.
+  sourceAssetRef ??= await temporaryBlobReadUrl(blobUrl);
+  if (!styleReferenceAssetRef && referenceBlobUrl && job) {
+    styleReferenceAssetRef = await temporaryBlobReadUrl(referenceBlobUrl);
+  }
   const turn: StyleTurnRequest = {
     contract_version: 'home-style-v1', request_id: requestId, home_id: projectId,
-    source_asset_ref: sourceUrl, source_raster: sourceRaster, room_type: roomType, style_id: 'modern_east', style_profile: profile,
+    source_asset_ref: sourceAssetRef, source_raster: sourceRaster, room_type: roomType, style_id: 'modern_east', style_profile: profile,
     renovation_scope: scope, user_preferences: preferences.slice(-20),
-    ...(styleReferenceUrl ? { style_reference_asset_ref: styleReferenceUrl } : {}),
+    ...(styleReferenceAssetRef ? { style_reference_asset_ref: styleReferenceAssetRef } : {}),
     known_immutable_elements: ['room envelope', 'walls', 'columns', 'beams', 'doors', 'windows', 'openings', 'ceiling geometry', 'fixed service locations', 'camera position', 'lens perspective', 'crop'],
   };
   if (!job) {
-    await zoo.ensureRunning();
-    const conversation = await zoo.createConversation(projectId, newId(`style_${refine ? 'refine' : 'generate'}_${projectId}`));
-    const started = await zoo.startStyleTurn(conversation, turn);
+    let conversation;
+    let started;
+    try {
+      conversation = await zoo.createConversation(projectId, newId(`style_${refine ? 'refine' : 'generate'}_${projectId}`));
+      started = await zoo.startStyleTurn(conversation, turn);
+    } catch (error) {
+      await deleteStyleSourceAliases([sourceAliasToken, styleReferenceAliasToken]).catch(() => undefined);
+      throw error;
+    }
     sendJson(response, 202, {
       status: 'processing',
       job_token: signJob({
@@ -163,8 +209,12 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
         requestId,
         projectId,
         type,
-        expiresAt: Date.now() + 30 * 60 * 1000,
+        expiresAt,
         sourceRaster,
+        sourceAssetRef,
+        styleReferenceAssetRef,
+        sourceAliasToken,
+        styleReferenceAliasToken,
       }),
       poll_after_ms: 3_000,
     });
@@ -182,22 +232,26 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
     return;
   }
 
-  const result = polled.result;
-  const artifact = result.artifacts.find((candidate) => candidate.status === 'ready' && (candidate.contentType?.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(candidate.fileName ?? '')));
-  if (!artifact) throw new Error(result.response.warnings?.join(' ') || 'Home Style Agent completed without a readable published image artifact');
-  const signedUrl = await zoo.resolveArtifactUrl(artifact.artifactId);
-  const stored = await persistGeneratedImage({ signedUrl, kind: 'style', projectId, requestId: turn.request_id, artifactId: artifact.artifactId, contentType: artifact.contentType, fileName: artifact.fileName, size: artifact.size });
-  sendJson(response, 200, {
-    session_id: conversation.sessionId, request_id: turn.request_id, project_id: projectId,
-    style_id: 'modern_east', style_profile: profile, knowledge_version: MODERN_EAST_KNOWLEDGE_VERSION,
-    response: result.response,
-    generated_image: { ...stored, provider_model: 'ZooWork Designer Skill' },
-    request_context: {
-      project_id: projectId, asset_id: blobUrl, locale, room_type: roomType, style_id: 'modern_east',
-      style_profile: profile, renovation_scope: scope, preferences: preferences.slice(-20), source_raster: sourceRaster,
-      ...(referenceBlobUrl ? { reference_asset_id: referenceBlobUrl } : {}),
-    },
-  });
+  try {
+    const result = polled.result;
+    const artifact = result.artifacts.find((candidate) => candidate.status === 'ready' && (candidate.contentType?.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(candidate.fileName ?? '')));
+    if (!artifact) throw new Error(result.response.warnings?.join(' ') || 'Home Style Agent completed without a readable published image artifact');
+    const signedUrl = await zoo.resolveArtifactUrl(artifact.artifactId);
+    const stored = await persistGeneratedImage({ signedUrl, kind: 'style', projectId, requestId: turn.request_id, artifactId: artifact.artifactId, contentType: artifact.contentType, fileName: artifact.fileName, size: artifact.size });
+    sendJson(response, 200, {
+      session_id: conversation.sessionId, request_id: turn.request_id, project_id: projectId,
+      style_id: 'modern_east', style_profile: profile, knowledge_version: MODERN_EAST_KNOWLEDGE_VERSION,
+      response: result.response,
+      generated_image: { ...stored, provider_model: 'ZooWork Designer Skill' },
+      request_context: {
+        project_id: projectId, asset_id: blobUrl, locale, room_type: roomType, style_id: 'modern_east',
+        style_profile: profile, renovation_scope: scope, preferences: preferences.slice(-20), source_raster: sourceRaster,
+        ...(referenceBlobUrl ? { reference_asset_id: referenceBlobUrl } : {}),
+      },
+    });
+  } finally {
+    await deleteStyleSourceAliases([job.sourceAliasToken, job.styleReferenceAliasToken]).catch(() => undefined);
+  }
 }
 
 export default async function handler(request: VercelRequest, response: VercelResponse): Promise<void> {
@@ -205,6 +259,10 @@ export default async function handler(request: VercelRequest, response: VercelRe
   response.setHeader('X-Content-Type-Options', 'nosniff');
   try {
     const path = requestPath(request.query.path);
+    if (request.method === 'GET' && path.startsWith('source/')) {
+      await serveStyleSourceAlias(path.slice('source/'.length), response);
+      return;
+    }
     if (request.method === 'GET' && path === 'health') {
       sendJson(response, 200, { ok: true, runtime: 'vercel', storage: 'vercel-blob', extra_image_provider_key_required: false });
       return;
