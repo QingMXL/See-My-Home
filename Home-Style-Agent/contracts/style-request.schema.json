@@ -45,9 +45,14 @@
         "other"
       ]
     },
-    "style_id": { "const": "modern_east" },
+    "style_id": { "enum": ["modern_east", "california_modern", "maximal_luxe", "custom_reference"] },
     "style_profile": {
-      "enum": ["quiet-poise", "urban-elegance", "sculptural-luxe", "warm-residence"]
+      "enum": [
+        "quiet-poise", "urban-elegance", "sculptural-luxe", "warm-residence",
+        "sunlit-casual", "ranch-modern", "coastal-modern", "desert-warm",
+        "edited-glamour", "eighties-socialite", "regency-modern", "collector-color",
+        "reference-led"
+      ]
     },
     "renovation_scope": {
       "enum": ["soft_furnishing_only", "finishes_and_furnishing", "limited_hard_finish"]
@@ -62,5 +67,29 @@
       "items": { "type": "string", "maxLength": 160 },
       "maxItems": 40
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "style_id": { "const": "modern_east" } } },
+      "then": { "properties": { "style_profile": { "enum": ["quiet-poise", "urban-elegance", "sculptural-luxe", "warm-residence"] } } }
+    },
+    {
+      "if": { "properties": { "style_id": { "const": "california_modern" } } },
+      "then": { "properties": { "style_profile": { "enum": ["sunlit-casual", "ranch-modern", "coastal-modern", "desert-warm"] } } }
+    },
+    {
+      "if": { "properties": { "style_id": { "const": "maximal_luxe" } } },
+      "then": { "properties": { "style_profile": { "enum": ["edited-glamour", "eighties-socialite", "regency-modern", "collector-color"] } } }
+    },
+    {
+      "if": { "properties": { "style_id": { "const": "custom_reference" } } },
+      "then": {
+        "properties": {
+          "style_profile": { "const": "reference-led" },
+          "style_reference_asset_ref": { "type": "string", "minLength": 1 }
+        },
+        "required": ["style_reference_asset_ref"]
+      }
+    }
+  ]
 }

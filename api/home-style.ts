@@ -2,8 +2,18 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { ZooworkError } from '@zoowork-ai/sdk';
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import type { ModernEastProfile, RenovationScope, SourceRaster, StyleRoomType, StyleTurnRequest } from '../Home-Style-Agent/src/contracts.js';
-import { HomeStyleRuntime, HomeStyleTurnTimeoutError, MODERN_EAST_KNOWLEDGE_VERSION } from '../Home-Style-Agent/src/runtime.js';
+import {
+  DEFAULT_STYLE_PROFILES,
+  isStyleId,
+  isStyleProfile,
+  type RenovationScope,
+  type SourceRaster,
+  type StyleId,
+  type StyleProfile,
+  type StyleRoomType,
+  type StyleTurnRequest,
+} from '../Home-Style-Agent/src/contracts.js';
+import { HomeStyleRuntime, HomeStyleTurnTimeoutError, styleKnowledge } from '../Home-Style-Agent/src/runtime.js';
 import { inspectSourceRasterUrl } from '../Home-Style-Agent/src/source-raster.js';
 import { ContractValidationError } from '../Home-Style-Agent/src/validation.js';
 import { newId, objectBody, parseLocale, persistGeneratedImage, privateBlobUrl, requestPath, requireString, sendJson, temporaryBlobReadUrl } from './_lib/common.js';
@@ -12,7 +22,6 @@ import { createStyleSourceAlias, deleteStyleSourceAliases, requestOrigin, serveS
 export const config = { maxDuration: 300 };
 
 const roomTypes = new Set<StyleRoomType>(['living_room', 'primary_bedroom', 'kitchen', 'dining_room', 'bathroom', 'home_office', 'other']);
-const profiles = new Set<ModernEastProfile>(['quiet-poise', 'urban-elegance', 'sculptural-luxe', 'warm-residence']);
 const scopes = new Set<RenovationScope>(['soft_furnishing_only', 'finishes_and_furnishing', 'limited_hard_finish']);
 
 interface StyleJob {
@@ -29,6 +38,8 @@ interface StyleJob {
   sourceAliasToken?: string;
   styleReferenceAliasToken?: string;
   completionRecoveryAttempts?: number;
+  styleId?: StyleId;
+  styleProfile?: StyleProfile;
 }
 
 function runtime(): HomeStyleRuntime {
@@ -82,6 +93,10 @@ function verifyJob(value: unknown): StyleJob | null {
       || !Number.isSafeInteger(job.completionRecoveryAttempts)
       || job.completionRecoveryAttempts < 0
       || job.completionRecoveryAttempts > 1
+    ))
+    || (job.styleId !== undefined && !isStyleId(job.styleId))
+    || (job.styleProfile !== undefined && (
+      job.styleId === undefined || !isStyleProfile(job.styleId, job.styleProfile)
     ))
     || (sourceRaster !== undefined && (
       typeof sourceRaster.width_px !== 'number'
@@ -149,15 +164,22 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
     : privateBlobUrl(input.reference_asset_id, 'style', projectId);
   const roomType = requireString(input.room_type, 'room_type') as StyleRoomType;
   if (!roomTypes.has(roomType)) throw new Error('room_type is unsupported');
-  if (input.style_id !== 'modern_east') throw new Error('Only modern_east is currently deployed');
-  const profile = (input.style_profile ?? 'quiet-poise') as ModernEastProfile;
-  if (!profiles.has(profile)) throw new Error('style_profile is unsupported');
+  if (!isStyleId(input.style_id)) throw new Error('style_id is unsupported');
+  const styleId = input.style_id;
+  const profile = (input.style_profile ?? DEFAULT_STYLE_PROFILES[styleId]) as StyleProfile;
+  if (!isStyleProfile(styleId, profile)) throw new Error('style_profile is unsupported for the selected style');
   const scope = (input.renovation_scope ?? 'finishes_and_furnishing') as RenovationScope;
   if (!scopes.has(scope)) throw new Error('renovation_scope is unsupported');
   const preferences = stringArray(input.preferences);
   if (refine) preferences.push(requireString(body.refinement, 'refinement'));
   const zoo = runtime();
-  if (job && (job.projectId !== projectId || job.type !== type)) throw new Error('job_token does not match this request');
+  if (styleId === 'custom_reference' && !referenceBlobUrl) throw new Error('custom_reference requires reference_asset_id');
+  if (job && (
+    job.projectId !== projectId
+    || job.type !== type
+    || (job.styleId !== undefined && job.styleId !== styleId)
+    || (job.styleProfile !== undefined && job.styleProfile !== profile)
+  )) throw new Error('job_token does not match this request');
   const requestId = job?.requestId ?? newId('req');
   const sourceRaster = job?.sourceRaster ?? await inspectSourceRasterUrl(await temporaryBlobReadUrl(blobUrl));
   const expiresAt = job?.expiresAt ?? Date.now() + 30 * 60 * 1000;
@@ -195,10 +217,10 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
   }
   const turn: StyleTurnRequest = {
     contract_version: 'home-style-v1', request_id: requestId, home_id: projectId,
-    source_asset_ref: sourceAssetRef, source_raster: sourceRaster, room_type: roomType, style_id: 'modern_east', style_profile: profile,
+    source_asset_ref: sourceAssetRef, source_raster: sourceRaster, room_type: roomType, style_id: styleId, style_profile: profile,
     renovation_scope: scope, user_preferences: preferences.slice(-20),
     ...(styleReferenceAssetRef ? { style_reference_asset_ref: styleReferenceAssetRef } : {}),
-    known_immutable_elements: ['room envelope', 'walls', 'columns', 'beams', 'doors', 'windows', 'openings', 'ceiling geometry', 'fixed service locations', 'camera position', 'lens perspective', 'crop'],
+    known_immutable_elements: ['room envelope', 'walls', 'column silhouettes and both edges', 'beam silhouettes and both edges', 'doors', 'windows', 'openings', 'structural ceiling plane and height', 'fixed service locations', 'camera position', 'lens perspective', 'crop'],
   };
   if (!job) {
     let conversation;
@@ -225,6 +247,8 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
         styleReferenceAssetRef,
         sourceAliasToken,
         styleReferenceAliasToken,
+        styleId,
+        styleProfile: profile,
       }),
       poll_after_ms: 3_000,
     });
@@ -272,11 +296,11 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
     const stored = await persistGeneratedImage({ signedUrl, kind: 'style', projectId, requestId: turn.request_id, artifactId: artifact.artifactId, contentType: artifact.contentType, fileName: artifact.fileName, size: artifact.size });
     sendJson(response, 200, {
       session_id: conversation.sessionId, request_id: turn.request_id, project_id: projectId,
-      style_id: 'modern_east', style_profile: profile, knowledge_version: MODERN_EAST_KNOWLEDGE_VERSION,
+      style_id: styleId, style_profile: profile, knowledge_version: styleKnowledge(styleId).knowledgeVersion,
       response: result.response,
       generated_image: { ...stored, provider_model: 'ZooWork Designer Skill' },
       request_context: {
-        project_id: projectId, asset_id: blobUrl, locale, room_type: roomType, style_id: 'modern_east',
+        project_id: projectId, asset_id: blobUrl, locale, room_type: roomType, style_id: styleId,
         style_profile: profile, renovation_scope: scope, preferences: preferences.slice(-20), source_raster: sourceRaster,
         ...(referenceBlobUrl ? { reference_asset_id: referenceBlobUrl } : {}),
       },

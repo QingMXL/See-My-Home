@@ -9,7 +9,7 @@
     "contract_version": { "const": "home-style-v1" },
     "request_id": { "type": "string", "minLength": 1 },
     "status": { "enum": ["completed", "failed"] },
-    "style_id": { "const": "modern_east" },
+    "style_id": { "enum": ["modern_east", "california_modern", "maximal_luxe", "custom_reference"] },
     "knowledge_version": { "type": "string", "minLength": 1 },
     "artifact_id": { "type": "string", "minLength": 1 },
     "style_summary": { "type": "string", "maxLength": 1000 },

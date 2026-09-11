@@ -1,11 +1,11 @@
 schema_version: "1.0"
-knowledge_base_version: "0.1-research"
+knowledge_base_version: "0.2-production"
 style:
   id: modern_east
   display_name: Modern East
   display_name_zh: 摩登东方
   market: en-US
-  status: research
+  status: production
   tagline: A refined balance of modern form, natural materials, and Eastern restraint.
   definition: >-
     A contemporary residential language that expresses Eastern ideas through
@@ -28,8 +28,8 @@ profiles:
   quiet-poise:
     default: true
     suitable_for: [apartment, condo, townhouse, single_family_home, bedroom, family_room]
-    intensity: restrained
-    cues: [warm_pale_neutrals, tactile_textiles, restrained_dark_timber, soft_daylight, sparse_art]
+    intensity: medium_high
+    cues: [warm_pale_neutrals, tactile_textiles, substantial_dark_timber_datum, soft_daylight, confident_abstract_art, complete_furnishing]
   urban-elegance:
     default: false
     suitable_for: [urban_apartment, penthouse, open_living_dining]
@@ -61,6 +61,8 @@ style_dna:
     - balanced_asymmetry
     - low_glare_layered_light
     - conventional_residential_scale
+    - fully_resolved_furnishing
+    - designed_fifth_plane
   forbidden:
     - literal_historical_theme
     - japanese_room_language
@@ -123,6 +125,8 @@ vocabulary:
     - focused wall wash
     - paper-like diffused pendant
     - low-glare fixtures
+    - shallow perimeter reveal
+    - room-scaled statement fixture
 
 materials:
   primary:
@@ -233,7 +237,7 @@ renovation_levels:
   furnish:
     editable: [movable_furniture, rugs, curtains, freestanding_lighting, art, plants, decor]
   refresh:
-    editable: [paint, wall_finish, floor_finish, cabinet_front_finish, movable_furniture, lighting, textiles, decor]
+    editable: [paint, wall_finish, floor_finish, ceiling_finish_without_structural_change, shallow_perimeter_cove, cabinet_front_finish, movable_furniture, lighting, textiles, art, decor]
   light-remodel:
     editable: [explicitly_masked_non_structural_built_ins]
     requires_explicit_mask: true
@@ -258,7 +262,7 @@ room_recipes:
 
 raw_shell_rules:
   immutable: [visible_walls, slab_edges, beams, columns, ceiling_planes, door_openings, window_openings]
-  add: [finishes, justified_cabinetry, lighting, furniture, textiles, decor]
+  add: [substantial_coherent_finishes, shallow_non_structural_ceiling_treatment, layered_lighting, justified_cabinetry, complete_furniture_group, textiles, art, decor]
   never_invent: [new_windows, new_doors, fireplace, stairs, mezzanine, vaulted_ceiling, structural_opening]
   service_assumption: conservative
 
@@ -283,11 +287,12 @@ style_evaluation:
     - impossible_kitchen_or_bathroom_services
     - blocked_circulation
   identity_gate:
-    minimum_families_present: 3
+    minimum_families_present: 4
     families:
       spatial_order: [calibrated_negative_space, balanced_asymmetry, dark_linear_datum, framed_sightline]
       material_contrast: [mineral_or_honed_stone, matte_dark_timber, tactile_neutral_textile]
       cultural_abstraction: [ink_like_abstract_art, paper_or_silk_diffused_light, handcrafted_ceramic_and_branch]
+      complete_residential_composition: [properly_scaled_furniture_group, functional_side_pieces, layered_window_treatment, designed_ceiling_and_lighting]
 
 retrieval:
   required_keys: [style_id, profile, room_type, renovation_level]

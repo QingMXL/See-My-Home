@@ -73,6 +73,8 @@ describe("styleTemplates zh stories", () => {
     ]);
     expect(STYLE_TEMPLATES.filter((template) => template.styleId).map((template) => template.styleId)).toEqual([
       "modern_east",
+      "california_modern",
+      "maximal_luxe",
     ]);
     expect(new Set(STYLE_TEMPLATES.map((template) => template.previewUrl)).size).toBe(3);
   });

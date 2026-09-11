@@ -1,4 +1,4 @@
-# Modern East｜摩登东方风格知识库 v0.1
+# Modern East｜摩登东方风格知识库 v0.2
 
 ## 0. 定义与研究边界
 
@@ -94,7 +94,7 @@ Modern East 是一种以现代主义空间和家具语言承载东方审美意�
 ### 3.1 `quiet-poise`｜静雅克制（默认）
 
 - 适用：美国公寓、Condo、Townhouse、普通独栋住宅。
-- 特征：暖白、灰褐、深木小比例；柔和自然光；家具舒适；装饰最少。
+- 特征：暖白、灰褐、明确的深木构图基准；柔和自然光；完整舒适的家具组；艺术与器物少而有分量。
 - 来源倾向：无间的留白与诗性 + CCD卧室和轻奢住宅的材料完成度。
 - 风险控制：不使用大尺度装置天花、巨型石材背景或大堂式中轴。
 
@@ -144,7 +144,7 @@ Modern East 是一种以现代主义空间和家具语言承载东方审美意�
 
 #### 灯光
 
-`soft daylight`、`warm indirect lighting`、`concealed cove light`、`focused wall wash`、`paper-like diffused pendant`、`subtle pools of light`、`low-glare fixtures`
+`soft daylight`、`warm indirect lighting`、`shallow perimeter reveal`、`concealed cove light`、`focused wall wash`、`paper-like diffused pendant`、`room-scaled statement fixture`、`subtle pools of light`、`low-glare fixtures`
 
 ### 4.2 推荐家具与构件标签
 
@@ -192,6 +192,8 @@ preserve the exact source aspect ratio, crop and framing
 preserve the exact camera position, camera height, focal-length feel, vanishing points and perspective
 preserve the exact room geometry
 preserve every wall, column, beam, door, window and opening
+preserve both visible edges, silhouette and apparent width of every column and beam
+preserve the structural slab plane and ceiling height while allowing only shallow applied ceiling finishes
 preserve the exact count, dimensions, position and panel divisions of all doors and windows
 preserve fixed kitchen and bathroom service locations unless explicitly editable
 maintain believable residential dimensions and circulation
@@ -295,10 +297,10 @@ do not enlarge the room or convert it into a hotel, gallery or showroom
 ### 7.5 毛坯房输入
 
 - 把现有墙、梁、柱、门窗开口和层高视为不可变的几何框架。
-- 补全墙面、地面、照明、基础柜体、家具和软装；不得重新规划建筑。
+- 完整补全墙面、地面、浅层非结构吊顶饰面、分层照明、基础柜体、家具、织物和艺术陈设；不得重新规划建筑，也不得留下大面积无意图的空区。
 - 对无法判断的水电点位采取保守策略：厨房与浴室只在可见服务区内完成设计。
 - 不因空间空旷而自动增加窗、门、壁炉、楼梯、夹层或挑空。
-- 普通层高使用贴顶、壁灯、落地灯和局部间接光；不生成需要大幅吊顶的复杂灯阵。
+- 普通层高优先使用浅灯槽或周边阴影缝、连续间接光、洗墙、贴顶或尺度适当的主灯、壁灯与任务灯；禁止大幅降板、深吊顶、遮梁或改变层高。仅摆放两只射灯不算完成的天花设计。
 
 ---
 
@@ -341,9 +343,9 @@ style_id + profile + room_type + renovation_level + room_size_band + daylight_le
 | 当代性 | 线面、家具和细节明确现代，无复古套装。 |
 | 东方抽象度 | 东方感来自空间、留白、光和材料，不依赖符号。 |
 | 材质一致性 | 主材数量受控，深浅、冷暖和软硬关系清晰。 |
-| 空间克制 | 有焦点、有留白、无堆砌，视觉密度符合住宅。 |
+| 空间克制 | 有焦点和有意图的留白，同时家具组、材质、艺术与灯光层次完整，无空置感或堆砌。 |
 | 居住感 | 家具舒适、功能真实、有家庭尺度，不像酒店或展馆。 |
-| 灯光 | 自然光被尊重，人工光温暖、分层、低眩光。 |
+| 灯光 | 自然光被尊重，天花作为第五立面完成设计，环境光、重点光与任务光温暖、分层、低眩光。 |
 | 差异化 | 与 Japandi、传统中式、泛轻奢有明确区别。 |
 
 ### 硬失败项

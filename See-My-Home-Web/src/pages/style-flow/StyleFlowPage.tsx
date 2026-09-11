@@ -151,19 +151,13 @@ export function StyleFlowPage() {
     }
     const template = selectedTemplate;
     if (!template) return;
-    if (!isDemo && !usesCustomReference && !template.styleId) {
-      setStyleAgentError(lang === "zh"
-        ? "这个风格目前可以在风格案例中查看，上传照片生成正在准备中。"
-        : "This style is available in the Style Example while generation for uploaded rooms is being prepared.");
-      return;
-    }
     const input = {
       project_id: style.uploadedAsset.project_id,
       asset_id: style.uploadedAsset.asset_id,
       locale: lang === "zh" ? "zh-CN" as const : "en-US" as const,
       room_type: roomTypeToCode(style.roomType),
-      style_id: template.styleId ?? "modern_east" as const,
-      style_profile: template.styleProfile,
+      style_id: usesCustomReference ? "custom_reference" as const : template.styleId,
+      style_profile: usesCustomReference ? "reference-led" as const : template.styleProfile,
       renovation_scope: "finishes_and_furnishing" as const,
       preferences: style.customRequirements.trim() ? [style.customRequirements.trim()] : [],
       ...(usesCustomReference && style.referenceAsset ? { reference_asset_id: style.referenceAsset.asset_id } : {}),
@@ -409,14 +403,6 @@ export function StyleFlowPage() {
             onChange={(event) => onReferenceChosen(event.target.files?.[0])}
           />
 
-          {style.uploadedAsset && !isDemo && !usesCustomReference && selectedTemplate && !selectedTemplate.styleId && (
-            <p className="style-availability-note" role="status">
-              {lang === "zh"
-                ? `${selectedTemplate.nameZh}目前可在风格案例中查看；上传照片生成正在准备中。`
-                : `${selectedTemplate.name} is available in the Style Example; generation for uploaded rooms is being prepared.`}
-            </p>
-          )}
-
           {style.agentError && <p className="layout-agent-error" role="alert">{style.agentError}</p>}
 
           <Button
@@ -428,7 +414,6 @@ export function StyleFlowPage() {
               || uploading
               || uploadingReference
               || style.phase === "generating"
-              || (!isDemo && !usesCustomReference && !selectedTemplate?.styleId)
             }
           >
             <Sparkle />

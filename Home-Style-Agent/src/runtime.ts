@@ -16,12 +16,24 @@ import type {
   StyleAgentResponse,
   StyleTurnRequest,
   StyleTurnResult,
+  StyleId,
 } from './contracts.js';
 import { responseSchemaPath } from './paths.js';
 import { assertStyleTurnRequest, parseStyleAgentResponse } from './validation.js';
 
 const RESPONSE_SCHEMA = JSON.parse(readFileSync(responseSchemaPath, 'utf8')) as unknown;
-export const MODERN_EAST_KNOWLEDGE_VERSION = '0.1-research';
+export const STYLE_KNOWLEDGE = {
+  modern_east: { skillName: 'modern-east-style', knowledgeVersion: '0.2-production' },
+  california_modern: { skillName: 'california-modern-style', knowledgeVersion: '0.1-research' },
+  maximal_luxe: { skillName: 'maximal-luxe-style', knowledgeVersion: '0.1-research' },
+  custom_reference: { skillName: null, knowledgeVersion: 'reference-v1' },
+} as const satisfies Record<StyleId, { skillName: string | null; knowledgeVersion: string }>;
+
+export const MODERN_EAST_KNOWLEDGE_VERSION = STYLE_KNOWLEDGE.modern_east.knowledgeVersion;
+
+export function styleKnowledge(styleId: StyleId) {
+  return STYLE_KNOWLEDGE[styleId];
+}
 
 export interface HomeStyleRuntimeOptions {
   agentId: string;
@@ -157,7 +169,7 @@ export class HomeStyleRuntime {
     const response = parseStyleAgentResponse(raw.text);
     if (response.request_id !== request.request_id) throw new Error('Style response request_id does not match request');
     if (response.style_id !== request.style_id) throw new Error('Style response style_id does not match request');
-    if (response.knowledge_version !== MODERN_EAST_KNOWLEDGE_VERSION) {
+    if (response.knowledge_version !== styleKnowledge(request.style_id).knowledgeVersion) {
       throw new Error('Style response knowledge_version does not match the deployed catalog');
     }
     const passedQa = response.qa.structure_preserved
@@ -187,10 +199,12 @@ export class HomeStyleRuntime {
 
   private buildEvents(request: StyleTurnRequest): OutboundEvent[] {
     const filename = `${request.home_id}_${request.request_id}_style.png`;
+    const selected = styleKnowledge(request.style_id);
+    const isReferenceLed = request.style_id === 'custom_reference';
     const hasStyleReference = Boolean(request.style_reference_asset_ref);
-    const aestheticSourceInstruction = hasStyleReference
-      ? 'Read the modern-east-style Skill for residential quality, structural safety, and negative constraints. Treat style_reference_asset_ref as the user-selected primary aesthetic evidence for colors, material character, furniture language, styling density, and lighting only; do not copy its room architecture, layout, camera, text, artwork, or identifiable objects.'
-      : 'Read and use the modern-east-style Skill as the only aesthetic source.';
+    const aestheticSourceInstruction = isReferenceLed
+      ? 'Do not read or mix any preset aesthetic Skill. Treat style_reference_asset_ref as the sole aesthetic evidence for color hierarchy, material character, furniture language, styling density, art direction, ceiling treatment, and lighting. Transfer those design attributes without copying its room architecture, layout, camera, text, artwork, or identifiable objects.'
+      : `Read and use the ${selected.skillName} Skill as the only aesthetic source. Meet its visual-density and identity gates strongly enough that the selected style is immediately recognizable.`;
     const inspectInstruction = hasStyleReference
       ? 'Inspect source_asset_ref and style_reference_asset_ref once each with the available ZooWork visual tool before composing the edit prompt. Record which visual facts belong to structure versus style. Do not ask the visual tool to estimate image dimensions or aspect ratio; request.source_raster is authoritative.'
       : 'Inspect source_asset_ref once with the available ZooWork visual tool before composing the edit prompt. Do not ask the visual tool to estimate image dimensions or aspect ratio; request.source_raster is authoritative.';
@@ -207,23 +221,24 @@ export class HomeStyleRuntime {
         runtime_timestamp: new Date().toISOString(),
         selected_knowledge: {
           style_id: request.style_id,
-          skill_name: 'modern-east-style',
-          knowledge_version: MODERN_EAST_KNOWLEDGE_VERSION,
+          skill_name: selected.skillName,
+          knowledge_version: selected.knowledgeVersion,
         },
         contracts: { response_schema: RESPONSE_SCHEMA },
         request,
         output_requirement: [
           `${aestheticSourceInstruction} Also read the Designer Skill and only the references it requires for the current image-edit model-routing decision.`,
           inspectInstruction,
-          'Treat the visible room envelope, walls, columns, beams, doors, windows, openings, ceiling outline and height, fixed service locations, camera position, lens perspective, and crop as immutable. User preferences never override these constraints.',
-          'Change only the furnishing and finish categories permitted by renovation_scope. Keep the result a believable American residence at the source room scale.',
+          'Treat the visible room envelope, every wall junction, every column silhouette, both edges and apparent width of every column, every beam edge, slab plane, doors, windows, openings, ceiling height, fixed service locations, camera position, lens perspective, and crop as immutable. Preserve their exact pixel-registered positions relative to the image borders and each other. User preferences never override these constraints.',
+          'Change only the furnishing and finish categories permitted by renovation_scope. Ceiling finish and decorative lighting may be redesigned, including a shallow applied perimeter reveal or cove, continuous indirect light, wall wash, and one room-scaled statement fixture, but never move or conceal a structural beam, shift the slab plane, lower the room perceptibly, change a column, or move a door/window head. Do not settle for two isolated spotlights as the entire ceiling design.',
+          'Keep the result a believable, fully resolved American residence at the source room scale. Furnish the usable zones completely with correctly scaled furniture, textiles, art, and lighting; avoid an under-furnished or generic staging result.',
           'Build the English image-edit prompt from the Skill schema and room component. Do not include research sources, firm names, designer names, or unsupported weighting syntax.',
           'The See My Home UI click is explicit authorization to generate one image now. Do not ask the user to choose a model, do not write Designer preferences, and do not pause for confirmation.',
           'Use the Designer Skill existing-image workflow and its image_generation_cli.py. Do not call the generic image_generate tool. For this constraint-heavy edit, prioritize the Designer routing rule for strongest instruction fidelity and source adherence over lowest cost.',
           rasterInstruction,
           designerImagesInstruction,
           `Capture the single output path printed by the Designer CLI and copy it to "/workspace/artifacts/${request.home_id}/${filename}". An empty output path or failed command is a failed response.`,
-          `Use Pillow to verify the copied output orientation and aspect ratio against the actual source raster before visual QA. Require the same orientation and relative aspect-ratio drift no greater than 3 percent; reject larger drift rather than repairing it with crop, resize, rotation, or padding. Then inspect the copied output image once and compare it with the original at the level of crop, camera position, perspective, wall and ceiling boundaries, columns, beams, window and door count, opening size and position, and fixed service locations.`,
+          `Use Pillow to verify the copied output orientation and aspect ratio against the actual source raster before visual QA. Require the same orientation and relative aspect-ratio drift no greater than 3 percent; reject larger drift rather than repairing it with crop, resize, rotation, or padding. Then inspect the copied output image once beside the original. Trace and compare both visible edges of every column and beam, their apparent widths, wall-column junctions, slab and ceiling boundaries, crop, camera position, perspective, window and door count, opening size and position, and fixed service locations. Decorative cladding may change surface appearance but must not move, narrow, widen, merge, hide, or reshape the underlying structural silhouette.`,
           'If the raster is missing, corrupt, or any immutable structure or camera geometry changed, do not publish it. Return status="failed", qa.publishable=false, and precise warnings.',
           'If structure and camera are preserved and the style avoids all forbidden patterns, call artifact_publish exactly once. Return status="completed" and use the returned artifact id.',
           'Return one compact JSON object matching response_schema immediately after the publish-or-withhold decision. Keep style_summary under 700 characters and every warning under 280 characters. Do not use Markdown fences, append an artifact link or filename after the JSON, or request another API key.',

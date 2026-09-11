@@ -9,6 +9,13 @@ export type StyleRoomCode =
   | "home_office"
   | "other";
 
+export type StyleId = "modern_east" | "california_modern" | "maximal_luxe" | "custom_reference";
+export type StyleProfile =
+  | "quiet-poise" | "urban-elegance" | "sculptural-luxe" | "warm-residence"
+  | "sunlit-casual" | "ranch-modern" | "coastal-modern" | "desert-warm"
+  | "edited-glamour" | "eighties-socialite" | "regency-modern" | "collector-color"
+  | "reference-led";
+
 export interface UploadedStyleAsset {
   project_id: string;
   asset_id: string;
@@ -25,7 +32,7 @@ export interface StyleAgentResponse {
   contract_version: "home-style-v1";
   request_id: string;
   status: "completed" | "failed";
-  style_id: "modern_east";
+  style_id: StyleId;
   knowledge_version: string;
   artifact_id?: string;
   style_summary?: string;
@@ -42,8 +49,8 @@ export interface StyleGenerationResult {
   session_id: string;
   request_id: string;
   project_id: string;
-  style_id: "modern_east";
-  style_profile: "quiet-poise" | "urban-elegance" | "sculptural-luxe" | "warm-residence";
+  style_id: StyleId;
+  style_profile: StyleProfile;
   knowledge_version: string;
   response: StyleAgentResponse;
   generated_image: {
@@ -62,7 +69,7 @@ export interface StyleGenerateInput {
   reference_asset_id?: string;
   locale: "en-US" | "zh-CN";
   room_type: StyleRoomCode;
-  style_id: "modern_east";
+  style_id: StyleId;
   style_profile?: StyleGenerationResult["style_profile"];
   renovation_scope?: "soft_furnishing_only" | "finishes_and_furnishing" | "limited_hard_finish";
   preferences?: string[];

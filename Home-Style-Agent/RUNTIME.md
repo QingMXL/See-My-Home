@@ -33,7 +33,7 @@ pnpm test
 pnpm package:skills
 ```
 
-The generated archive is `dist/skills/modern-east-style.zip`. Its top-level directory is `modern-east-style/`, matching the `name` in `SKILL.md`. The archive contains only the production prompt components and sanitized schema; research images and provenance are excluded.
+The generated archives are `dist/skills/modern-east-style.zip`, `dist/skills/california-modern-style.zip`, and `dist/skills/maximal-luxe-style.zip`. Each top-level directory matches the `name` in its `SKILL.md`. Archives contain only production prompt components and sanitized schemas; research images and provenance are excluded.
 
 ## Remote provisioning — only after explicit approval
 

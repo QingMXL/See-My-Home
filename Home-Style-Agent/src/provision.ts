@@ -11,13 +11,13 @@ import {
 import { createHomeStyleAgentResource } from './agent-definition.js';
 import { projectRoot, runtimeStatePath } from './paths.js';
 
-export const HOME_STYLE_SKILL = 'modern-east-style' as const;
+export const HOME_STYLE_SKILLS = ['modern-east-style', 'california-modern-style', 'maximal-luxe-style'] as const;
+export type HomeStyleSkillName = typeof HOME_STYLE_SKILLS[number];
 
 export interface ProvisionedStyleAgentState {
   agent_id: string;
   model_id: string;
-  style_skill_id: string;
-  style_skill_version: number;
+  style_skills: Array<{ name: HomeStyleSkillName; skill_id: string; version: number }>;
   provisioned_at: string;
 }
 
@@ -35,21 +35,21 @@ function requireRemoteWriteGuard(): void {
   }
 }
 
-function archiveBytes(): Uint8Array {
-  return new Uint8Array(readFileSync(resolve(projectRoot, 'dist', 'skills', `${HOME_STYLE_SKILL}.zip`)));
+function archiveBytes(skillName: HomeStyleSkillName): Uint8Array {
+  return new Uint8Array(readFileSync(resolve(projectRoot, 'dist', 'skills', `${skillName}.zip`)));
 }
 
-async function resolveOwnedStyleSkill(client: ZooworkClient): Promise<SkillRecord> {
-  const matches = (await client.listSkills({ q: HOME_STYLE_SKILL }))
-    .filter((skill) => skill.name === HOME_STYLE_SKILL && (skill.scope === 'org' || skill.scope === 'personal'));
-  if (matches.length > 1) throw new Error(`More than one owned ${HOME_STYLE_SKILL} skill exists; resolve manually`);
+async function resolveOwnedStyleSkill(client: ZooworkClient, skillName: HomeStyleSkillName): Promise<SkillRecord> {
+  const matches = (await client.listSkills({ q: skillName }))
+    .filter((skill) => skill.name === skillName && (skill.scope === 'org' || skill.scope === 'personal'));
+  if (matches.length > 1) throw new Error(`More than one owned ${skillName} skill exists; resolve manually`);
   if (matches[0]) return matches[0];
-  const bytes = archiveBytes();
+  const bytes = archiveBytes(skillName);
   const digest = createHash('sha256').update(bytes).digest('hex').slice(0, 20);
   return client.uploadSkill(bytes, {
     scope: 'org',
-    fileName: `${HOME_STYLE_SKILL}.zip`,
-    idempotencyKey: `see-my-home:${HOME_STYLE_SKILL}:${digest}`,
+    fileName: `${skillName}.zip`,
+    idempotencyKey: `see-my-home:${skillName}:${digest}`,
   });
 }
 
@@ -107,7 +107,7 @@ async function ensureRunning(client: ZooworkClient, agent: AgentRecord): Promise
   await client.waitUntilRunning(agent.agent_id, { timeoutMs: 60_000 });
 }
 
-async function attachPinnedStyleSkill(client: ZooworkClient, agentId: string, skill: SkillRecord): Promise<number> {
+async function attachPinnedStyleSkill(client: ZooworkClient, agentId: string, skillName: HomeStyleSkillName, skill: SkillRecord): Promise<number> {
   const version = Number(skill.latest_version);
   if (!Number.isInteger(version) || version < 1) throw new Error('Style Skill latest_version is invalid');
   // One official PUT both attaches and pins. Read-back, not config_version, proves it resolved.
@@ -115,7 +115,7 @@ async function attachPinnedStyleSkill(client: ZooworkClient, agentId: string, sk
   const verified = (await client.listAgentSkills(agentId, { verbose: true }))
     .find((item) => item.skill_id === skill.skill_id);
   if (!verified || verified.eligible !== true || Number(verified.version) !== version) {
-    throw new Error(`Skill ${HOME_STYLE_SKILL} is not attached, eligible, and pinned to v${version}`);
+    throw new Error(`Skill ${skillName} is not attached, eligible, and pinned to v${version}`);
   }
   return version;
 }
@@ -129,14 +129,17 @@ export async function provisionPrivateStyleAgent(client: ZooworkClient, modelId:
   const resolved = await resolveAgent(client, modelId);
   const agent = await reconcileAgent(client, resolved, modelId);
   await ensureRunning(client, agent);
-  const skill = await resolveOwnedStyleSkill(client);
-  const version = await attachPinnedStyleSkill(client, agent.agent_id, skill);
+  const styleSkills: ProvisionedStyleAgentState['style_skills'] = [];
+  for (const skillName of HOME_STYLE_SKILLS) {
+    const skill = await resolveOwnedStyleSkill(client, skillName);
+    const version = await attachPinnedStyleSkill(client, agent.agent_id, skillName, skill);
+    styleSkills.push({ name: skillName, skill_id: skill.skill_id, version });
+  }
 
   const state: ProvisionedStyleAgentState = {
     agent_id: agent.agent_id,
     model_id: modelId,
-    style_skill_id: skill.skill_id,
-    style_skill_version: version,
+    style_skills: styleSkills,
     provisioned_at: new Date().toISOString(),
   };
   mkdirSync(dirname(runtimeStatePath), { recursive: true });
@@ -144,29 +147,43 @@ export async function provisionPrivateStyleAgent(client: ZooworkClient, modelId:
   return state;
 }
 
-export async function syncStyleSkill(client: ZooworkClient) {
+export async function syncStyleSkills(client: ZooworkClient) {
   requireRemoteWriteGuard();
-  const matches = (await client.listSkills({ q: HOME_STYLE_SKILL }))
-    .filter((skill) => skill.name === HOME_STYLE_SKILL && (skill.scope === 'org' || skill.scope === 'personal'));
-  if (matches.length !== 1) throw new Error(`Expected one owned ${HOME_STYLE_SKILL} skill, found ${matches.length}`);
-  const skill = matches[0];
-  if (!skill) throw new Error('Style Skill is missing');
-  const bytes = archiveBytes();
-  const digest = createHash('sha256').update(bytes).digest('hex').slice(0, 20);
-  const updated = await client.uploadSkillVersion(skill.skill_id, bytes, {
-    fileName: `${HOME_STYLE_SKILL}.zip`,
-    idempotencyKey: `see-my-home:${HOME_STYLE_SKILL}:${digest}`,
-  });
   const agentId = process.env.ZOOWORK_STYLE_AGENT_ID?.trim();
-  // Published SDK 0.5.2 still types this receipt as SkillRecord/latest_version,
-  // while the current official source returns SkillVersionRecord/version.
-  const version = skillVersionFromReceipt(updated);
   if (!agentId) throw new Error('ZOOWORK_STYLE_AGENT_ID is required to advance the pinned Skill version');
-  await client.putAgentSkill(agentId, skill.skill_id, { enabled: true, versionPin: version });
-  const verified = (await client.listAgentSkills(agentId, { verbose: true }))
-    .find((item) => item.skill_id === skill.skill_id);
-  if (!verified || verified.eligible !== true || Number(verified.version) !== version) {
-    throw new Error(`Skill ${HOME_STYLE_SKILL} did not advance to pinned version ${version}`);
+  const synced: Array<{ name: HomeStyleSkillName; skill_id: string; version: number; state: unknown }> = [];
+  for (const skillName of HOME_STYLE_SKILLS) {
+    const matches = (await client.listSkills({ q: skillName }))
+      .filter((skill) => skill.name === skillName && (skill.scope === 'org' || skill.scope === 'personal'));
+    if (matches.length > 1) throw new Error(`Expected at most one owned ${skillName} skill, found ${matches.length}`);
+    const bytes = archiveBytes(skillName);
+    const digest = createHash('sha256').update(bytes).digest('hex').slice(0, 20);
+    let skill = matches[0];
+    let version: number;
+    let state: unknown;
+    if (skill) {
+      const updated = await client.uploadSkillVersion(skill.skill_id, bytes, {
+        fileName: `${skillName}.zip`,
+        idempotencyKey: `see-my-home:${skillName}:${digest}`,
+      });
+      version = skillVersionFromReceipt(updated);
+      state = updated;
+    } else {
+      skill = await client.uploadSkill(bytes, {
+        scope: 'org',
+        fileName: `${skillName}.zip`,
+        idempotencyKey: `see-my-home:${skillName}:${digest}`,
+      });
+      version = skillVersionFromReceipt(skill);
+      state = skill;
+    }
+    await client.putAgentSkill(agentId, skill.skill_id, { enabled: true, versionPin: version });
+    const verified = (await client.listAgentSkills(agentId, { verbose: true }))
+      .find((item) => item.skill_id === skill.skill_id);
+    if (!verified || verified.eligible !== true || Number(verified.version) !== version) {
+      throw new Error(`Skill ${skillName} did not advance to pinned version ${version}`);
+    }
+    synced.push({ name: skillName, skill_id: skill.skill_id, version, state });
   }
-  return updated;
+  return synced;
 }

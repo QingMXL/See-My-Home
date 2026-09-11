@@ -11,6 +11,18 @@
         "knowledge_base_id": "ce58f618f8c2407da0a1ac6860d167ab",
         "runtime_attachment": "unsupported_by_sdk_0.5.2"
       }
+    },
+    "california_modern": {
+      "runtime_provider": "zoowork_skill",
+      "skill_name": "california-modern-style",
+      "skill_scope": "org",
+      "version_policy": "pinned"
+    },
+    "maximal_luxe": {
+      "runtime_provider": "zoowork_skill",
+      "skill_name": "maximal-luxe-style",
+      "skill_scope": "org",
+      "version_policy": "pinned"
     }
   }
 }

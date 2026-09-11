@@ -4,7 +4,7 @@
     "modern_east": {
       "display_name": "Modern East",
       "display_name_zh": "摩登东方",
-      "knowledge_version": "0.1-research",
+      "knowledge_version": "0.2-production",
       "source_directory": "knowledge/modern-east",
       "default_profile": "quiet-poise",
       "supported_rooms": [
@@ -25,6 +25,30 @@
           "reference-images/**",
           "sources/**"
         ]
+      }
+    },
+    "california_modern": {
+      "display_name": "California Modern",
+      "display_name_zh": "加州现代",
+      "knowledge_version": "0.1-research",
+      "source_directory": "knowledge/california-modern",
+      "default_profile": "sunlit-casual",
+      "supported_rooms": ["living_room", "primary_bedroom", "kitchen", "dining_room", "bathroom", "home_office"],
+      "runtime_projection": {
+        "include": ["california-modern-knowledge-base.md", "prompts/california-modern-prompts.md", "schema/california-modern.v1.yaml"],
+        "exclude": ["reference-images/**", "sources/**"]
+      }
+    },
+    "maximal_luxe": {
+      "display_name": "Maximal Luxe",
+      "display_name_zh": "极繁奢华",
+      "knowledge_version": "0.1-research",
+      "source_directory": "knowledge/maximal-luxe",
+      "default_profile": "edited-glamour",
+      "supported_rooms": ["living_room", "primary_bedroom", "kitchen", "dining_room", "bathroom", "home_office"],
+      "runtime_projection": {
+        "include": ["maximal-luxe-knowledge-base.md", "prompts/maximal-luxe-prompts.md", "schema/maximal-luxe.v1.yaml"],
+        "exclude": ["reference-images/**", "sources/**"]
       }
     }
   }

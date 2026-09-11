@@ -5,11 +5,11 @@
 
 ## 1. 知识放在哪里
 
-Modern East 采用三层结构：
+每套预设风格采用三层结构：
 
 | 层 | 位置 | 内容 | 是否包含图片 |
 |---|---|---|---|
-| 研究源 | `knowledge/modern-east/` | 完整研究、出处、结构化规则、Prompt 组件 | 是，仅供内部校对 |
+| 研究源 | `knowledge/<style>/` | 完整研究、出处、结构化规则、Prompt 组件 | 是，仅供内部校对 |
 | 生产投影 | 构建生成的 Skill 或检索文档 | 去掉设计师名称、出处说明和图片后的模型可读规则 | 否 |
 | 运行时绑定 | 服务端配置 / ZooWork Agent | `style_id -> knowledge version -> remote resource` | 否 |
 
@@ -25,11 +25,11 @@ Home Layout Agent 管理平面图、房间功能和 Home Model；Home Style Agen
 - `home-style`
 - `home-furniture`
 
-在 Home Style 域内部，当前只有 `modern_east` 是可运行风格。两个后续风格只作为 UI 占位，不提前创建远端 Skill 或虚构内部 ID。新风格只有在知识源、生产投影、契约、QA 与 ZooWork smoke test 全部完成后，才进入服务端风格目录。
+Home Style 当前开放 `modern_east`、`california_modern` 与 `maximal_luxe` 三套独立预设。`custom_reference` 不绑定预设 Skill，参考图是当次唯一审美来源。新风格仍需在知识源、生产投影、契约、QA 与 ZooWork smoke test 完成后才能进入服务端目录。
 
 ## 3. 知识库与 Agent 的职责
 
-知识库回答“Modern East 看起来是什么”：风格 DNA、材质、色彩、家具、灯光、房间配方和反模式。
+每套知识库回答“这个风格看起来是什么”：风格 DNA、材质、色彩、家具、灯光、房间配方和反模式。
 
 Agent / Runtime 回答“这张图可以改什么、怎样调用模型、怎样验收”：
 
@@ -44,10 +44,10 @@ Agent / Runtime 回答“这张图可以改什么、怎样调用模型、怎样�
 
 ## 4. 推荐请求链路
 
-1. UI 上传照片，选择 `modern_east` 和房间类型。
+1. UI 上传照片，选择三套预设之一或上传风格参考图，并选择房间类型。
 2. 应用后端保存原图，并生成 Agent 可访问的短期资源引用。
 3. Runtime 分析原图，产生 `immutable_elements` 与 `editable_elements`。
-4. 服务端目录把 `modern_east` 解析成固定知识版本；客户端无权提供远端知识 ID。
+4. 服务端目录把风格 ID 解析成固定知识版本；参考图路径解析为 `reference-v1`，客户端无权提供远端知识 ID。
 5. 只选择通用片段、对应房间片段、用户偏好与统一负向约束。
 6. ZooWork Agent 读取内置 Designer Skill，按其模型路由调用一次现有图片编辑流程。
 7. UI 使用服务端签名的短期 job token 轮询同一 ZooWork Session；轮询不会重复提交生图事件。
@@ -57,7 +57,7 @@ Agent / Runtime 回答“这张图可以改什么、怎样调用模型、怎样�
 
 ### 当前可验证方案：私有 Skill
 
-把生产投影打包成 `modern-east-style` Skill，上传并挂到独立的 Home Style Agent。事件中同时传入确定性的 `style_id` 和 `knowledge_version`，避免模型凭自然语言猜风格。
+把三套生产投影分别打包成 `modern-east-style`、`california-modern-style` 与 `maximal-luxe-style`，上传并挂到同一个独立 Home Style Agent。事件中同时传入确定性的 `style_id`、Skill 名与 `knowledge_version`，避免模型凭自然语言猜风格或混用知识。
 
 当未来风格很多时，不建议每次把所有风格全文装入 Prompt。可以选择：
 

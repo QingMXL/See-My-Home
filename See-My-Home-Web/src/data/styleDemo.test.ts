@@ -10,7 +10,7 @@ describe("Home Style example", () => {
         asset_id: DEMO_STYLE_ASSET.asset_id,
         locale: "en-US",
         room_type: "living_room",
-        style_id: "modern_east",
+        style_id: template.styleId,
         style_profile: template.styleProfile,
         renovation_scope: "finishes_and_furnishing",
       });
@@ -18,6 +18,7 @@ describe("Home Style example", () => {
       expect(result.generated_image.url).toBe(template.demoResultUrl);
       expect(result.generated_image.provider_model).toBe("Pre-rendered demo");
       expect(result.request_id).toContain(template.id);
+      expect(result.style_id).toBe(template.styleId);
     }
   });
 

@@ -2,8 +2,7 @@ import type { StyleGenerationResult } from "../lib/homeStyleApi";
 
 export interface StyleTemplate {
   id: "modern-oriental" | "california-modern" | "maximal-luxe";
-  /** Only styles with this binding can run against a user upload. */
-  styleId?: "modern_east";
+  styleId: "modern_east" | "california_modern" | "maximal_luxe";
   styleProfile: StyleGenerationResult["style_profile"];
   name: string;
   nameZh: string;
@@ -25,8 +24,8 @@ export interface StyleStory {
 }
 
 /**
- * Three visible presets share one bundled source room. A missing styleId means
- * that the preset is available for the pre-rendered example but not live uploads.
+ * Three visible presets share one bundled source room and map to independent
+ * server-owned ZooWork style Skills.
  */
 export const STYLE_TEMPLATES: StyleTemplate[] = [
   {
@@ -57,7 +56,8 @@ export const STYLE_TEMPLATES: StyleTemplate[] = [
   },
   {
     id: "california-modern",
-    styleProfile: "warm-residence",
+    styleId: "california_modern",
+    styleProfile: "sunlit-casual",
     name: "California Modern",
     nameZh: "加州现代",
     tagline: "Sunlit California minimalism with a relaxed gallery feel.",
@@ -82,7 +82,8 @@ export const STYLE_TEMPLATES: StyleTemplate[] = [
   },
   {
     id: "maximal-luxe",
-    styleProfile: "sculptural-luxe",
+    styleId: "maximal_luxe",
+    styleProfile: "edited-glamour",
     name: "Maximal Luxe",
     nameZh: "极繁奢华",
     tagline: "High-glamour layering with bold color and artistic drama.",

@@ -99,7 +99,7 @@ renovation_levels:
   furnish:
     editable: [movable_furniture, rugs, curtains, freestanding_lighting, art, plants, decor]
   refresh:
-    editable: [paint, wall_finish, floor_finish, cabinet_front_finish, movable_furniture, lighting, textiles, decor]
+    editable: [paint, wall_finish, floor_finish, ceiling_finish_without_structural_change, shallow_perimeter_cove, cabinet_front_finish, movable_furniture, lighting, textiles, decor]
   light-remodel:
     editable: [explicitly_masked_non_structural_built_ins]
     requires_explicit_mask: true
@@ -124,7 +124,7 @@ room_recipes:
 
 raw_shell_rules:
   immutable: [visible_walls, slab_edges, beams, columns, ceiling_planes, door_openings, window_openings]
-  add: [plausible_finishes, justified_cabinetry, practical_lighting, furniture, textiles, restrained_decor]
+  add: [plausible_finishes, shallow_non_structural_ceiling_treatment, layered_lighting, justified_cabinetry, complete_furniture_group, textiles, restrained_decor]
   never_invent: [new_windows, new_doors, fireplace, arches, beams, stairs, mezzanine, vaulted_ceiling]
   daylight_assumption: conservative
   service_assumption: conservative

@@ -1,4 +1,4 @@
-# Modern East Prompt Library v0.1
+# Modern East Prompt Library v0.2
 
 这些 Prompt 是模型无关的语义组件。Style Agent 应按输入图、房间、子风格和改造等级选择组件，再由模型适配器转换为目标 API 的格式。
 
@@ -21,13 +21,13 @@
 ## 2. 通用正向基础片段
 
 ```text
-Restyle this real residential {{room_type}} in the Modern East aesthetic: a refined contemporary interior shaped by Eastern restraint, layered views, calibrated negative space, quiet material contrast, and a strong relationship between light, nature, and daily life. Use clean architectural planes, balanced asymmetry, subtle framed sightlines, and at most one controlled sculptural gesture. Build a warm, low-saturation palette from warm ivory, stone greige, mushroom taupe, matte dark oak or smoked walnut, pale honed stone, tactile neutral textiles, and sparse satin-bronze or blackened-metal details. Choose comfortable, conventionally scaled residential furniture with tailored silhouettes and softly rounded edges. Make the style legible without themed decoration by combining three restrained identity anchors: one spatial anchor such as a dark linear datum or framed sightline; one material anchor pairing quiet mineral or honed stone with matte dark timber and tactile textile; and one cultural-abstraction anchor such as ink-like abstract art, a paper- or silk-like diffused lamp, or a handcrafted ceramic vessel with a restrained branch. Use realistic soft daylight, warm indirect illumination, low glare, and believable material texture. The result must feel collected, calm, culturally nuanced, contemporary, highly livable, and photographed as a real home rather than a showroom—not generic beige contemporary or generic warm minimalism.
+Restyle this real residential {{room_type}} in an unmistakable Modern East aesthetic: contemporary architectural clarity shaped by Eastern restraint, layered views, calibrated negative space, strong material hierarchy, and a composed relationship between light, nature, art, and daily life. Build one clear spatial datum and a complete residential composition. Use warm ivory mineral plaster, stone greige, mushroom taupe, a substantial matte dark-oak or smoked-walnut element, one pale honed limestone or quiet-veined marble anchor, tactile linen or bouclé upholstery, a layered wool or silk-blend rug, and restrained satin-bronze or blackened-metal details. Add tailored sculptural furniture at normal residential scale, functional side pieces, full-height window treatment where appropriate, one confident ink-like abstract artwork, paper- or silk-like diffused light, and one handcrafted ceramic or stone object. Design a visible fifth-plane ceiling treatment with a shallow applied perimeter reveal or cove, continuous warm indirect illumination, focused wall wash, and one room-scaled statement fixture where appropriate, while preserving the structural ceiling plane and height. The result must be richly resolved and recognizable at first glance, never under-furnished, generic beige contemporary, generic warm minimalism, literal historical styling, or a hotel lobby.
 ```
 
 ## 3. 强制结构保护片段
 
 ```text
-This is a controlled image edit, not a scene replacement. Preserve the input photograph as the geometric and camera authority. Keep the exact source aspect ratio, crop, framing, camera position, camera height, focal-length feel, vanishing points and perspective. Keep the exact room envelope, wall positions, columns, beams, ceiling height, doors, windows, openings, recesses, glazing divisions and built-in boundaries. Preserve the exact count, dimensions, position and panel divisions of all doors and windows. Keep all fixed fixtures and service locations listed in {{fixed_fixtures}}. Make changes only inside {{editable_scope}}. Do not recenter, straighten, widen, crop, zoom, rotate, enlarge, simplify, rebuild, reframe or reinterpret the architecture. Maintain realistic residential clearances and circulation.
+This is a controlled image edit, not a scene replacement. Preserve the input photograph as the pixel-registered geometric and camera authority. Keep the exact source aspect ratio, crop, framing, camera position, camera height, focal-length feel, vanishing points and perspective. Keep the exact room envelope and wall junctions. Preserve both visible edges, silhouette, apparent width and image-border position of every column and beam. Preserve the structural slab plane, ceiling height, doors, windows, openings, recesses, glazing divisions and built-in boundaries. Keep the exact count, dimensions, position and panel divisions of all doors and windows. Keep all fixed fixtures and service locations listed in {{fixed_fixtures}}. Make changes only inside {{editable_scope}}. Decorative cladding may change surface appearance but must not move, narrow, widen, merge, hide or reshape structure. Do not recenter, straighten, widen, crop, zoom, rotate, enlarge, simplify, rebuild, reframe or reinterpret the architecture. Maintain realistic residential clearances and circulation.
 ```
 
 注意：此片段必须与 Agent 的不可编辑 Mask、结构条件及后验校验共同使用。
@@ -37,7 +37,7 @@ This is a controlled image edit, not a scene replacement. Preserve the input pho
 ### `quiet-poise`｜默认
 
 ```text
-Favor quiet poise: warm pale neutrals, tactile fabrics, restrained dark timber framing, gentle natural light, sparse art, comfortable seating, and generous but functional breathing room. Preserve a clearly visible dark horizontal or portal-like datum and one ink-like, paper-like, or handcrafted focal detail so the room remains distinctly Modern East rather than generic beige contemporary. Keep every gesture subtle and suitable for an everyday American home.
+Favor quiet poise without visual weakness: warm pale neutrals, tactile fabrics, a clearly visible dark-timber datum, gentle natural light, confident abstract art, comfortable complete furnishing, and deliberate breathing room. Pair mineral plaster, honed stone, dark timber, layered textile and bronze in a controlled hierarchy. Keep the room distinctly Modern East and richly resolved while suitable for an everyday American home.
 ```
 
 ### `urban-elegance`
@@ -89,7 +89,7 @@ Create a calm, warm Modern East bathroom with honed pale stone, a restrained tim
 把这一片段附加到相应房间 Prompt，而不是单独生成空间。
 
 ```text
-The input is an unfinished shell. Treat every visible wall, slab edge, beam, column, ceiling plane, door opening, window opening, and camera relationship as immutable. Complete the room through finishes, lighting, cabinetry only where functionally justified, furniture, textiles, and decor. Do not invent additional windows, doors, fireplaces, stairs, mezzanines, vaulted ceilings, or structural openings. Use conservative assumptions for plumbing and electrical services, and keep the design buildable within the visible envelope.
+The input is an unfinished shell. Treat every visible wall, slab edge, beam, column, structural ceiling plane, door opening, window opening, and camera relationship as immutable. Complete every usable zone through substantial but coherent finishes, a shallow non-structural ceiling finish layer where appropriate, layered lighting, cabinetry only where functionally justified, correctly scaled furniture, textiles, art, and decor. Do not leave the room looking empty or merely staged with a few objects. Do not invent additional windows, doors, fireplaces, stairs, mezzanines, vaulted ceilings, structural openings, or deep dropped ceilings. Use conservative assumptions for plumbing and electrical services, and keep the design buildable within the visible envelope.
 ```
 
 ## 7. 旧房改造片段
@@ -109,7 +109,7 @@ Limit the redesign to movable furniture, rugs, curtains, freestanding lighting, 
 ### `refresh`
 
 ```text
-Allow paint, wall finish, flooring appearance, cabinet-front finish, movable furniture, lighting, textiles, and decor. Preserve the location, size, geometry, and function of every built-in element and fixture.
+Allow paint, wall finish, flooring appearance, cabinet-front finish, movable furniture, textiles, art, decorative lighting, and a shallow applied ceiling finish or perimeter cove that does not alter structural height, beams, columns, or opening heads. Preserve the location, size, geometry, and function of every built-in element and fixture.
 ```
 
 ### `light-remodel`

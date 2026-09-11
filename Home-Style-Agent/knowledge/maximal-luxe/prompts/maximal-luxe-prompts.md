@@ -17,7 +17,7 @@ Production prompts are English-only. Names of designers, studios, publications, 
 ## 2. Universal positive base
 
 ```text
-Edit the supplied interior photograph into a Maximal Luxe residence: bold, collected and glamorous, yet carefully edited and fully livable. Build one clear dramatic focal point using saturated color, sculptural comfortable furniture, layered art, controlled pattern, rich tactile textiles, expressive material contrast and a few jewel-like reflective accents. Create hierarchy rather than clutter: one dominant field color, one supporting jewel tone, a neutral breathing color, one coherent metal finish, and no more than two pattern families at clearly different scales. Keep circulation, ergonomics and residential comfort believable.
+Edit the supplied interior photograph into an unmistakable Maximal Luxe residence: bold, collected and glamorous, yet carefully edited and fully livable. Reach a controlled 60–75% visual density and build one clear dramatic focal point using saturated color, sculptural comfortable furniture, layered art, controlled pattern, rich tactile textiles, expressive material contrast and a few jewel-like reflective accents. Create hierarchy rather than clutter: one dominant field color, one supporting jewel tone, a neutral breathing color, one coherent metal finish, and no more than two pattern families at clearly different scales. Treat the ceiling as a major design layer with a shallow applied perimeter cove or graphic reveal, one room-scaled statement fixture, warm picture or wall lighting, and controlled accent pools, without changing the structural slab plane, beams, columns, room height, or opening heads. Keep circulation, ergonomics and residential comfort believable.
 ```
 
 ## 3. Mandatory source-preservation block
@@ -83,7 +83,7 @@ Keep all fixture and wet-zone locations. For a full bath, choose one expressive 
 ## 6. Raw-shell completion fragment
 
 ```text
-Complete the unfinished room without changing its visible geometry. Treat all existing walls, slab edges, beams, columns, ceiling planes, door openings and window openings as immutable. First add plausible residential finishes, necessary cabinetry within the approved scope, practical lighting and correctly scaled furniture; then add the controlled color, art, pattern and reflective accents. Do not invent arches, columns, fireplaces, stairs, mezzanines, grand foyers or structural openings.
+Complete the unfinished room without changing its visible geometry. Treat all existing walls, slab edges, beams, columns, structural ceiling plane, door openings and window openings as immutable. First add plausible residential finishes, a shallow non-structural ceiling treatment, layered lighting, necessary cabinetry within the approved scope and correctly scaled furniture; then add controlled color, art, pattern and reflective accents until the room reaches a deliberate 60–75% visual density. Do not invent arches, columns, fireplaces, stairs, mezzanines, grand foyers, deep dropped ceilings or structural openings.
 ```
 
 ## 7. Renovation-level fragments

@@ -6,6 +6,18 @@
       "skill_name": "modern-east-style",
       "skill_scope": "org",
       "version_policy": "pinned"
+    },
+    "california_modern": {
+      "provider": "zoowork_skill",
+      "skill_name": "california-modern-style",
+      "skill_scope": "org",
+      "version_policy": "pinned"
+    },
+    "maximal_luxe": {
+      "provider": "zoowork_skill",
+      "skill_name": "maximal-luxe-style",
+      "skill_scope": "org",
+      "version_policy": "pinned"
     }
   }
 }

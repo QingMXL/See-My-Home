@@ -6,7 +6,7 @@ import {
   createClientFromEnvironment,
   listAvailableModels,
   provisionPrivateStyleAgent,
-  syncStyleSkill,
+  syncStyleSkills,
 } from './provision.js';
 import { assertStyleAgentResponse, assertStyleTurnRequest } from './validation.js';
 
@@ -59,7 +59,7 @@ async function main(): Promise<void> {
     return;
   }
   if (command === 'sync-skill') {
-    process.stdout.write(`${JSON.stringify(await syncStyleSkill(createClientFromEnvironment()), null, 2)}\n`);
+    process.stdout.write(`${JSON.stringify(await syncStyleSkills(createClientFromEnvironment()), null, 2)}\n`);
     return;
   }
   if (command === 'validate-request') {

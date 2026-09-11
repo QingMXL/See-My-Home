@@ -55,6 +55,28 @@ test('accepts a user-provided style reference as an optional second image', () =
   }));
 });
 
+test('accepts each deployed preset with its own profile', () => {
+  assert.doesNotThrow(() => assertStyleTurnRequest({ ...validRequest, style_id: 'california_modern', style_profile: 'sunlit-casual' }));
+  assert.doesNotThrow(() => assertStyleTurnRequest({ ...validRequest, style_id: 'maximal_luxe', style_profile: 'edited-glamour' }));
+  assert.throws(
+    () => assertStyleTurnRequest({ ...validRequest, style_id: 'california_modern', style_profile: 'quiet-poise' }),
+    ContractValidationError,
+  );
+});
+
+test('requires a reference image for the custom reference route', () => {
+  assert.throws(
+    () => assertStyleTurnRequest({ ...validRequest, style_id: 'custom_reference', style_profile: 'reference-led' }),
+    ContractValidationError,
+  );
+  assert.doesNotThrow(() => assertStyleTurnRequest({
+    ...validRequest,
+    style_id: 'custom_reference',
+    style_profile: 'reference-led',
+    style_reference_asset_ref: 'https://example.com/reference.png',
+  }));
+});
+
 test('rejects an unsupported style id', () => {
   assert.throws(
     () => assertStyleTurnRequest({ ...validRequest, style_id: 'japandi' }),

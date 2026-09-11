@@ -17,7 +17,7 @@ Production prompts are English-only. Names of designers, studios, publications, 
 ## 2. Universal positive base
 
 ```text
-Edit the supplied interior photograph into a refined California Modern residence. Create a sunlit, relaxed and grounded atmosphere with clean architectural planes, warm natural materials, tactile textiles, comfortable proportions, and an edited mix of contemporary and vintage-inspired furnishings. Use a warm mineral-toned envelope, one coherent natural wood family, quiet honed stone, linen and wool textures, softened geometry, relaxed asymmetry, and a few handcrafted objects. Keep the result elevated, functional, timeless, and genuinely lived in, with visual breathing room and realistic residential circulation.
+Edit the supplied interior photograph into a complete, refined California Modern residence. Create a sunlit, relaxed and grounded atmosphere with clean architectural planes, warm natural materials, tactile textiles, comfortable proportions, and an edited mix of contemporary and vintage-inspired furnishings. Use a warm mineral-toned envelope, one coherent natural wood family, quiet honed stone, linen and wool textures, softened geometry, relaxed asymmetry, and a few handcrafted objects. Furnish every usable zone while retaining visual breathing room. Treat the ceiling as a designed fifth plane through a shallow applied reveal or cove, warm indirect light, one simple sculptural fixture where appropriate, and practical task lighting, without changing the structural ceiling plane, beams, columns, room height, or opening heads. Keep the result elevated, functional, timeless, and genuinely lived in.
 ```
 
 ## 3. Mandatory source-preservation block
@@ -83,7 +83,7 @@ Keep all fixture and wet-zone locations. Use warm honed stone, pale timber, mine
 ## 6. Raw-shell completion fragment
 
 ```text
-Complete the unfinished room without changing its visible geometry. Treat the existing walls, slab edges, beams, columns, ceiling planes, door openings and window openings as immutable. Add only plausible residential finishes, necessary cabinetry within the approved scope, practical lighting, correctly scaled furniture, textiles and restrained decor. Do not invent daylight, views, fireplaces, arches, stairs, mezzanines or structural openings.
+Complete the unfinished room without changing its visible geometry. Treat the existing walls, slab edges, beams, columns, structural ceiling plane, door openings and window openings as immutable. Add plausible residential finishes, a shallow non-structural ceiling treatment, layered lighting, necessary cabinetry within the approved scope, correctly scaled furniture, textiles and restrained decor. Do not leave usable zones empty. Do not invent daylight, views, fireplaces, arches, stairs, mezzanines, deep dropped ceilings or structural openings.
 ```
 
 ## 7. Renovation-level fragments

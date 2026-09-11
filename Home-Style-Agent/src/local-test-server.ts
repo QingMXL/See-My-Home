@@ -6,14 +6,16 @@ import { resolve } from 'node:path';
 import { createZooworkClient, ZooworkError } from '@zoowork-ai/sdk';
 import type {
   ConversationHandle,
-  ModernEastProfile,
   RenovationScope,
+  StyleId,
+  StyleProfile,
   StyleRoomType,
   StyleTurnRequest,
   SupportedLocale,
 } from './contracts.js';
+import { DEFAULT_STYLE_PROFILES, isStyleId, isStyleProfile } from './contracts.js';
 import { projectRoot } from './paths.js';
-import { HomeStyleRuntime, HomeStyleTurnTimeoutError, MODERN_EAST_KNOWLEDGE_VERSION } from './runtime.js';
+import { HomeStyleRuntime, HomeStyleTurnTimeoutError, styleKnowledge } from './runtime.js';
 import { inspectSourceRaster } from './source-raster.js';
 
 const envPath = resolve(projectRoot, '.env');
@@ -45,7 +47,8 @@ interface ProjectState {
   referenceAsset: UploadedAsset | undefined;
   conversation: ConversationHandle;
   roomType: StyleRoomType;
-  profile: ModernEastProfile;
+  styleId: StyleId;
+  profile: StyleProfile;
   renovationScope: RenovationScope;
   preferences: string[];
   artifactIds: Set<string>;
@@ -174,7 +177,6 @@ function sourceUrl(asset: UploadedAsset): string {
 }
 
 const roomTypes = new Set<StyleRoomType>(['living_room', 'primary_bedroom', 'kitchen', 'dining_room', 'bathroom', 'home_office', 'other']);
-const profiles = new Set<ModernEastProfile>(['quiet-poise', 'urban-elegance', 'sculptural-luxe', 'warm-residence']);
 const scopes = new Set<RenovationScope>(['soft_furnishing_only', 'finishes_and_furnishing', 'limited_hard_finish']);
 
 function stringArray(value: unknown, maxItems: number): string[] {
@@ -197,8 +199,11 @@ async function createState(input: Record<string, unknown>): Promise<ProjectState
   }
   const roomType = input.room_type as StyleRoomType;
   if (!roomTypes.has(roomType)) throw new Error('room_type is unsupported');
-  const profile = (input.style_profile ?? 'quiet-poise') as ModernEastProfile;
-  if (!profiles.has(profile)) throw new Error('style_profile is unsupported');
+  if (!isStyleId(input.style_id)) throw new Error('style_id is unsupported');
+  const styleId = input.style_id;
+  const profile = (input.style_profile ?? DEFAULT_STYLE_PROFILES[styleId]) as StyleProfile;
+  if (!isStyleProfile(styleId, profile)) throw new Error('style_profile is unsupported for the selected style');
+  if (styleId === 'custom_reference' && !referenceAsset) throw new Error('custom_reference requires reference_asset_id');
   const renovationScope = (input.renovation_scope ?? 'finishes_and_furnishing') as RenovationScope;
   if (!scopes.has(renovationScope)) throw new Error('renovation_scope is unsupported');
   const preferences = stringArray(input.preferences, 12);
@@ -207,6 +212,7 @@ async function createState(input: Record<string, unknown>): Promise<ProjectState
     existing.asset = asset;
     existing.referenceAsset = referenceAsset;
     existing.roomType = roomType;
+    existing.styleId = styleId;
     existing.profile = profile;
     existing.renovationScope = renovationScope;
     existing.preferences = preferences;
@@ -219,6 +225,7 @@ async function createState(input: Record<string, unknown>): Promise<ProjectState
     referenceAsset,
     conversation,
     roomType,
+    styleId,
     profile,
     renovationScope,
     preferences,
@@ -253,13 +260,13 @@ async function runGeneration(state: ProjectState, selectedLocale: SupportedLocal
     source_raster: sourceRaster,
     ...(state.referenceAsset ? { style_reference_asset_ref: sourceUrl(state.referenceAsset) } : {}),
     room_type: state.roomType,
-    style_id: 'modern_east',
+    style_id: state.styleId,
     style_profile: state.profile,
     renovation_scope: state.renovationScope,
     user_preferences: state.preferences,
     known_immutable_elements: [
       'room envelope', 'walls', 'columns', 'beams', 'doors', 'windows', 'openings',
-      'ceiling geometry', 'fixed service locations', 'camera position', 'lens perspective', 'crop',
+      'structural ceiling plane and height', 'fixed service locations', 'camera position', 'lens perspective', 'crop',
     ],
   };
   const result = await runtime.runStyleTurn(state.conversation, request);
@@ -281,9 +288,9 @@ async function runGeneration(state: ProjectState, selectedLocale: SupportedLocal
     session_id: state.conversation.sessionId,
     request_id: request.request_id,
     project_id: state.projectId,
-    style_id: 'modern_east',
+    style_id: state.styleId,
     style_profile: state.profile,
-    knowledge_version: MODERN_EAST_KNOWLEDGE_VERSION,
+    knowledge_version: styleKnowledge(state.styleId).knowledgeVersion,
     response: result.response,
     generated_image: {
       asset_id: ready.artifactId,
@@ -354,7 +361,6 @@ const server = createServer(async (request, response) => {
       const raw = await readJson(request);
       if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) throw new Error('Body must be an object');
       const input = raw as Record<string, unknown>;
-      if (input.style_id !== 'modern_east') throw new Error('Only modern_east is currently deployed');
       const state = await createState(input);
       json(response, 200, { ...(await runGeneration(state, locale(input.locale))), request_context: input });
       return;
