@@ -18,6 +18,8 @@ const validRequest = {
     aspect_ratio: '3:2',
     orientation: 'landscape',
     designer_size: '1536x1024',
+    designer_request_size: '1024x1536',
+    designer_request_aspect_ratio: '2:3',
   },
   room_type: 'living_room',
   style_id: 'modern_east',

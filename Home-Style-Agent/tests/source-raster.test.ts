@@ -10,12 +10,18 @@ test('plans a deterministic landscape canvas from the source pixels', () => {
     aspect_ratio: '3:2',
     orientation: 'landscape',
     designer_size: '1536x1024',
+    designer_request_size: '1024x1536',
+    designer_request_aspect_ratio: '2:3',
   });
 });
 
 test('plans deterministic portrait and square canvases', () => {
   assert.equal(planSourceRaster(3024, 4032).designer_size, '1152x1536');
+  assert.equal(planSourceRaster(3024, 4032).designer_request_size, '1536x1152');
+  assert.equal(planSourceRaster(3024, 4032).designer_request_aspect_ratio, '4:3');
   assert.equal(planSourceRaster(1200, 1200).designer_size, '1536x1536');
+  assert.equal(planSourceRaster(1200, 1200).designer_request_size, '1536x1536');
+  assert.equal(planSourceRaster(1200, 1200).designer_request_aspect_ratio, '1:1');
 });
 
 test('reads raster pixels without relying on visual-model estimation', async () => {
@@ -28,6 +34,8 @@ test('reads raster pixels without relying on visual-model estimation', async () 
     aspect_ratio: '3:2',
     orientation: 'landscape',
     designer_size: '1536x1024',
+    designer_request_size: '1024x1536',
+    designer_request_aspect_ratio: '2:3',
   });
 });
 

@@ -5,6 +5,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { ModernEastProfile, RenovationScope, SourceRaster, StyleRoomType, StyleTurnRequest } from '../Home-Style-Agent/src/contracts.js';
 import { HomeStyleRuntime, HomeStyleTurnTimeoutError, MODERN_EAST_KNOWLEDGE_VERSION } from '../Home-Style-Agent/src/runtime.js';
 import { inspectSourceRasterUrl } from '../Home-Style-Agent/src/source-raster.js';
+import { ContractValidationError } from '../Home-Style-Agent/src/validation.js';
 import { newId, objectBody, parseLocale, persistGeneratedImage, privateBlobUrl, requestPath, requireString, sendJson, temporaryBlobReadUrl } from './_lib/common.js';
 import { createStyleSourceAlias, deleteStyleSourceAliases, requestOrigin, serveStyleSourceAlias } from './_lib/style-source-proxy.js';
 
@@ -27,6 +28,7 @@ interface StyleJob {
   styleReferenceAssetRef?: string;
   sourceAliasToken?: string;
   styleReferenceAliasToken?: string;
+  completionRecoveryAttempts?: number;
 }
 
 function runtime(): HomeStyleRuntime {
@@ -75,12 +77,20 @@ function verifyJob(value: unknown): StyleJob | null {
     || (job.styleReferenceAssetRef !== undefined && typeof job.styleReferenceAssetRef !== 'string')
     || (job.sourceAliasToken !== undefined && typeof job.sourceAliasToken !== 'string')
     || (job.styleReferenceAliasToken !== undefined && typeof job.styleReferenceAliasToken !== 'string')
+    || (job.completionRecoveryAttempts !== undefined && (
+      typeof job.completionRecoveryAttempts !== 'number'
+      || !Number.isSafeInteger(job.completionRecoveryAttempts)
+      || job.completionRecoveryAttempts < 0
+      || job.completionRecoveryAttempts > 1
+    ))
     || (sourceRaster !== undefined && (
       typeof sourceRaster.width_px !== 'number'
       || typeof sourceRaster.height_px !== 'number'
       || typeof sourceRaster.aspect_ratio !== 'string'
       || (sourceRaster.orientation !== 'landscape' && sourceRaster.orientation !== 'portrait' && sourceRaster.orientation !== 'square')
       || typeof sourceRaster.designer_size !== 'string'
+      || typeof sourceRaster.designer_request_size !== 'string'
+      || typeof sourceRaster.designer_request_aspect_ratio !== 'string'
     ))
   ) throw new Error('job_token is invalid or expired');
   return job as unknown as StyleJob;
@@ -222,7 +232,29 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
   }
 
   const conversation = { agentId: zoo.agentId, sessionId: job.sessionId };
-  const polled = await zoo.pollStyleTurn(conversation, turn, job.postedSeq);
+  let polled;
+  try {
+    polled = await zoo.pollStyleTurn(conversation, turn, job.postedSeq);
+  } catch (error) {
+    const recoveryAttempts = job.completionRecoveryAttempts ?? 0;
+    if (error instanceof ContractValidationError && recoveryAttempts < 1) {
+      const recovery = await zoo.startCompletionRecovery(conversation, turn);
+      sendJson(response, 202, {
+        status: 'processing',
+        job_token: signJob({
+          ...job,
+          postedSeq: recovery.postedSeq,
+          completionRecoveryAttempts: recoveryAttempts + 1,
+        }),
+        poll_after_ms: 3_000,
+      });
+      return;
+    }
+    if (error instanceof ContractValidationError) {
+      await deleteStyleSourceAliases([job.sourceAliasToken, job.styleReferenceAliasToken]).catch(() => undefined);
+    }
+    throw error;
+  }
   if (polled.status === 'processing') {
     sendJson(response, 202, {
       status: 'processing',

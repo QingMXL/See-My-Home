@@ -11,6 +11,8 @@ export interface SourceRaster {
   aspect_ratio: string;
   orientation: RasterOrientation;
   designer_size: string;
+  designer_request_size: string;
+  designer_request_aspect_ratio: string;
 }
 
 function gcd(left: number, right: number): number {
@@ -46,6 +48,8 @@ export function planSourceRaster(width: number, height: number): SourceRaster {
     aspect_ratio: `${width / divisor}:${height / divisor}`,
     orientation,
     designer_size: `${targetWidth}x${targetHeight}`,
+    designer_request_size: `${targetHeight}x${targetWidth}`,
+    designer_request_aspect_ratio: `${height / divisor}:${width / divisor}`,
   };
 }
 

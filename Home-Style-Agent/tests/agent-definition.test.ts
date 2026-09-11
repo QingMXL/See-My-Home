@@ -19,7 +19,9 @@ test('creates a session-scoped Home Style Agent resource', () => {
   assert.match(persona, /\/skills\/designer\/SKILL\.md/);
   assert.match(persona, /image_generation_cli\.py/);
   assert.match(persona, /artifact_publish/);
-  assert.match(persona, /--size "WIDTHxHEIGHT"/);
+  assert.match(persona, /designer_request_size/);
+  assert.match(persona, /designer_request_aspect_ratio/);
+  assert.match(persona, /no more than 3 percent relative aspect-ratio drift/);
   assert.match(persona, /Never print, inspect, echo, or expose environment variables or credentials/);
 });
 

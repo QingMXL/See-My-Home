@@ -16,6 +16,8 @@ export interface SourceRaster {
   aspect_ratio: string;
   orientation: 'landscape' | 'portrait' | 'square';
   designer_size: string;
+  designer_request_size: string;
+  designer_request_aspect_ratio: string;
 }
 
 export interface StyleTurnRequest {

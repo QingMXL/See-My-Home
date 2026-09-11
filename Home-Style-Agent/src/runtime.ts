@@ -110,6 +110,31 @@ export class HomeStyleRuntime {
     return { postedSeq };
   }
 
+  async startCompletionRecovery(conversation: ConversationHandle, request: StyleTurnRequest): Promise<StyleTurnStart> {
+    assertStyleTurnRequest(request);
+    if (conversation.agentId !== this.agentId) throw new Error('conversation belongs to a different Agent');
+    const filename = `${request.home_id}_${request.request_id}_style.png`;
+    const postedSeq = await this.postTurnEvents(conversation.sessionId, [{
+      type: 'user.message',
+      idempotency_key: `${request.request_id}:completion-recovery`,
+      content: JSON.stringify({
+        runtime_contract: 'home-style-v1',
+        request_id: request.request_id,
+        recovery_instruction: [
+          'The preceding run ended after the Designer CLI produced an image but before it returned the required contract JSON.',
+          'Resume that same request now. Do not generate another image and do not rewrite the image prompt.',
+          'Use the most recent existing Designer output path from the preceding run and copy it to the required artifact path.',
+          `The required artifact path is /workspace/artifacts/${request.home_id}/${filename}.`,
+          `Verify its raster with Pillow against ${request.source_raster.aspect_ratio} ${request.source_raster.orientation}; the intended Designer canvas is ${request.source_raster.designer_size}.`,
+          'Compare the existing output visually with the already-downloaded source image for crop, camera, perspective, envelope, walls, ceiling, beams, columns, doors, windows, openings, and fixed service locations.',
+          'If every gate passes, call artifact_publish exactly once. Otherwise withhold the image.',
+          'Finish by returning exactly one compact JSON object matching the response schema from the preceding request. Return failed JSON even if the existing output is missing or unreadable. Do not return an empty message, prose, or Markdown.',
+        ].join(' '),
+      }),
+    }]);
+    return { postedSeq };
+  }
+
   async pollStyleTurn(
     conversation: ConversationHandle,
     request: StyleTurnRequest,
@@ -170,10 +195,10 @@ export class HomeStyleRuntime {
       ? 'Inspect source_asset_ref and style_reference_asset_ref once each with the available ZooWork visual tool before composing the edit prompt. Record which visual facts belong to structure versus style. Do not ask the visual tool to estimate image dimensions or aspect ratio; request.source_raster is authoritative.'
       : 'Inspect source_asset_ref once with the available ZooWork visual tool before composing the edit prompt. Do not ask the visual tool to estimate image dimensions or aspect ratio; request.source_raster is authoritative.';
     const raster = request.source_raster;
-    const rasterInstruction = `The server measured the source raster as ${raster.width_px}x${raster.height_px}, exact reduced aspect ratio ${raster.aspect_ratio}, orientation ${raster.orientation}. This metadata is authoritative. Use gpt-image-2 directly and pass --size "${raster.designer_size}" to image_generation_cli.py. Do not rely on --aspect-ratio alone and do not try a model whose credentials are unavailable. Never inspect or print environment variables or credentials.`;
+    const rasterInstruction = `The server measured the source raster as ${raster.width_px}x${raster.height_px}, exact reduced aspect ratio ${raster.aspect_ratio}, orientation ${raster.orientation}. This metadata and the desired output canvas ${raster.designer_size} are authoritative. The current ZooWork starter image gateway has a verified width-height inversion for gpt-image-2 edits. Compensate only at request time: pass --size "${raster.designer_request_size}" and --aspect-ratio "${raster.designer_request_aspect_ratio}". These inverted request arguments are not the desired output orientation. Do not try a model whose credentials are unavailable. Never inspect or print environment variables or credentials.`;
     const designerImagesInstruction = hasStyleReference
-      ? `Download both inputs to local files without printing their signed URLs. Pass exactly two local images through the Designer --images argument in this order: source_asset_ref first as the immutable room and style_reference_asset_ref second as aesthetic reference only. Pass --model "gpt-image-2", --size "${raster.designer_size}", --quality "high", and --n 1. Run inline in this session; do not spawn a subagent and do not call sessions_yield.`
-      : `Download source_asset_ref to a local file without printing its signed URL. Pass that local file once through the Designer --images argument. Pass --model "gpt-image-2", --size "${raster.designer_size}", --quality "high", and --n 1. Run inline in this session; do not spawn a subagent and do not call sessions_yield.`;
+      ? `Download both inputs to local files without printing their signed URLs. Pass exactly two local images through the Designer --images argument in this order: source_asset_ref first as the immutable room and style_reference_asset_ref second as aesthetic reference only. Pass --model "gpt-image-2", --size "${raster.designer_request_size}", --aspect-ratio "${raster.designer_request_aspect_ratio}", --quality "high", and --n 1. Run inline in this session; do not spawn a subagent and do not call sessions_yield.`
+      : `Download source_asset_ref to a local file without printing its signed URL. Pass that local file once through the Designer --images argument. Pass --model "gpt-image-2", --size "${raster.designer_request_size}", --aspect-ratio "${raster.designer_request_aspect_ratio}", --quality "high", and --n 1. Run inline in this session; do not spawn a subagent and do not call sessions_yield.`;
     return [{
       type: 'user.message',
       idempotency_key: `${request.request_id}:style`,
@@ -198,7 +223,7 @@ export class HomeStyleRuntime {
           rasterInstruction,
           designerImagesInstruction,
           `Capture the single output path printed by the Designer CLI and copy it to "/workspace/artifacts/${request.home_id}/${filename}". An empty output path or failed command is a failed response.`,
-          `Use Pillow to verify the copied output orientation and aspect ratio against request.source_raster before visual QA. The requested Designer canvas is ${raster.designer_size}; reject any portrait/landscape flip or material ratio mismatch rather than repairing it with crop or padding. Then inspect the copied output image once and compare it with the original at the level of crop, camera position, perspective, wall and ceiling boundaries, columns, beams, window and door count, opening size and position, and fixed service locations.`,
+          `Use Pillow to verify the copied output orientation and aspect ratio against the actual source raster before visual QA. Require the same orientation and relative aspect-ratio drift no greater than 3 percent; reject larger drift rather than repairing it with crop, resize, rotation, or padding. Then inspect the copied output image once and compare it with the original at the level of crop, camera position, perspective, wall and ceiling boundaries, columns, beams, window and door count, opening size and position, and fixed service locations.`,
           'If the raster is missing, corrupt, or any immutable structure or camera geometry changed, do not publish it. Return status="failed", qa.publishable=false, and precise warnings.',
           'If structure and camera are preserved and the style avoids all forbidden patterns, call artifact_publish exactly once. Return status="completed" and use the returned artifact id.',
           'Return one compact JSON object matching response_schema immediately after the publish-or-withhold decision. Keep style_summary under 700 characters and every warning under 280 characters. Do not use Markdown fences, append an artifact link or filename after the JSON, or request another API key.',
