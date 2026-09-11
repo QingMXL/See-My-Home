@@ -32,6 +32,7 @@
   },
   "rewrites": [
     { "source": "/api/home-furniture/:path*", "destination": "/api/home-furniture?path=:path*" },
+    { "source": "/api/home-style/source/:token", "destination": "/api/home-style?path=source/:token" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
