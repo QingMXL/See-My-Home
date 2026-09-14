@@ -1,4 +1,4 @@
-# California Modern Prompt Library v0.1
+# California Modern Prompt Library v0.2
 
 Production prompts are English-only. Names of designers, studios, publications, and projects must never be compiled into a production prompt.
 
@@ -17,7 +17,7 @@ Production prompts are English-only. Names of designers, studios, publications, 
 ## 2. Universal positive base
 
 ```text
-Edit the supplied interior photograph into a complete, refined California Modern residence. Create a sunlit, relaxed and grounded atmosphere with clean architectural planes, warm natural materials, tactile textiles, comfortable proportions, and an edited mix of contemporary and vintage-inspired furnishings. Use a warm mineral-toned envelope, one coherent natural wood family, quiet honed stone, linen and wool textures, softened geometry, relaxed asymmetry, and a few handcrafted objects. Furnish every usable zone while retaining visual breathing room. Treat the ceiling as a designed fifth plane through a shallow applied reveal or cove, warm indirect light, one simple sculptural fixture where appropriate, and practical task lighting, without changing the structural ceiling plane, beams, columns, room height, or opening heads. Keep the result elevated, functional, timeless, and genuinely lived in.
+Edit the supplied interior photograph into a complete, clearly recognizable California Modern residence. Create a sunlit, relaxed and grounded atmosphere with clean architectural planes, warm handcrafted materials, tactile textiles, comfortable proportions, and an edited tension between contemporary and vintage-inspired furnishings. Target a visibly furnished 50–65% visual density without blocking daylight or circulation. Use a warm limewash or mineral-plaster envelope; one major wall in woven linen or grasscloth wallcovering, shallow white-oak panels, restrained upholstered textile, or handmade tile when finishes are editable; one coherent oak family; quiet honed limestone, travertine or terracotta; at least three textile layers across linen, wool, bouclé and leather; and restrained aged-brass, blackened-metal or charcoal details. Pair a deep comfortable sofa with non-matching sling, cane, leather, or sculptural lounge seating and a substantial burl-wood, aged-oak, cast-stone or monolithic-stone table. Add collected ceramics, timber objects and one contemporary material accent in cast resin, translucent acrylic, smoked or colored glass, or perforated metal, kept warm and subordinate. Treat the ceiling as a designed fifth plane through a shallow plaster reveal or cove, an optional limited oak inset, warm indirect light, one linen, parchment, frosted-glass, carved-wood, or woven sculptural fixture, and practical wall-wash or task lighting, without changing the structural ceiling plane, beams, columns, room height, or opening heads. Replace or integrate generic construction downlights. Keep the result elevated, functional, timeless and genuinely lived in—never an empty beige room.
 ```
 
 ## 3. Mandatory source-preservation block
@@ -33,7 +33,7 @@ This block communicates intent only. The Agent must also enforce the same constr
 ### `sunlit-casual`｜default
 
 ```text
-Use sun-washed warm whites, sand and oatmeal neutrals, matte honey-toned oak, relaxed linen upholstery, a softly worn wool rug, one vintage-inspired accent piece, restrained charcoal details, and sparse handmade ceramics. Favor easy comfort, filtered daylight and understated craftsmanship.
+Use sun-washed warm whites, sand and oatmeal neutrals, matte honey-toned oak, relaxed linen upholstery, a softly worn wool rug, at least two non-matching vintage-inspired or handcrafted counterpoints, restrained charcoal details, and grouped handmade ceramics. Favor easy comfort, filtered daylight and understated craftsmanship without visual weakness.
 ```
 
 ### `ranch-modern`
@@ -59,13 +59,13 @@ Use warm mineral plaster, clay and tobacco accents, matte oak, grounded stone, w
 ### Living room
 
 ```text
-Arrange one deep, comfortable sofa and one or two non-matching accent chairs around a practical coffee table. Anchor the seating with a correctly sized textured rug while keeping doors, windows and circulation unobstructed. Let an existing view, an existing fireplace, or one piece of abstract art serve as the focal point. Add only a few books, ceramics and a realistically scaled plant.
+Arrange one deep, comfortable linen or nubby-wool sofa and one or two non-matching sling, leather, cane, or sculptural accent chairs around a substantial burl-wood, aged-oak, cast-resin, or monolithic-stone coffee table. Anchor the seating with a correctly sized textured rug and use full-height relaxed drapery while keeping doors, windows and circulation unobstructed. Let an existing view, existing fireplace, or one piece of abstract art serve as the focal point. Add an artisanal floor lamp, a few books, grouped ceramics and one realistically scaled plant.
 ```
 
 ### Primary bedroom
 
 ```text
-Create a calm, softly layered bedroom with a simple upholstered or timber bed, breathable linen and cotton bedding, useful bedside surfaces, warm low-glare lighting, and relaxed full-height drapery fitted to the existing window. Keep decoration quieter than the living room and avoid hotel-suite staging or rigid showroom symmetry.
+Create a calm, softly layered bedroom with a substantial upholstered or timber bed against limewash, woven-linen wallcovering, or a restrained padded textile headboard wall; breathable linen and cotton bedding with one quiet woven stripe or tonal geometric; useful mismatched bedside surfaces; warm low-glare lighting; and relaxed full-height drapery fitted to the existing window. Add one vintage-inspired chair or bench when circulation permits. Keep decoration quieter than the living room and avoid hotel-suite staging or rigid showroom symmetry.
 ```
 
 ### Kitchen and dining
@@ -83,7 +83,7 @@ Keep all fixture and wet-zone locations. Use warm honed stone, pale timber, mine
 ## 6. Raw-shell completion fragment
 
 ```text
-Complete the unfinished room without changing its visible geometry. Treat the existing walls, slab edges, beams, columns, structural ceiling plane, door openings and window openings as immutable. Add plausible residential finishes, a shallow non-structural ceiling treatment, layered lighting, necessary cabinetry within the approved scope, correctly scaled furniture, textiles and restrained decor. Do not leave usable zones empty. Do not invent daylight, views, fireplaces, arches, stairs, mezzanines, deep dropped ceilings or structural openings.
+Complete the unfinished room without changing its visible geometry. Treat the existing walls, slab edges, beams, columns, structural ceiling plane, door openings and window openings as immutable geometry, but treat unfinished surfaces and temporary construction lighting as editable within scope. Add a warm mineral envelope, one designed major wall, a shallow non-structural ceiling treatment, integrated indirect and decorative lighting, necessary cabinetry within scope, correctly scaled low comfortable furniture, at least three textile layers, vintage/handcrafted counterpoints and restrained collected decor. Do not leave raw walls, a blank slab with isolated downlights, or usable zones empty. Do not invent daylight, views, fireplaces, arches, stairs, mezzanines, deep dropped ceilings or structural openings.
 ```
 
 ## 7. Renovation-level fragments
@@ -97,7 +97,7 @@ Keep every fixed finish and built-in element unchanged. Edit movable furniture, 
 ### `refresh`
 
 ```text
-Retain the layout and fixed boundaries. Update approved paint, wall finish, floor finish, cabinet-front finish, lighting, furniture, textiles, art and decor only.
+Retain the layout and fixed boundaries. Update approved paint; mineral, woven-textile, timber-panel, upholstered-panel or handmade-tile wall finish; floor finish; cabinet-front finish; decorative lighting and generic downlight integration; furniture; textiles; art; and decor only.
 ```
 
 ### `light-remodel`
@@ -109,7 +109,7 @@ Modify only explicitly masked non-structural built-ins. Do not infer permission 
 ## 8. Unified negative prompt
 
 ```text
-traditional farmhouse, modern farmhouse template, barn door, farmhouse sign, distressed white furniture, industrial cage pendant, nautical theme, navy-and-white stripes, anchors, shells, rope decor, beach sign, boho clutter, macrame overload, rattan everywhere, dense ethnic prints, plant jungle, Southwestern theme, cow skull, cactus print, all-pale-wood Japandi, tatami, shoji screen, Japanese tea room, cold gray flip, sterile all-white staging, matching furniture set, hotel lobby, resort lobby, monumental chandelier, double-height fantasy, glossy marble everywhere, excessive black metal, fake fireplace, invented window, invented door, invented beam, changed opening count, changed window panels, altered walls, altered columns, altered ceiling height, changed camera angle, recentered view, straight-on replacement view, perspective shift, zoom, crop change, aspect-ratio change, blocked circulation, oversized furniture, impossible cabinetry, impossible plumbing, text, watermark, people
+traditional farmhouse, modern farmhouse template, barn door, farmhouse sign, distressed white furniture, industrial cage pendant, nautical theme, navy-and-white stripes, anchors, shells, rope decor, beach sign, boho clutter, macrame overload, rattan everywhere, dense ethnic prints, plant jungle, Southwestern theme, cow skull, cactus print, all-pale-wood Japandi, tatami, shoji screen, Japanese tea room, cold gray flip, sterile all-white staging, bland beige minimalism, matching furniture set, cheap plastic acrylic, untreated raw wall, blank white ceiling, only two isolated downlights, hotel lobby, resort lobby, monumental chandelier, double-height fantasy, glossy marble everywhere, excessive black metal, fake fireplace, invented window, invented door, invented beam, changed opening count, changed window panels, altered walls, altered columns, altered ceiling height, changed camera angle, recentered view, straight-on replacement view, perspective shift, zoom, crop change, aspect-ratio change, blocked circulation, oversized furniture, impossible cabinetry, impossible plumbing, text, watermark, people
 ```
 
 ## 9. Compilation order

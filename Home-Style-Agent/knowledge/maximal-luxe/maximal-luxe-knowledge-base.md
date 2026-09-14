@@ -1,4 +1,4 @@
-# Maximal Luxe｜极繁奢华风格知识库 v0.1
+# Maximal Luxe｜极繁奢华风格知识库 v0.2
 
 ## 0. 定义与研究边界
 
@@ -79,9 +79,10 @@ Maximal Luxe is a bold yet edited residential style built from saturated color, 
 + 1 plush textile family
 + 1 reflective accent family
 + 1 art or collectible focal layer
++ 1 premium new-material counterpoint
 ```
 
-同一视图最多 1 种强纹石材、1 种主要金属和 1 个大面积镜面/玻璃策略。
+同一视图最多 1 种强纹石材、1 种主要金属、1 个大面积镜面/玻璃策略和 1 个树脂/Lucite/亚克力/有色玻璃新材料点缀。
 
 ## 3. 子风格配置
 
@@ -111,7 +112,7 @@ Maximal Luxe is a bold yet edited residential style built from saturated color, 
 
 - 空间：`layered residential interior`, `edited abundance`, `dramatic focal point`, `intimate entertaining`, `clear circulation`
 - 造型：`sculptural curves`, `bold silhouettes`, `graphic geometry`, `controlled symmetry`, `jewel-like details`
-- 材质：`lacquered wood`, `dark walnut`, `expressive honed marble`, `velvet`, `silk blend`, `smoked glass`, `antiqued mirror`, `satin brass`
+- 材质：`lacquered wood`, `dark walnut`, `expressive honed marble`, `velvet`, `mohair`, `patterned silk`, `jacquard`, `cast resin`, `Lucite or acrylic`, `colored glass`, `antiqued mirror`, `satin brass`
 - 色彩：`aubergine`, `plum`, `oxblood`, `emerald`, `teal`, `ink black`, `cream`, `warm blush`, `brass`
 - 软装：`curved sofa`, `channel-tufted upholstery`, `statement lounge chair`, `layered rug`, `large-scale art`, `collected objects`
 - 灯光：`statement chandelier`, `jewel-like sconces`, `warm pools of light`, `picture lighting`, `controlled sparkle`
@@ -122,6 +123,8 @@ Maximal Luxe is a bold yet edited residential style built from saturated color, 
 - 石材或烟熏玻璃茶几、黄铜细节边桌、复古 1970s/1980s statement piece。
 - 大幅艺术、成组画廊墙、收藏式陶艺或玻璃对象；单个视图选择一种陈列策略。
 - 天鹅绒、丝绒感羊毛、提花、丝混窗帘；图案需有尺度层级。
+- 带图案丝绸/提花墙面、浅软包板、漆面或图形墙纸可完成一面主要墙；只选一种强墙面策略。
+- 一件浇铸树脂、Lucite/亚克力、有色玻璃或艺术金属家具/灯具可制造新旧材料冲突，但必须精致且小比例。
 - 弧形或几何镜、珠宝感壁灯、单盏 statement chandelier。
 
 ### 4.3 禁用／负向标签
@@ -158,6 +161,9 @@ apply decorative richness only to editable finishes, furnishings, lighting, art 
 | Satin / polished brass | 受控点缀；profile 决定亮度 | 塑料金、每件家具都镶金 |
 | Ceramic / Murano-like glass | 收藏式单品、颜色呼应 | 批量小摆件 |
 | Graphic wallpaper | 单面墙或 powder room 包裹 | 每个房间不同强图案 |
+| Patterned silk / jacquard wall panel | 一面主要墙或浅软包板，图案与地毯错开尺度 | 宫廷织锦套装、每面墙都强图案 |
+| Cast resin / Lucite / acrylic | 一件茶几、边几、灯具或雕塑对象 | 廉价透明塑料、过多同质透明家具 |
+| Colored glass / artistic metal | 单件焦点，与主色呼应 | 商业展柜感、金属过载 |
 
 ## 6. 色彩系统
 
@@ -212,7 +218,7 @@ apply decorative richness only to editable finishes, furnishings, lighting, art 
 ### 7.5 毛坯房输入
 
 - 以现有墙顶地几何为舞台，不新造拱门、柱式、护墙比例或双层空间。
-- 先完成可施工的墙地饰面、灯位、柜体和家具，再增加图案与收藏层。
+- 先完成可施工的墙地饰面、浅层天花、主灯/壁灯/画灯、柜体和家具，再增加图案、织物、新材料与收藏层；不得保留空白天花和孤立筒灯。
 - 小空间默认 `edited-glamour`，不使用 ballroom 尺度的吊灯或家具。
 
 ## 8. Style Agent 接口边界
@@ -243,6 +249,7 @@ apply decorative richness only to editable finishes, furnishings, lighting, art 
 - 宫殿、KTV、赌场、ballroom 或影视布景感压倒住宅性。
 - 所有表面都高反射或有强图案，没有安静面。
 - 家具堵塞动线，或厨房卫浴功能失真。
+- Finish-enabled 结果的主要墙面或天花仍未完成、只剩孤立筒灯，或新材料呈现廉价塑料感。
 
 ## 10. 研究结论
 

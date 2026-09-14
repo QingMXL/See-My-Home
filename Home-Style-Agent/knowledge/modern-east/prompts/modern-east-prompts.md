@@ -1,4 +1,4 @@
-# Modern East Prompt Library v0.2
+# Modern East Prompt Library v0.3
 
 这些 Prompt 是模型无关的语义组件。Style Agent 应按输入图、房间、子风格和改造等级选择组件，再由模型适配器转换为目标 API 的格式。
 
@@ -21,7 +21,7 @@
 ## 2. 通用正向基础片段
 
 ```text
-Restyle this real residential {{room_type}} in an unmistakable Modern East aesthetic: contemporary architectural clarity shaped by Eastern restraint, layered views, calibrated negative space, strong material hierarchy, and a composed relationship between light, nature, art, and daily life. Build one clear spatial datum and a complete residential composition. Use warm ivory mineral plaster, stone greige, mushroom taupe, a substantial matte dark-oak or smoked-walnut element, one pale honed limestone or quiet-veined marble anchor, tactile linen or bouclé upholstery, a layered wool or silk-blend rug, and restrained satin-bronze or blackened-metal details. Add tailored sculptural furniture at normal residential scale, functional side pieces, full-height window treatment where appropriate, one confident ink-like abstract artwork, paper- or silk-like diffused light, and one handcrafted ceramic or stone object. Design a visible fifth-plane ceiling treatment with a shallow applied perimeter reveal or cove, continuous warm indirect illumination, focused wall wash, and one room-scaled statement fixture where appropriate, while preserving the structural ceiling plane and height. The result must be richly resolved and recognizable at first glance, never under-furnished, generic beige contemporary, generic warm minimalism, literal historical styling, or a hotel lobby.
+Restyle this real residential {{room_type}} in an unmistakable Modern East aesthetic: contemporary architectural clarity shaped by Eastern restraint, layered views, calibrated negative space, strong material hierarchy, and a composed relationship between light, nature, art, and daily life. Target a calm but visibly complete 50–65% visual density. Build one dark linear datum and a full residential composition across architecture, furniture, textile, art, object, and light. Use warm ivory mineral plaster; one major wall in woven silk- or linen-like wallcovering, shallow upholstered textile, matte dark oak, smoked walnut, or honed stone when finishes are editable; one pale limestone or quiet-veined marble anchor; tactile linen, bouclé or nubby wool upholstery; a layered wool or silk-blend rug; and restrained satin-bronze or blackened-metal details. Pair comfortable contemporary seating with at least one abstracted Ming-derived silhouette such as a yoke-back or horseshoe-back lounge chair, restrained joinery stool or bench, or bridged-frame side table—never a replica furniture suite. Add full-height window treatment where appropriate, ink-wash abstraction or quiet landscape-like mark making, a contemporary paper- or silk-diffused light, and one celadon, smoky-glazed, black-stoneware, or carved-stone vessel with a restrained branch. A tea-smoked acrylic, cast-resin, hand-finished lacquer, or colored-glass accent may add contemporary tension without looking plastic. Design the ceiling as a visible fifth plane with a shallow plaster or timber-lined perimeter reveal, continuous warm indirect illumination, focused wall wash, and one room-scaled lantern-like fixture in paper, silk, bronze, alabaster, or stone, while preserving the structural ceiling plane and height. Replace or integrate generic construction downlights. The result must be richly resolved and recognizable at first glance, never under-furnished, generic beige contemporary, generic warm minimalism, literal historical styling, or a hotel lobby.
 ```
 
 ## 3. 强制结构保护片段
@@ -37,13 +37,13 @@ This is a controlled image edit, not a scene replacement. Preserve the input pho
 ### `quiet-poise`｜默认
 
 ```text
-Favor quiet poise without visual weakness: warm pale neutrals, tactile fabrics, a clearly visible dark-timber datum, gentle natural light, confident abstract art, comfortable complete furnishing, and deliberate breathing room. Pair mineral plaster, honed stone, dark timber, layered textile and bronze in a controlled hierarchy. Keep the room distinctly Modern East and richly resolved while suitable for an everyday American home.
+Favor quiet poise without visual weakness: warm pale neutrals, tactile and optionally subtle patterned fabrics, a clearly visible dark-timber datum, gentle natural light, confident ink-wash abstraction, one contemporary Ming-derived furniture silhouette, a quiet ceramic vessel, complete furnishing, and deliberate breathing room. Pair mineral plaster or woven wallcovering, honed stone, dark timber, layered textile and bronze in a controlled hierarchy. Keep the room distinctly Modern East and richly resolved while suitable for an everyday American home.
 ```
 
 ### `urban-elegance`
 
 ```text
-Favor urban elegance: slim dark frames, smoked or reeded glass, warm gray and espresso tones, precise metal detailing, tailored furniture, and a lightly cosmopolitan rhythm. Keep historical references abstract and avoid themed Shanghai nostalgia.
+Favor urban elegance: slim dark frames, smoked or reeded glass, warm gray and espresso tones, precise metal detailing, tailored furniture, one abstracted joinery piece, and a lightly cosmopolitan rhythm. A tea-smoked acrylic or lacquer accent may sharpen the old-new contrast. Keep historical references abstract and avoid themed Shanghai nostalgia.
 ```
 
 ### `sculptural-luxe`
@@ -63,13 +63,13 @@ Favor warm residential comfort: warm pale oak, ivory and mushroom textiles, soft
 ### 5.1 客厅
 
 ```text
-Create a conversation-oriented living room with one primary sofa group, realistic side seating, a restrained stone or dark-timber coffee table, and a properly scaled rug. Integrate any existing television or fireplace instead of removing it. Use one primary artwork, one optional architectural plant, and very few tabletop objects. Zone an open plan through furniture, rug, and light rather than new walls. Keep the room intimate and residential; avoid lobby seating, double-living-room staging, or oversized chandeliers.
+Create a conversation-oriented living room with one generous tailored sofa group, one comfortable contemporary Ming-derived yoke-back or horseshoe-back accent chair, a restrained stone or dark-timber coffee table, a joinery side stool, and a properly scaled layered rug. Integrate any existing television or fireplace instead of removing it. Resolve one major wall with woven wallcovering, dark-timber datum, upholstered textile panel, or a single quiet stone plane when editable. Use one ink-wash abstract artwork, one celadon or smoky-glazed vessel, one optional architectural plant, and a few edited tabletop objects. Zone an open plan through furniture, rug, and light rather than new walls. Keep the room intimate and residential; avoid lobby seating, double-living-room staging, or oversized chandeliers.
 ```
 
 ### 5.2 主卧
 
 ```text
-Create a quiet, enveloping primary bedroom with an integrated but restrained headboard composition, tactile neutral bedding, warm timber or textured wall panels, functional bedside surfaces, and soft layered lighting. A window bench or lounge chair may be added only when circulation allows. Preserve every window and door. Avoid hotel-suite staging, excessive symmetry, dramatic marble feature walls, and floor-level Japanese furniture.
+Create a quiet, enveloping primary bedroom with an integrated but restrained headboard composition in dark timber, woven silk-like wallcovering, or shallow upholstered textile panels; tactile neutral bedding with a subtle tonal pattern; functional bedside surfaces; and layered lantern-like, cove, and reading light. Add a contemporary joinery stool or bench and, only when circulation allows, a softly curved lounge chair. Preserve every window and door. Avoid hotel-suite staging, excessive symmetry, dramatic marble feature walls, and floor-level Japanese furniture.
 ```
 
 ### 5.3 厨房与餐厅
@@ -89,7 +89,7 @@ Create a calm, warm Modern East bathroom with honed pale stone, a restrained tim
 把这一片段附加到相应房间 Prompt，而不是单独生成空间。
 
 ```text
-The input is an unfinished shell. Treat every visible wall, slab edge, beam, column, structural ceiling plane, door opening, window opening, and camera relationship as immutable. Complete every usable zone through substantial but coherent finishes, a shallow non-structural ceiling finish layer where appropriate, layered lighting, cabinetry only where functionally justified, correctly scaled furniture, textiles, art, and decor. Do not leave the room looking empty or merely staged with a few objects. Do not invent additional windows, doors, fireplaces, stairs, mezzanines, vaulted ceilings, structural openings, or deep dropped ceilings. Use conservative assumptions for plumbing and electrical services, and keep the design buildable within the visible envelope.
+The input is an unfinished shell. Treat every visible wall, slab edge, beam, column, structural ceiling plane, door opening, window opening, and camera relationship as immutable geometry, but treat unfinished surface appearance and temporary construction lighting as editable within scope. Complete every usable zone through a major wall-finish strategy, substantial dark-timber or stone datum, a shallow non-structural ceiling finish layer, integrated cove and decorative lighting, cabinetry only where functionally justified, correctly scaled furniture including one contemporary Ming-derived piece, layered textiles, abstract art, and ceramic or stone objects. Do not leave raw walls, a blank slab with isolated downlights, or a room merely staged with a few generic objects. Do not invent additional windows, doors, fireplaces, stairs, mezzanines, vaulted ceilings, structural openings, or deep dropped ceilings. Use conservative assumptions for plumbing and electrical services, and keep the design buildable within the visible envelope.
 ```
 
 ## 7. 旧房改造片段
@@ -109,7 +109,7 @@ Limit the redesign to movable furniture, rugs, curtains, freestanding lighting, 
 ### `refresh`
 
 ```text
-Allow paint, wall finish, flooring appearance, cabinet-front finish, movable furniture, textiles, art, decorative lighting, and a shallow applied ceiling finish or perimeter cove that does not alter structural height, beams, columns, or opening heads. Preserve the location, size, geometry, and function of every built-in element and fixture.
+Allow paint, wall finish including woven or patterned textile wallcovering and shallow upholstered panels, flooring appearance, cabinet-front finish, movable furniture, textiles, art, decorative lighting, replacement or integration of generic downlights, and a shallow applied ceiling finish or perimeter cove that does not alter structural height, beams, columns, or opening heads. Preserve the location, size, geometry, and function of every built-in element and fixture.
 ```
 
 ### `light-remodel`
@@ -123,7 +123,7 @@ Allow selected non-structural built-in finishes or cabinetry only where explicit
 仅在目标模型支持独立负向 Prompt 时使用。否则由适配器将关键禁令转为正向约束或校验规则。
 
 ```text
-traditional Chinese theme room, ornate Chinese carving, dragon motif, phoenix motif, dense cloud pattern, imperial palace decor, glossy red rosewood furniture set, replica dynasty furniture, oversized antique cabinet, red lantern theme, calligraphy wall decal, chinoiserie, blue-and-white porcelain collection, tatami, shoji screen, Japanese tea room, floor cushions, floor-level dining table, all-pale-wood Japandi, exaggerated wabi-sabi decay, rustic farmhouse, bohemian decor, high-saturation red, bright emerald green, mirror-polished gold, glossy burgundy wood, busy multicolor marble, plastic stone texture, excessive black marble, too many materials, hotel lobby, reception lounge, banquet hall, sales gallery, museum gallery, luxury showroom, monumental symmetry, oversized chandelier, theatrical hospitality lighting, excessive ceiling sculpture, empty mansion staging, altered architecture, added window, removed window, added door, removed door, changed opening, changed opening count, changed door panels, changed window panels, removed column, hidden beam, raised ceiling, enlarged room, shifted camera, changed camera height, recentered view, straight-on replacement view, changed focal length, distorted perspective, zoom, crop change, aspect-ratio change, blocked doorway, blocked window, floating furniture, duplicated furniture, impossible cabinetry, unusable kitchen, impossible plumbing, text, logo, watermark
+traditional Chinese theme room, ornate Chinese carving, dragon motif, phoenix motif, dense cloud pattern, imperial palace decor, glossy red rosewood furniture set, replica dynasty furniture, oversized antique cabinet, red lantern theme, calligraphy wall decal, lone Chinese scroll as the only style cue, chinoiserie, blue-and-white porcelain collection, tatami, shoji screen, Japanese tea room, floor cushions, floor-level dining table, all-pale-wood Japandi, exaggerated wabi-sabi decay, rustic farmhouse, bohemian decor, high-saturation red, bright emerald green, mirror-polished gold, glossy burgundy wood, cheap clear plastic furniture, busy multicolor marble, plastic stone texture, excessive black marble, too many materials, generic beige luxury, generic furniture set, untreated raw wall, blank white ceiling, only two isolated downlights, hotel lobby, reception lounge, banquet hall, sales gallery, museum gallery, luxury showroom, monumental symmetry, oversized chandelier, theatrical hospitality lighting, excessive ceiling sculpture, empty mansion staging, altered architecture, added window, removed window, added door, removed door, changed opening, changed opening count, changed door panels, changed window panels, removed column, hidden beam, raised ceiling, enlarged room, shifted camera, changed camera height, recentered view, straight-on replacement view, changed focal length, distorted perspective, zoom, crop change, aspect-ratio change, blocked doorway, blocked window, floating furniture, duplicated furniture, impossible cabinetry, unusable kitchen, impossible plumbing, text, logo, watermark
 ```
 
 ## 10. 推荐拼接顺序

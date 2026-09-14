@@ -1,4 +1,4 @@
-# Maximal Luxe Prompt Library v0.1
+# Maximal Luxe Prompt Library v0.2
 
 Production prompts are English-only. Names of designers, studios, publications, television series, and fictional characters must never be compiled into a production prompt.
 
@@ -17,7 +17,7 @@ Production prompts are English-only. Names of designers, studios, publications, 
 ## 2. Universal positive base
 
 ```text
-Edit the supplied interior photograph into an unmistakable Maximal Luxe residence: bold, collected and glamorous, yet carefully edited and fully livable. Reach a controlled 60–75% visual density and build one clear dramatic focal point using saturated color, sculptural comfortable furniture, layered art, controlled pattern, rich tactile textiles, expressive material contrast and a few jewel-like reflective accents. Create hierarchy rather than clutter: one dominant field color, one supporting jewel tone, a neutral breathing color, one coherent metal finish, and no more than two pattern families at clearly different scales. Treat the ceiling as a major design layer with a shallow applied perimeter cove or graphic reveal, one room-scaled statement fixture, warm picture or wall lighting, and controlled accent pools, without changing the structural slab plane, beams, columns, room height, or opening heads. Keep circulation, ergonomics and residential comfort believable.
+Edit the supplied interior photograph into an unmistakable Maximal Luxe residence: bold, collected and glamorous, yet carefully edited and fully livable. Reach a controlled 60–75% visual density and build one clear dramatic focal point using saturated color, sculptural comfortable furniture, layered art, controlled pattern, rich tactile textiles, expressive material contrast and a few jewel-like reflective accents. Create hierarchy rather than clutter: one dominant field color, one supporting jewel tone, a neutral breathing color, one coherent metal finish, and no more than two pattern families at clearly different scales. When finishes are editable, resolve one major wall with lacquer, graphic wallpaper, patterned silk or jacquard, shallow upholstered textile panels, dark timber, or one expressive stone plane. Add one materially surprising contemporary counterpoint in cast resin, Lucite or acrylic, smoked or colored glass, lacquer, or artistic metal, kept premium and subordinate. Treat the ceiling as a major design layer with a shallow applied perimeter cove or graphic stepped reveal, an optional lacquered or softly patterned inner tray finish that preserves the slab geometry, one room-scaled statement fixture, jewel-like sconces, warm picture or wall lighting, and controlled accent pools. Replace or integrate generic construction downlights without changing the structural slab plane, beams, columns, room height, or opening heads. Keep circulation, ergonomics and residential comfort believable.
 ```
 
 ## 3. Mandatory source-preservation block
@@ -33,7 +33,7 @@ This block communicates intent only. The Agent must also enforce the same constr
 ### `edited-glamour`｜default
 
 ```text
-Use a cream, warm taupe or soft-black foundation with one controlled field of aubergine, plum, emerald, teal or oxblood. Add a sculptural curved seating piece, tactile velvet or mohair, dark timber or one expressive stone, satin brass, one statement light and confident contemporary art. Preserve at least one calm surface in every view.
+Use a cream, warm taupe or soft-black foundation with one controlled field of aubergine, plum, emerald, teal or oxblood. Add a sculptural curved seating piece, tactile velvet or mohair, patterned silk or jacquard, dark timber or one expressive stone, satin brass, one statement light, one resin, Lucite or colored-glass accent, and confident contemporary art. Preserve at least one calm surface in every view.
 ```
 
 ### `eighties-socialite`
@@ -83,7 +83,7 @@ Keep all fixture and wet-zone locations. For a full bath, choose one expressive 
 ## 6. Raw-shell completion fragment
 
 ```text
-Complete the unfinished room without changing its visible geometry. Treat all existing walls, slab edges, beams, columns, structural ceiling plane, door openings and window openings as immutable. First add plausible residential finishes, a shallow non-structural ceiling treatment, layered lighting, necessary cabinetry within the approved scope and correctly scaled furniture; then add controlled color, art, pattern and reflective accents until the room reaches a deliberate 60–75% visual density. Do not invent arches, columns, fireplaces, stairs, mezzanines, grand foyers, deep dropped ceilings or structural openings.
+Complete the unfinished room without changing its visible geometry. Treat all existing walls, slab edges, beams, columns, structural ceiling plane, door openings and window openings as immutable geometry, but treat unfinished surfaces and temporary construction lighting as editable within scope. First add a coherent wall-finish strategy, a shallow non-structural ceiling treatment, integrated decorative lighting, necessary cabinetry within scope and correctly scaled furniture; then add controlled color, patterned textiles, art, a premium new-material accent and reflective details until the room reaches a deliberate 60–75% visual density. Do not leave raw walls or a blank slab with isolated downlights. Do not invent arches, columns, fireplaces, stairs, mezzanines, grand foyers, deep dropped ceilings or structural openings.
 ```
 
 ## 7. Renovation-level fragments
@@ -97,7 +97,7 @@ Keep every fixed finish and built-in element unchanged. Edit movable furniture, 
 ### `refresh`
 
 ```text
-Retain the layout and fixed boundaries. Update approved paint, wallpaper, wall finish, floor finish, cabinet-front finish, lighting, furniture, textiles, art and decor only.
+Retain the layout and fixed boundaries. Update approved paint; wallpaper; patterned silk, jacquard or shallow upholstered wall panels; lacquer, timber or stone wall finish; floor finish; cabinet-front finish; lighting and generic downlight integration; furniture; textiles; art; and decor only.
 ```
 
 ### `light-remodel`
@@ -109,7 +109,7 @@ Modify only explicitly masked non-structural built-ins. Do not infer permission 
 ## 8. Unified negative prompt
 
 ```text
-Versailles palace, royal palace, baroque carving, rococo furniture set, gilded molding everywhere, cherub ornament, throne room, ballroom, hotel lobby, nightclub, disco club, casino, stage set, runway, Studio 54 replica, mirror ceiling, colored club lighting, plastic gold, chrome overload, crystal on every surface, tufted furniture set, fake luxury showroom, random clutter, every wall patterned, too many animal prints, multiple competing marbles, souvenir collage, full 1980s replica, Dynasty set, Gatsby theme, Memphis primary-color room, oversized self portrait, people, faces, all-black KTV interior, invented arch, invented column, invented window, invented door, invented fireplace, changed opening count, changed window panels, altered walls, altered ceiling height, changed camera angle, recentered view, straight-on replacement view, perspective shift, zoom, crop change, aspect-ratio change, blocked circulation, oversized furniture, impossible cabinetry, impossible plumbing, text, watermark
+Versailles palace, royal palace, baroque carving, rococo furniture set, gilded molding everywhere, cherub ornament, throne room, ballroom, hotel lobby, nightclub, disco club, casino, stage set, runway, Studio 54 replica, mirror ceiling, colored club lighting, plastic gold, cheap clear plastic, chrome overload, crystal on every surface, tufted furniture set, fake luxury showroom, random clutter, every wall patterned, too many animal prints, multiple competing marbles, souvenir collage, full 1980s replica, Dynasty set, Gatsby theme, Memphis primary-color room, oversized self portrait, blank white ceiling, only two isolated downlights, people, faces, all-black KTV interior, invented arch, invented column, invented window, invented door, invented fireplace, changed opening count, changed window panels, altered walls, altered ceiling height, changed camera angle, recentered view, straight-on replacement view, perspective shift, zoom, crop change, aspect-ratio change, blocked circulation, oversized furniture, impossible cabinetry, impossible plumbing, text, watermark
 ```
 
 ## 9. Compilation order

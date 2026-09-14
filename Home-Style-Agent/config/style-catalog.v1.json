@@ -4,7 +4,7 @@
     "modern_east": {
       "display_name": "Modern East",
       "display_name_zh": "摩登东方",
-      "knowledge_version": "0.2-production",
+      "knowledge_version": "0.3-production",
       "source_directory": "knowledge/modern-east",
       "default_profile": "quiet-poise",
       "supported_rooms": [
@@ -30,7 +30,7 @@
     "california_modern": {
       "display_name": "California Modern",
       "display_name_zh": "加州现代",
-      "knowledge_version": "0.1-research",
+      "knowledge_version": "0.2-production",
       "source_directory": "knowledge/california-modern",
       "default_profile": "sunlit-casual",
       "supported_rooms": ["living_room", "primary_bedroom", "kitchen", "dining_room", "bathroom", "home_office"],
@@ -42,7 +42,7 @@
     "maximal_luxe": {
       "display_name": "Maximal Luxe",
       "display_name_zh": "极繁奢华",
-      "knowledge_version": "0.1-research",
+      "knowledge_version": "0.2-production",
       "source_directory": "knowledge/maximal-luxe",
       "default_profile": "edited-glamour",
       "supported_rooms": ["living_room", "primary_bedroom", "kitchen", "dining_room", "bathroom", "home_office"],
