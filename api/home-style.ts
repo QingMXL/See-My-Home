@@ -13,9 +13,8 @@ import {
   type StyleRoomType,
   type StyleTurnRequest,
 } from '../Home-Style-Agent/src/contracts.js';
-import { HomeStyleRuntime, HomeStyleTurnTimeoutError, STYLE_KNOWLEDGE, styleKnowledge } from '../Home-Style-Agent/src/runtime.js';
+import { HomeStyleRuntime, HomeStyleTurnTimeoutError, STYLE_KNOWLEDGE, StyleTurnContractError, styleKnowledge } from '../Home-Style-Agent/src/runtime.js';
 import { inspectSourceRasterUrl } from '../Home-Style-Agent/src/source-raster.js';
-import { ContractValidationError } from '../Home-Style-Agent/src/validation.js';
 import { newId, objectBody, parseLocale, persistGeneratedImage, privateBlobUrl, requestPath, requireString, sendJson, temporaryBlobReadUrl } from './_lib/common.js';
 import { createStyleSourceAlias, deleteStyleSourceAliases, requestOrigin, serveStyleSourceAlias } from './_lib/style-source-proxy.js';
 
@@ -38,6 +37,8 @@ interface StyleJob {
   sourceAliasToken?: string;
   styleReferenceAliasToken?: string;
   completionRecoveryAttempts?: number;
+  recoveryAttempts?: number;
+  lastRecoveryMode?: 'resume_generation' | 'finalize_existing';
   styleId?: StyleId;
   styleProfile?: StyleProfile;
 }
@@ -94,6 +95,15 @@ function verifyJob(value: unknown): StyleJob | null {
       || job.completionRecoveryAttempts < 0
       || job.completionRecoveryAttempts > 1
     ))
+    || (job.recoveryAttempts !== undefined && (
+      typeof job.recoveryAttempts !== 'number'
+      || !Number.isSafeInteger(job.recoveryAttempts)
+      || job.recoveryAttempts < 0
+      || job.recoveryAttempts > 2
+    ))
+    || (job.lastRecoveryMode !== undefined
+      && job.lastRecoveryMode !== 'resume_generation'
+      && job.lastRecoveryMode !== 'finalize_existing')
     || (job.styleId !== undefined && !isStyleId(job.styleId))
     || (job.styleProfile !== undefined && (
       job.styleId === undefined || !isStyleProfile(job.styleId, job.styleProfile)
@@ -260,22 +270,38 @@ async function generate(request: VercelRequest, response: VercelResponse, refine
   try {
     polled = await zoo.pollStyleTurn(conversation, turn, job.postedSeq);
   } catch (error) {
-    const recoveryAttempts = job.completionRecoveryAttempts ?? 0;
-    if (error instanceof ContractValidationError && recoveryAttempts < 1) {
-      const recovery = await zoo.startCompletionRecovery(conversation, turn);
+    const recoveryAttempts = job.recoveryAttempts ?? job.completionRecoveryAttempts ?? 0;
+    if (
+      error instanceof StyleTurnContractError
+      && recoveryAttempts < 2
+      && job.lastRecoveryMode !== error.recoveryMode
+    ) {
+      console.warn('[home-style] recovering incomplete ZooWork turn', {
+        requestId: turn.request_id,
+        recoveryMode: error.recoveryMode,
+        recoveryAttempts,
+        artifactPublished: error.artifactPublished,
+      });
+      const recovery = error.recoveryMode === 'resume_generation'
+        ? await zoo.startGenerationRecovery(conversation, turn)
+        : await zoo.startCompletionRecovery(conversation, turn, error.artifactPublished);
       sendJson(response, 202, {
         status: 'processing',
         job_token: signJob({
           ...job,
           postedSeq: recovery.postedSeq,
-          completionRecoveryAttempts: recoveryAttempts + 1,
+          recoveryAttempts: recoveryAttempts + 1,
+          lastRecoveryMode: error.recoveryMode,
         }),
         poll_after_ms: 3_000,
       });
       return;
     }
-    if (error instanceof ContractValidationError) {
-      await deleteStyleSourceAliases([job.sourceAliasToken, job.styleReferenceAliasToken]).catch(() => undefined);
+    await deleteStyleSourceAliases([job.sourceAliasToken, job.styleReferenceAliasToken]).catch(() => undefined);
+    if (error instanceof StyleTurnContractError) {
+      throw new Error(error.recoveryMode === 'resume_generation'
+        ? 'Home Style Agent stopped before Designer could start after one recovery attempt'
+        : 'Home Style Agent finished image work but did not return a usable final response after recovery');
     }
     throw error;
   }

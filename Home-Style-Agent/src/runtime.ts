@@ -19,7 +19,7 @@ import type {
   StyleId,
 } from './contracts.js';
 import { responseSchemaPath } from './paths.js';
-import { assertStyleTurnRequest, parseStyleAgentResponse } from './validation.js';
+import { assertStyleTurnRequest, ContractValidationError, parseStyleAgentResponse } from './validation.js';
 
 const RESPONSE_SCHEMA = JSON.parse(readFileSync(responseSchemaPath, 'utf8')) as unknown;
 export const STYLE_KNOWLEDGE = {
@@ -50,12 +50,81 @@ export class HomeStyleTurnTimeoutError extends Error {
   }
 }
 
+export type StyleTurnRecoveryMode = 'resume_generation' | 'finalize_existing';
+
+export class StyleTurnContractError extends ContractValidationError {
+  constructor(
+    details: string,
+    readonly recoveryMode: StyleTurnRecoveryMode,
+    readonly artifactPublished: boolean,
+  ) {
+    super('StyleAgentResponse', details);
+    this.name = 'StyleTurnContractError';
+  }
+}
+
 interface RawTurnResult {
   text: string;
   outcome: 'succeeded' | 'failed' | 'aborted';
   toolCalls: AgentToolTrace[];
   cursor?: string;
   runId?: string;
+}
+
+type NormalizedToolCall = NonNullable<ReturnType<typeof toolCall>>;
+
+function isDesignerGenerationCall(call: NormalizedToolCall): boolean {
+  if (call.phase !== 'start' || call.toolName !== 'exec' || !call.args) return false;
+  return JSON.stringify(call.args).includes('image_generation_cli.py');
+}
+
+function execCallFailed(call: AgentToolTrace): boolean {
+  if (call.isError === true) return true;
+  const exitCode = call.resultPreview?.match(/\bexitCode=(\d+)\b/)?.[1];
+  return exitCode !== undefined && exitCode !== '0';
+}
+
+function turnExecutionState(toolCalls: AgentToolTrace[]) {
+  const designerCallIds = new Set(toolCalls.flatMap((call) => (
+    call.phase === 'start' && call.purpose === 'designer_generation' && call.toolCallId
+      ? [call.toolCallId]
+      : []
+  )));
+  const designerEnds = toolCalls.filter((call) => (
+    call.phase === 'end'
+    && Boolean(call.toolCallId)
+    && designerCallIds.has(call.toolCallId as string)
+  ));
+  const outputPrepared = toolCalls.some((call) => (
+    call.phase === 'end'
+    && call.isError !== true
+    && Boolean(call.resultPreview?.match(/\/workspace\/artifacts\/[^\s]+_style\.(?:png|jpe?g|webp)\b/i))
+  ));
+  const designerOutputObserved = toolCalls.some((call) => (
+    call.phase === 'end'
+    && call.isError !== true
+    && Boolean(call.resultPreview?.match(/\/tmp\/openclaw\/designer\/[^\s]+\.(?:png|jpe?g|webp)\b/i))
+  ));
+  const artifactPublished = toolCalls.some((call) => (
+    call.phase === 'end' && call.toolName === 'artifact_publish' && call.isError !== true
+  ));
+  const failedDesignerCall = designerEnds.find(execCallFailed);
+  const designerFailure = failedDesignerCall?.resultPreview
+    ?.replace(/https?:\/\/\S+/g, '[redacted-url]')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 500);
+  return {
+    designerStarted: designerCallIds.size > 0 || designerOutputObserved,
+    designerFailed: designerEnds.length > 0
+      && designerEnds.every(execCallFailed)
+      && !designerOutputObserved
+      && !outputPrepared
+      && !artifactPublished,
+    outputPrepared,
+    artifactPublished,
+    designerFailure,
+  };
 }
 
 export interface StyleTurnStart {
@@ -122,7 +191,32 @@ export class HomeStyleRuntime {
     return { postedSeq };
   }
 
-  async startCompletionRecovery(conversation: ConversationHandle, request: StyleTurnRequest): Promise<StyleTurnStart> {
+  async startGenerationRecovery(conversation: ConversationHandle, request: StyleTurnRequest): Promise<StyleTurnStart> {
+    assertStyleTurnRequest(request);
+    if (conversation.agentId !== this.agentId) throw new Error('conversation belongs to a different Agent');
+    const postedSeq = await this.postTurnEvents(conversation.sessionId, [{
+      type: 'user.message',
+      idempotency_key: `${request.request_id}:generation-recovery`,
+      content: JSON.stringify({
+        runtime_contract: 'home-style-v1',
+        request_id: request.request_id,
+        recovery_instruction: [
+          'The preceding run stopped before invoking the Designer CLI and produced no image.',
+          'Resume the same request now from the prompt-compilation step. Invoke the Designer CLI exactly once using the original request, selected Skill, source image, raster arguments, and required artifact path already present in this session.',
+          'Do not repeat completed source inspection unless the local source file is missing. Do not call sessions_yield or message.',
+          'After generation, complete raster verification, visual QA, artifact publication when eligible, and return exactly one compact JSON object matching the original response schema as the final assistant text.',
+          'If Designer fails, return failed contract JSON with the actual generation failure summarized in warnings. Do not return an empty message, prose, or Markdown.',
+        ].join(' '),
+      }),
+    }]);
+    return { postedSeq };
+  }
+
+  async startCompletionRecovery(
+    conversation: ConversationHandle,
+    request: StyleTurnRequest,
+    artifactPublished = false,
+  ): Promise<StyleTurnStart> {
     assertStyleTurnRequest(request);
     if (conversation.agentId !== this.agentId) throw new Error('conversation belongs to a different Agent');
     const filename = `${request.home_id}_${request.request_id}_style.png`;
@@ -133,14 +227,20 @@ export class HomeStyleRuntime {
         runtime_contract: 'home-style-v1',
         request_id: request.request_id,
         recovery_instruction: [
-          'The preceding run ended after the Designer CLI produced an image but before it returned the required contract JSON.',
+          artifactPublished
+            ? 'The preceding run already published its generated image but did not return the required contract JSON.'
+            : 'The preceding run ended after the Designer CLI produced an image but before it returned the required contract JSON.',
           'Resume that same request now. Do not generate another image and do not rewrite the image prompt.',
-          'Use the most recent existing Designer output path from the preceding run and copy it to the required artifact path.',
+          artifactPublished
+            ? 'Reuse the artifact id from the preceding successful artifact_publish result. Do not call artifact_publish again.'
+            : 'Use the most recent existing Designer output path from the preceding run and copy it to the required artifact path.',
           `The required artifact path is /workspace/artifacts/${request.home_id}/${filename}.`,
           `Verify its raster with Pillow against ${request.source_raster.aspect_ratio} ${request.source_raster.orientation}; the intended Designer canvas is ${request.source_raster.designer_size}.`,
           'Compare the existing output visually with the already-downloaded source image for crop, camera, perspective, envelope, walls, ceiling, beams, columns, doors, windows, openings, and fixed service locations.',
-          'If every gate passes, call artifact_publish exactly once. Otherwise withhold the image.',
-          'Finish by returning exactly one compact JSON object matching the response schema from the preceding request. Return failed JSON even if the existing output is missing or unreadable. Do not return an empty message, prose, or Markdown.',
+          artifactPublished
+            ? 'Preserve the preceding publish decision and do not create a duplicate artifact.'
+            : 'If every gate passes, call artifact_publish exactly once. Otherwise withhold the image.',
+          'Finish by returning exactly one compact JSON object matching the response schema from the preceding request as final assistant text. Return failed JSON even if the existing output is missing or unreadable. Do not call sessions_yield or message. Do not return an empty message, prose, or Markdown.',
         ].join(' '),
       }),
     }]);
@@ -166,7 +266,7 @@ export class HomeStyleRuntime {
     raw: RawTurnResult,
   ): Promise<StyleTurnResult> {
     if (raw.outcome !== 'succeeded') throw new Error(`ZooWork run ended with status ${raw.outcome}`);
-    const response = parseStyleAgentResponse(raw.text);
+    const response = this.responseForTurn(request, raw);
     if (response.request_id !== request.request_id) throw new Error('Style response request_id does not match request');
     if (response.style_id !== request.style_id) throw new Error('Style response style_id does not match request');
     if (response.knowledge_version !== styleKnowledge(request.style_id).knowledgeVersion) {
@@ -189,6 +289,63 @@ export class HomeStyleRuntime {
     if (raw.cursor !== undefined) result.cursor = raw.cursor;
     if (raw.runId !== undefined) result.runId = raw.runId;
     return result;
+  }
+
+  private responseForTurn(request: StyleTurnRequest, raw: RawTurnResult): StyleAgentResponse {
+    const candidates = [
+      raw.text,
+      ...raw.toolCalls
+        .filter((call) => (
+          call.phase === 'end'
+          && call.resultPreview
+          && (call.resultPreview.includes(request.request_id) || call.resultPreview.includes('"contract_version"'))
+        ))
+        .slice()
+        .reverse()
+        .map((call) => call.resultPreview as string),
+    ];
+    let lastContractError: ContractValidationError | undefined;
+    let mismatch: string | undefined;
+    for (const candidate of candidates) {
+      try {
+        const response = parseStyleAgentResponse(candidate);
+        if (response.request_id !== request.request_id) {
+          mismatch = 'response request_id does not match request';
+          continue;
+        }
+        if (response.style_id !== request.style_id) {
+          mismatch = 'response style_id does not match request';
+          continue;
+        }
+        if (response.knowledge_version !== styleKnowledge(request.style_id).knowledgeVersion) {
+          mismatch = 'response knowledge_version does not match the deployed catalog';
+          continue;
+        }
+        return response;
+      } catch (error) {
+        if (error instanceof ContractValidationError) lastContractError = error;
+        else throw error;
+      }
+    }
+
+    const state = turnExecutionState(raw.toolCalls);
+    if (state.designerFailed) {
+      throw new Error(
+        state.designerFailure
+          ? `Designer image generation failed: ${state.designerFailure}`
+          : 'Designer image generation failed before producing a usable output',
+      );
+    }
+    const details = mismatch
+      ?? lastContractError?.details
+      ?? 'response contains no valid contract JSON object';
+    throw new StyleTurnContractError(
+      details,
+      state.designerStarted || state.outputPrepared || state.artifactPublished
+        ? 'finalize_existing'
+        : 'resume_generation',
+      state.artifactPublished,
+    );
   }
 
   async resolveArtifactUrl(artifactId: string): Promise<string> {
@@ -243,7 +400,7 @@ export class HomeStyleRuntime {
           'If the raster is missing, corrupt, or any immutable structure or camera geometry changed, do not publish it. Return status="failed", qa.publishable=false, and precise warnings.',
           'For a finish-enabled request, set qa.style_passed=false and withhold publication if the ceiling is blank or relies only on generic isolated downlights, major wall-finish opportunities remain visibly unresolved, the furniture is generic to any luxury style, the material hierarchy is absent, or the style is communicated only by one symbolic artwork or accessory.',
           'If structure and camera are preserved, all selected-Skill identity gates pass, and the style avoids all forbidden patterns, call artifact_publish exactly once. Return status="completed" and use the returned artifact id.',
-          'Return one compact JSON object matching response_schema immediately after the publish-or-withhold decision. Keep style_summary under 700 characters and every warning under 280 characters. Do not use Markdown fences, append an artifact link or filename after the JSON, or request another API key.',
+          'Return one compact JSON object matching response_schema immediately after the publish-or-withhold decision as final assistant text. Keep style_summary under 700 characters and every warning under 280 characters. Do not call sessions_yield or message. Do not use Markdown fences, append an artifact link or filename after the JSON, or request another API key.',
         ].join(' '),
       }),
     }];
@@ -272,6 +429,7 @@ export class HomeStyleRuntime {
           phase: call.phase,
           ...(call.toolName ? { toolName: call.toolName } : {}),
           ...(call.toolCallId ? { toolCallId: call.toolCallId } : {}),
+          ...(isDesignerGenerationCall(call) ? { purpose: 'designer_generation' as const } : {}),
           ...(call.isError !== undefined ? { isError: call.isError } : {}),
           ...(call.resultPreview ? { resultPreview: call.resultPreview } : {}),
         });
@@ -367,6 +525,7 @@ export class HomeStyleRuntime {
           phase: call.phase,
           ...(call.toolName ? { toolName: call.toolName } : {}),
           ...(call.toolCallId ? { toolCallId: call.toolCallId } : {}),
+          ...(isDesignerGenerationCall(call) ? { purpose: 'designer_generation' as const } : {}),
           ...(call.isError !== undefined ? { isError: call.isError } : {}),
           ...(call.resultPreview ? { resultPreview: call.resultPreview } : {}),
         });

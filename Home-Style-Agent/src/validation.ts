@@ -35,9 +35,7 @@ export function assertStyleAgentResponse(value: unknown): asserts value is Style
   assertWith<StyleAgentResponse>('StyleAgentResponse', responseValidator, value);
 }
 
-export function extractJsonObject(raw: string): unknown {
-  const start = raw.indexOf('{');
-  if (start < 0) throw new ContractValidationError('StyleAgentResponse', 'response contains no JSON object');
+function balancedJsonObject(raw: string, start: number): string | null {
   let depth = 0;
   let inString = false;
   let escaped = false;
@@ -53,19 +51,39 @@ export function extractJsonObject(raw: string): unknown {
     else if (char === '{') depth += 1;
     else if (char === '}') {
       depth -= 1;
-      if (depth === 0) {
-        try { return JSON.parse(raw.slice(start, index + 1)) as unknown; }
-        catch (error) {
-          throw new ContractValidationError('StyleAgentResponse', error instanceof Error ? error.message : String(error));
-        }
-      }
+      if (depth === 0) return raw.slice(start, index + 1);
     }
   }
-  throw new ContractValidationError('StyleAgentResponse', 'JSON object is not balanced');
+  return null;
+}
+
+export function extractJsonObjects(raw: string): unknown[] {
+  const objects: unknown[] = [];
+  for (let start = raw.indexOf('{'); start >= 0; start = raw.indexOf('{', start + 1)) {
+    const candidate = balancedJsonObject(raw, start);
+    if (!candidate) continue;
+    try { objects.push(JSON.parse(candidate) as unknown); }
+    catch { /* A later balanced object may still contain the contract. */ }
+  }
+  return objects;
+}
+
+export function extractJsonObject(raw: string): unknown {
+  const objects = extractJsonObjects(raw);
+  if (objects.length > 0) return objects[0];
+  if (!raw.includes('{')) throw new ContractValidationError('StyleAgentResponse', 'response contains no JSON object');
+  throw new ContractValidationError('StyleAgentResponse', 'response contains no parseable JSON object');
 }
 
 export function parseStyleAgentResponse(raw: string): StyleAgentResponse {
-  const parsed = extractJsonObject(raw);
-  assertStyleAgentResponse(parsed);
-  return parsed;
+  const objects = extractJsonObjects(raw);
+  for (const parsed of [...objects].reverse()) {
+    if (responseValidator(parsed)) return parsed as StyleAgentResponse;
+  }
+  if (objects.length === 0) {
+    if (!raw.includes('{')) throw new ContractValidationError('StyleAgentResponse', 'response contains no JSON object');
+    throw new ContractValidationError('StyleAgentResponse', 'response contains no parseable JSON object');
+  }
+  assertStyleAgentResponse(objects.at(-1));
+  throw new ContractValidationError('StyleAgentResponse', 'response contains no valid contract JSON object');
 }

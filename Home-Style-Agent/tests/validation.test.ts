@@ -114,3 +114,18 @@ test('extracts the response object from a fenced assistant message', () => {
   const parsed = parseStyleAgentResponse(`Result follows:\n\`\`\`json\n${JSON.stringify(validCompletedResponse)}\n\`\`\``);
   assert.deepEqual(parsed, validCompletedResponse);
 });
+
+test('skips unrelated JSON and returns the last valid response contract', () => {
+  const parsed = parseStyleAgentResponse([
+    'Tool receipt: {"artifactId":"art_unrelated"}',
+    `Final response: ${JSON.stringify(validCompletedResponse)}`,
+  ].join('\n'));
+  assert.deepEqual(parsed, validCompletedResponse);
+});
+
+test('finds a valid response contract inside a tool result wrapper', () => {
+  const parsed = parseStyleAgentResponse(
+    `Yielded — result follows. ${JSON.stringify(validCompletedResponse)}`,
+  );
+  assert.deepEqual(parsed, validCompletedResponse);
+});

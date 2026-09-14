@@ -101,6 +101,7 @@ export interface AgentToolTrace {
   phase: 'start' | 'end' | 'blocked';
   toolName?: string;
   toolCallId?: string;
+  purpose?: 'designer_generation';
   isError?: boolean;
   resultPreview?: string;
 }
