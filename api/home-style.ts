@@ -13,7 +13,7 @@ import {
   type StyleRoomType,
   type StyleTurnRequest,
 } from '../Home-Style-Agent/src/contracts.js';
-import { HomeStyleRuntime, HomeStyleTurnTimeoutError, styleKnowledge } from '../Home-Style-Agent/src/runtime.js';
+import { HomeStyleRuntime, HomeStyleTurnTimeoutError, STYLE_KNOWLEDGE, styleKnowledge } from '../Home-Style-Agent/src/runtime.js';
 import { inspectSourceRasterUrl } from '../Home-Style-Agent/src/source-raster.js';
 import { ContractValidationError } from '../Home-Style-Agent/src/validation.js';
 import { newId, objectBody, parseLocale, persistGeneratedImage, privateBlobUrl, requestPath, requireString, sendJson, temporaryBlobReadUrl } from './_lib/common.js';
@@ -320,7 +320,15 @@ export default async function handler(request: VercelRequest, response: VercelRe
       return;
     }
     if (request.method === 'GET' && path === 'health') {
-      sendJson(response, 200, { ok: true, runtime: 'vercel', storage: 'vercel-blob', extra_image_provider_key_required: false });
+      sendJson(response, 200, {
+        ok: true,
+        runtime: 'vercel',
+        storage: 'vercel-blob',
+        extra_image_provider_key_required: false,
+        knowledge_versions: Object.fromEntries(
+          Object.entries(STYLE_KNOWLEDGE).map(([styleId, knowledge]) => [styleId, knowledge.knowledgeVersion]),
+        ),
+      });
       return;
     }
     if (request.method !== 'POST') { sendJson(response, 405, { error: 'Method not allowed' }); return; }

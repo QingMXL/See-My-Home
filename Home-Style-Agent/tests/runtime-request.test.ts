@@ -39,6 +39,11 @@ test('sends authoritative raster geometry and an explicit Designer size', async 
   assert.match(payload.output_requirement, /server measured the source raster as 678x452/);
   assert.match(payload.output_requirement, /--size "1024x1536"/);
   assert.match(payload.output_requirement, /--aspect-ratio "2:3"/);
+  assert.match(payload.output_requirement, /resolve at least one major wall plane/);
+  assert.match(payload.output_requirement, /generic construction downlights as editable/);
+  assert.match(payload.output_requirement, /acrylic, cast resin, colored or smoked glass/);
+  assert.match(payload.output_requirement, /single symbolic artwork or accessory/);
+  assert.match(payload.output_requirement, /qa\.style_passed=false/);
   assert.match(payload.output_requirement, /Never inspect or print environment variables or credentials/);
   assert.doesNotMatch(payload.output_requirement, /detected from source_asset_ref through --aspect-ratio/);
 });

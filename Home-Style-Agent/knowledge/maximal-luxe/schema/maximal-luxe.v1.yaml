@@ -1,11 +1,11 @@
 schema_version: "1.0"
-knowledge_base_version: "0.1-research"
+knowledge_base_version: "0.2-production"
 style:
   id: maximal_luxe
   display_name: Maximal Luxe
   display_name_zh: 极繁奢华
   market: en-US
-  status: research
+  status: production
   tagline: Curated drama, rich color, and livable glamour.
   definition: >-
     A bold but edited residential language using saturated color, sculptural
@@ -57,12 +57,12 @@ composition:
   maximum_pattern_families_per_view: 2
   maximum_primary_focal_points_per_view: 1
   color_formula: [one_dominant_field_color, one_supporting_jewel_tone, one_neutral_breathing_color, one_metal_finish]
-  material_formula: [one_deep_matte_or_lacquered_envelope, one_expressive_stone_or_dark_timber_anchor, one_plush_textile_family, one_reflective_accent_family, one_art_or_collectible_focal_layer]
+  material_formula: [one_deep_matte_lacquered_or_patterned_textile_envelope, one_expressive_stone_or_dark_timber_anchor, one_plush_textile_family, one_reflective_accent_family, one_art_or_collectible_focal_layer, one_premium_new_material_counterpoint]
 
 vocabulary:
   space: [layered_residential_interior, edited_abundance, dramatic_focal_point, intimate_entertaining, clear_circulation]
   form: [sculptural_curves, bold_silhouettes, graphic_geometry, controlled_symmetry, jewel_like_details]
-  material: [lacquered_wood, dark_walnut, expressive_honed_marble, velvet, smoked_glass, antiqued_mirror, satin_brass]
+  material: [lacquered_wood, dark_walnut, expressive_honed_marble, velvet, mohair, patterned_silk, jacquard, smoked_glass, colored_glass, cast_resin, lucite_or_acrylic, antiqued_mirror, satin_brass]
   color: [aubergine, plum, oxblood, emerald, teal, ink_black, cream, warm_blush, brass]
   furnishing: [curved_sofa, channel_tufted_upholstery, statement_lounge_chair, layered_rug, large_scale_art]
   lighting: [statement_chandelier, jewel_like_sconces, warm_pools_of_light, picture_lighting, controlled_sparkle]
@@ -75,7 +75,14 @@ materials:
     - {id: velvet_or_mohair, finish: rich_low_sheen, avoid: [cheap_reflective_velvet, all_over_tufting]}
     - {id: smoked_glass_or_antiqued_mirror, maximum_focal_surfaces_per_view: 1, avoid: [mirror_ceiling, full_bright_mirror_wall]}
     - {id: satin_or_polished_brass, maximum_share: "approximately 5-10%", polished_requires_profile: eighties-socialite}
-  secondary: [silk_blend, jacquard, ceramic, colored_glass, graphic_wallpaper, dark_leather]
+  secondary: [silk_blend, patterned_silk, jacquard, shallow_upholstered_wall_panel, ceramic, colored_glass, cast_resin, lucite_or_acrylic, graphic_wallpaper, dark_leather, artistic_metal]
+
+surface_system:
+  major_wall_options: [controlled_lacquer, graphic_wallpaper, patterned_silk_or_jacquard, shallow_upholstered_textile_panel, dark_timber, single_expressive_stone_plane]
+  ceiling_options: [shallow_perimeter_cove, graphic_stepped_reveal, lacquered_inner_tray_finish, softly_patterned_inner_tray_finish]
+  lighting_options: [room_scaled_statement_chandelier_or_pendant, jewel_like_sconces, picture_lighting, controlled_accent_pools]
+  new_material_accents: [cast_resin, lucite_or_acrylic, smoked_or_colored_glass, lacquer, artistic_metal]
+  rules: [resolve_one_major_wall_when_editable, use_only_one_new_material_counterpoint, replace_or_integrate_generic_construction_downlights, never_change_structural_ceiling_geometry]
 
 color_system:
   dominant: {target_share: "approximately 40-50%", colors: [cream, warm_taupe, soft_black, single_deep_field_color]}
@@ -135,7 +142,7 @@ style_evaluation:
   scoring_range_per_dimension: [0, 4]
   publish_threshold: 22
   dimensions: [dramatic_focal_hierarchy, controlled_color_richness, pattern_scale_coordination, material_tension_and_quality, residential_comfort, collected_identity_without_clutter, differentiation_from_palace_nightclub_and_stage_set]
-  hard_fail: [immutable_architecture_changed, camera_or_crop_changed, palace_nightclub_or_stage_set_dominates, no_visual_rest, impossible_kitchen_or_bathroom_services, blocked_circulation]
+  hard_fail: [immutable_architecture_changed, camera_or_crop_changed, palace_nightclub_or_stage_set_dominates, no_visual_rest, cheap_plastic_or_fake_luxury_materials, finish_enabled_result_has_blank_ceiling_or_only_isolated_downlights, finish_enabled_result_leaves_major_wall_unresolved, impossible_kitchen_or_bathroom_services, blocked_circulation]
 
 retrieval:
   required_keys: [style_id, profile, room_type, renovation_level]

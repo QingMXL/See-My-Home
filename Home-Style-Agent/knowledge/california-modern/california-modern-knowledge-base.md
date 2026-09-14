@@ -1,4 +1,4 @@
-# California Modern｜加州现代风格知识库 v0.1
+# California Modern｜加州现代风格知识库 v0.2
 
 ## 0. 定义与研究边界
 
@@ -55,7 +55,7 @@ California Modern creates a sunlit, relaxed home through clean architectural lin
 - 低到中等视觉重心，让窗、庭院或真实景观继续可见。
 - 开放空间用地毯、沙发背、餐桌和吊灯软性分区，避免新造墙体。
 - 家具布置自然偏心，可有一个复古焦点和一个舒适主坐席。
-- 保留 35–50% 的视觉休息面；墙面不需要全部挂满。
+- 保留 35–50% 的视觉休息面；整体家具与饰面完成度达到 50–65%，墙面不需要全部挂满但不能全部留白。
 - 线条简洁，但用圆角桌、软包沙发、编织物平衡过硬几何。
 
 ### 2.3 材质组合公式
@@ -66,15 +66,16 @@ California Modern creates a sunlit, relaxed home through clean architectural lin
 1 warm mineral envelope
 + 1 dominant natural wood
 + 1 grounded stone or terracotta surface
-+ 2 tactile textiles
++ 3 tactile textiles
 + 1 restrained dark or aged-metal accent
++ optional cast-resin, translucent-acrylic or colored-glass accent
 ```
 
 不要在同一视图同时竞争性使用多种木色、多种强纹石材和多套图案。
 
 ### 2.4 装饰密度
 
-- 默认视觉密度：35–50%。
+- 默认视觉密度：50–65%。
 - 开放架每层保留约 30–40% 空隙。
 - 单个视图最多 1 组主图案、1 组辅图案。
 - 植物 1–3 株，优先真实尺度橄榄树、橡胶树、枝条或庭院绿意，不做热带丛林。
@@ -107,9 +108,9 @@ California Modern creates a sunlit, relaxed home through clean architectural lin
 
 - 空间：`sunlit`, `open yet grounded`, `indoor-outdoor continuity`, `unforced zoning`, `residential scale`
 - 造型：`clean planes`, `softened geometry`, `low horizontal lines`, `relaxed asymmetry`, `simple built-ins`
-- 材质：`limewash`, `warm white oak`, `aged oak`, `honed limestone`, `terracotta`, `handmade ceramic`, `linen`, `wool`
+- 材质：`limewash`, `grasscloth`, `woven linen wallcovering`, `warm white oak`, `aged oak`, `burl wood`, `honed limestone`, `terracotta`, `linen`, `wool`, `cast resin`, `translucent acrylic`, `smoked or colored glass`
 - 色彩：`sun-washed white`, `sand`, `oatmeal`, `warm greige`, `honey wood`, `sage`, `clay`, `charcoal accent`
-- 软装：`deep comfortable sofa`, `vintage accent chair`, `hand-knotted rug`, `casual drapery`, `collected ceramics`
+- 软装：`deep comfortable sofa`, `non-matching sling, leather, cane or sculptural chair`, `substantial burl, aged-oak, stone or resin table`, `hand-knotted rug`, `casual drapery`, `collected ceramics`
 - 灯光：`abundant natural light`, `warm ambient light`, `soft wall wash`, `simple sculptural pendant`, `low glare`
 
 ### 4.2 推荐家具与构件标签
@@ -119,6 +120,7 @@ California Modern creates a sunlit, relaxed home through clean architectural lin
 - 落地亚麻窗帘、手结羊毛地毯、低矮木边柜、开放但克制的书架。
 - 简洁实木柜门、薄石台面、陶土或天然石地面、已有木梁的修复表达。
 - 手工陶器、编织篮、书、枝条与少量抽象艺术。
+- Finish-enabled 任务至少完成一面石灰基、草编/亚麻墙布、浅橡木、浅软包或手工砖主要墙面，并配合浅灯槽、间接光和雕塑灯具完成天花。
 
 ### 4.3 禁用／负向标签
 
@@ -155,6 +157,8 @@ edit finishes, furnishings, lighting and decor only within the approved scope
 | Wool / boucle | 奶油、燕麦、焦糖、触感柔和 | 全部家具同一种 boucle |
 | Leather | 鞍棕、烟草色、有自然包浆 | 黑亮皮革套装 |
 | Aged brass / blackened metal | 小比例、低光泽 | 镜面金、工业黑框泛滥 |
+| Cast resin / translucent acrylic | 一件茶几、边几、灯座或对象，色温温暖 | 廉价透明塑料、成套亚克力家具 |
+| Smoked / colored glass | 一件灯具、边几或屏风细节 | 冷商业展柜、大面积玻璃家具 |
 
 ## 6. 色彩系统
 
@@ -212,7 +216,7 @@ edit finishes, furnishings, lighting and decor only within the approved scope
 ### 7.5 毛坯房输入
 
 - 先把现有几何视为不可变基底；不擅自补窗、抬高层高或新造壁炉。
-- 完成地面、墙面、照明、必要柜体和家具，但保留普通住宅尺度。
+- 完成地面、主要墙面、浅层天花、间接光/装饰灯、必要柜体、成组家具和至少三层织物，但保留普通住宅尺度。
 - 若自然光弱，使用暖白墙、浅木与分层照明改善感受，而不是虚构强阳光。
 
 ## 8. Style Agent 接口边界
@@ -243,6 +247,7 @@ edit finishes, furnishings, lighting and decor only within the approved scope
 - 凭空增加壁炉、梁、拱门、露台或景观。
 - 明显 Farmhouse、nautical coastal 或 boho theme。
 - 家具堵塞动线、厨房卫浴功能位置不可信。
+- Finish-enabled 结果仍为大面积空米白墙、空白天花或只有孤立筒灯，家具仍像成套地产样板房。
 
 ## 10. 研究结论
 

@@ -1,11 +1,11 @@
 schema_version: "1.0"
-knowledge_base_version: "0.1-research"
+knowledge_base_version: "0.2-production"
 style:
   id: california_modern
   display_name: California Modern
   display_name_zh: 加州现代
   market: en-US
-  status: research
+  status: production
   tagline: Sunlit, natural, relaxed modern living.
   definition: >-
     A contemporary residential language rooted in natural light, indoor-outdoor
@@ -51,19 +51,20 @@ style_dna:
   forbidden: [farmhouse_theme, nautical_coastal_theme, boho_overload, all_pale_wood_japandi, architecture_change_without_explicit_scope]
 
 composition:
-  target_visual_density: "35-50%"
-  visual_rest_target: "50-65%"
+  target_visual_density: "50-65%"
+  visual_rest_target: "35-50%"
   maximum_pattern_families_per_view: 2
   maximum_primary_focal_points_per_view: 1
   plant_count_guidance: "1-3 realistically scaled plants"
-  material_formula: [one_warm_mineral_envelope, one_dominant_natural_wood, one_grounded_stone_or_terracotta_surface, two_tactile_textiles, one_restrained_dark_or_aged_metal_accent]
+  material_formula: [one_warm_mineral_or_woven_envelope, one_dominant_natural_wood, one_grounded_stone_or_terracotta_surface, three_tactile_textiles, one_restrained_dark_or_aged_metal_accent, optional_new_material_accent]
+  furniture_formula: [one_deep_comfortable_sofa_or_bed, one_or_two_non_matching_vintage_inspired_or_handcrafted_counterpoints, one_substantial_wood_stone_or_resin_table, relaxed_full_height_window_treatment]
 
 vocabulary:
   space: [sunlit, open_yet_grounded, indoor_outdoor_continuity, unforced_zoning, residential_scale]
   form: [clean_planes, softened_geometry, low_horizontal_lines, relaxed_asymmetry, simple_built_ins]
-  material: [limewash, warm_white_oak, aged_oak, honed_limestone, terracotta, linen, wool]
+  material: [limewash, grasscloth, woven_linen_wallcovering, warm_white_oak, aged_oak, burl_wood, honed_limestone, travertine, terracotta, linen, wool, boucle, saddle_leather, cast_resin, translucent_acrylic, smoked_or_colored_glass]
   color: [sun_washed_white, sand, oatmeal, warm_greige, honey_wood, sage, clay, charcoal_accent]
-  furnishing: [deep_comfortable_sofa, vintage_accent_chair, hand_knotted_rug, casual_drapery, collected_ceramics]
+  furnishing: [deep_comfortable_sofa, non_matching_sling_leather_cane_or_sculptural_chair, substantial_burl_aged_oak_stone_or_resin_table, hand_knotted_rug, casual_drapery, collected_ceramics]
   lighting: [abundant_natural_light, warm_ambient_light, soft_wall_wash, simple_sculptural_pendant, low_glare]
 
 materials:
@@ -73,7 +74,22 @@ materials:
     - {id: aged_oak, finish: authentic_light_patina, maximum_role: accent_or_single_furniture_family}
     - {id: honed_limestone_or_travertine, finish: quiet_honed, maximum_focal_surfaces_per_view: 1}
     - {id: terracotta_or_saltillo, finish: matte_warm_earth, gates: [profile_or_source_context_supports]}
-  secondary: [walnut, handmade_tile, linen, wool, boucle, saddle_leather, aged_brass, blackened_metal]
+  secondary: [walnut, burl_wood, grasscloth, woven_linen_wallcovering, upholstered_textile_panel, handmade_tile, linen, wool, boucle, saddle_leather, aged_brass, blackened_metal]
+  accents:
+    - id: cast_resin_or_translucent_acrylic
+      use: [single_coffee_or_side_table, lamp_base, sculptural_object]
+      maximum_share: "approximately 5%"
+      avoid: [cold_clear_plastic, novelty_furniture]
+    - id: smoked_or_colored_glass_or_perforated_metal
+      use: [single_light, side_piece, screen_detail]
+      maximum_focal_objects_per_view: 1
+
+surface_system:
+  major_wall_options: [warm_limewash, mineral_plaster, grasscloth, woven_linen_wallcovering, shallow_white_oak_panel, restrained_upholstered_textile_panel, handmade_tile_in_wet_or_service_zone]
+  pattern_options: [quiet_woven_stripe, tonal_geometric, small_scale_naturalistic_pattern]
+  ceiling_options: [shallow_plaster_cove, slim_perimeter_reveal, limited_warm_oak_inset, continuous_warm_indirect_light]
+  lighting_options: [linen_or_parchment_pendant, frosted_glass_fixture, carved_wood_or_woven_fixture, wall_wash, task_or_face_level_light]
+  rules: [resolve_at_least_one_major_wall_when_editable, replace_or_integrate_generic_construction_downlights, never_change_structural_ceiling_geometry]
 
 color_system:
   dominant: {target_share: "approximately 60%", colors: [sun_washed_white, warm_ivory, sand, light_greige]}
@@ -106,8 +122,8 @@ renovation_levels:
 
 room_recipes:
   living_room:
-    required: [deep_comfortable_sofa, non_matching_accent_seating, correctly_sized_rug, clear_circulation]
-    preferred: [existing_view_or_art_as_focal_point, restrained_ceramics, one_realistic_plant]
+    required: [deep_comfortable_sofa, non_matching_sling_leather_cane_or_sculptural_seating, substantial_wood_stone_or_resin_table, correctly_sized_rug, clear_circulation]
+    preferred: [existing_view_or_art_as_focal_point, artisanal_floor_lamp, grouped_ceramics, one_realistic_plant]
     avoid: [invented_fireplace, matching_set, blocked_window, lobby_layout]
   primary_bedroom:
     required: [calm_layering, functional_bedside_surfaces, breathable_bedding, warm_low_glare_light]
@@ -133,7 +149,15 @@ style_evaluation:
   scoring_range_per_dimension: [0, 4]
   publish_threshold: 22
   dimensions: [natural_light_response, contextual_continuity, warm_material_authenticity, residential_comfort, curated_old_new_layering, visual_edit_discipline, differentiation_from_adjacent_styles]
-  hard_fail: [immutable_architecture_changed, camera_or_crop_changed, invented_architecture, farmhouse_coastal_or_boho_theme, impossible_kitchen_or_bathroom_services, blocked_circulation]
+  hard_fail: [immutable_architecture_changed, camera_or_crop_changed, invented_architecture, farmhouse_coastal_or_boho_theme, generic_beige_or_matching_set_result, finish_enabled_result_has_blank_ceiling_or_only_isolated_downlights, finish_enabled_result_leaves_major_wall_unresolved, impossible_kitchen_or_bathroom_services, blocked_circulation]
+  identity_gate:
+    minimum_families_present: 5
+    families:
+      light_and_envelope: [sunlit_response, warm_mineral_or_woven_wall, indoor_outdoor_or_contextual_continuity]
+      furniture_mix: [deep_comfortable_primary_piece, non_matching_vintage_or_handcrafted_counterpoint, substantial_table]
+      natural_materials: [one_coherent_oak_family, one_honed_stone_or_terracotta_note, three_tactile_textile_layers]
+      crafted_detail: [collected_ceramics_or_timbers, aged_metal, optional_warm_new_material_accent]
+      designed_ceiling_and_light: [shallow_reveal_or_cove, sculptural_fixture, wall_wash_task_or_face_level_light]
 
 retrieval:
   required_keys: [style_id, profile, room_type, renovation_level]

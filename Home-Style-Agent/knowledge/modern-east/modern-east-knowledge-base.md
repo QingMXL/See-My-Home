@@ -1,4 +1,4 @@
-# Modern East｜摩登东方风格知识库 v0.2
+# Modern East｜摩登东方风格知识库 v0.3
 
 ## 0. 定义与研究边界
 
@@ -68,6 +68,7 @@ Modern East 是一种以现代主义空间和家具语言承载东方审美意�
 
 #### 留白与密度
 
+- 默认视觉密度 50–65%，留白必须是围绕完整家具组、材质、艺术与照明的主动构图，不得成为空置感。
 - 每个主要墙面最多一个主艺术锚点。
 - 开放搁架保持低密度，不摆满成套瓷器或仿古收藏。
 - 茶几表面保留大面积空面，只放 1–3 组对象。
@@ -75,11 +76,18 @@ Modern East 是一种以现代主义空间和家具语言承载东方审美意�
 
 #### 材质组合
 
-- 一个画面建议采用 `1 个主木色 + 1 个主石色 + 1 个织物家族 + 少量金属`。
+- 一个画面建议采用 `1 个主木色 + 1 个主石色 + 3 层织物 + 少量金属 + 可选的新材料点缀`。
 - 深木适合框架、门套、局部墙板和柜体；不要把全屋做成亮面深红木。
 - 石材优先哑光或柔光，纹理为中低对比；强纹理石材只用于一个焦点。
 - 金属是线、边、节点或灯具，避免大面积镜面金色覆面。
 - 玻璃用于通透和层次，优先压花、长虹、烟熏或夹绢效果，避免商业展示柜感。
+- 可将茶色亚克力、浇铸树脂、手工漆面或有色玻璃用于一件边几、灯座或小型艺术对象，作为当代张力；禁止廉价透明塑料感。
+
+#### 家具谱系与饰面完成度
+
+- 舒适的当代主座椅之外，每个主要起居空间至少加入一件抽象化现代明式轮廓：圈椅/官帽椅线索的休闲椅、榫接感凳/长凳或桥式边几，但不得复制古典家具套装。
+- Finish-enabled 任务至少完成一面主要墙体：矿物涂料、丝麻墙布、克制的水波/笔触/云气提花、浅软包、深木基准或一处柔光石材。
+- 东方感必须由家具谱系、饰面、器物、抽象艺术和灯光共同建立；一幅古风画或一个花瓶不能单独承担风格。
 
 #### 东方表达
 
@@ -132,7 +140,7 @@ Modern East 是一种以现代主义空间和家具语言承载东方审美意�
 
 #### 材质
 
-`matte dark oak`、`smoked walnut`、`warm pale oak`、`honed limestone`、`quiet-veined marble`、`mineral plaster`、`textured wallcovering`、`reeded glass`、`satin bronze`、`blackened metal`、`linen`、`wool`、`bouclé`
+`matte dark oak`、`smoked walnut`、`warm pale oak`、`honed limestone`、`quiet-veined marble`、`mineral plaster`、`woven silk or linen wallcovering`、`shallow upholstered textile panel`、`reeded glass`、`satin bronze`、`blackened metal`、`linen`、`wool`、`bouclé`、`tea-smoked acrylic`、`cast resin`、`hand-finished lacquer`、`colored glass`
 
 #### 色彩
 
@@ -140,7 +148,7 @@ Modern East 是一种以现代主义空间和家具语言承载东方审美意�
 
 #### 软装
 
-`low-profile tailored seating`、`tactile neutral upholstery`、`one abstract artwork`、`handcrafted ceramic object`、`natural branch arrangement`、`layered neutral rug`、`curated objects with breathing room`
+`tailored contemporary seating`、`abstracted Ming-derived yoke-back chair`、`abstracted horseshoe-back lounge chair`、`restrained joinery stool or bench`、`bridged-frame side table`、`ink-wash abstract artwork`、`celadon or smoky-glazed vessel`、`natural branch arrangement`、`layered neutral rug`
 
 #### 灯光
 
@@ -151,6 +159,9 @@ Modern East 是一种以现代主义空间和家具语言承载东方审美意�
 - `low but conventionally scaled sofa`
 - `rounded modular sofa`
 - `slender lounge chair with dark timber frame`
+- `abstracted Ming-derived yoke-back or horseshoe-back lounge chair`
+- `restrained joinery stool or bench`
+- `bridged-frame side table`
 - `round or softly oval dining table`
 - `simple dining chair with upholstered seat and visible frame`
 - `monolithic stone or dark timber coffee table`
@@ -220,6 +231,7 @@ do not enlarge the room or convert it into a hotel, gallery or showroom
 | 织物 | 亚麻、羊毛、羊羔绒、低光泽混纺、麂皮感面料 | 以米灰、灰褐、炭灰为主，强调触感。 | 高亮缎面、密集传统纹样。 |
 | 皮革 | 哑光暖灰、深棕或黑色皮革 | 小比例用于椅子、桌面或收边。 | 橙亮皮革大面积使用。 |
 | 艺术与器物 | 抽象水墨、陶、石、木、现代雕塑 | 1–3 件成组，轮廓和材质优先于文化符号。 | 仿古大件、成套瓷器陈列。 |
+| 新材料点缀 | 茶色亚克力、浇铸树脂、手工漆面、有色玻璃 | 仅用于一件边几、灯座或小型艺术对象，制造当代张力。 | 廉价透明塑料、荧光树脂、成套亚克力家具。 |
 
 ---
 
@@ -266,6 +278,7 @@ do not enlarge the room or convert it into a hotel, gallery or showroom
 - 沙发低重心但坐高正常；优先米灰、灰褐、炭灰，避免全套同品牌展示感。
 - 主茶几可为石材或深木，造型简洁、略带雕塑感。
 - 一个主艺术作品、一株结构清晰的植物、少量器物足够。
+- 至少一件现代明式轮廓椅/凳/边几，并用青瓷、烟熏釉、黑陶或石质器物与抽象水墨共同完成东方层次。
 - 电视存在时应融入深木/浅石背景，不为了“风格感”删除电视或壁炉。
 - 小客厅不使用巨型吊灯、双客厅或大面积镜面石材。
 
@@ -356,6 +369,7 @@ style_id + profile + room_type + renovation_level + room_size_band + daylight_le
 - 将普通住宅改成酒店大堂、会所、展厅或奢侈品店。
 - 厨卫设备位置和连接关系明显不可能。
 - 家具堵门、堵窗、堵通道或尺寸失真。
+- Finish-enabled 结果仍是空白天花/仅有孤立筒灯，主要墙面未完成，或只靠单幅古风画/单个花瓶表达东方感。
 
 ---
 
