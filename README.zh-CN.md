@@ -4,10 +4,7 @@
   <p>面向独立室内设计师及其客户的 AI 家居设计可视化工作区。</p>
   <p><a href="./README.md">English</a> · <strong>中文</strong></p>
 </div>
-
-<p align="center">
-  <img src="./docs/home.png" alt="See My Home 产品首页" width="100%" />
-</p>
+<div align="center"><img src="./docs/see-my-home-homepage-cn.png" alt="See My Home 中文产品首页" width="100%" /></div>
 
 ## See My Home 是什么？
 
