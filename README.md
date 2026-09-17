@@ -4,10 +4,7 @@
   <p>An AI-powered home-design visualization workspace for independent interior designers and their clients.</p>
   <p><strong>English</strong> · <a href="./README.zh-CN.md">中文</a></p>
 </div>
-
-<p align="center">
-  <img src="./docs/home.png" alt="See My Home product homepage" width="100%" />
-</p>
+<div align="center"><img src="./docs/see-my-home-homepage-cn.png" alt="See My Home product homepage in Chinese" width="100%" /></div>
 
 ## What is See My Home?
 
